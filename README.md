@@ -79,6 +79,28 @@ cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/install/dir -DOKULAR_UI=desktop ..
 ```
 Available options are `desktop`, `mobile`, and `both`.
 
+### Single-file Linux AppImage
+
+To make one file that runs without Qt or KDE Frameworks installed on the target
+machine, build Okular's core, part, and generators as static libraries, then
+bundle the remaining runtime libraries:
+
+```bash
+cmake -S . -B build \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DBUILD_TESTING=OFF \
+  -DFORCE_NOT_REQUIRED_DEPENDENCIES='KF6Wallet;KF6DocTools;Qt6Qml;Qt6TextToSpeech;KF6Purpose;Qt6::MultimediaWidgets;Poppler;Freetype;TIFF;LibSpectre;KExiv2Qt6;DjVuLibre;EPub;QMobiPocket6;Discount'
+LINUXDEPLOY=/path/to/linuxdeploy APPIMAGETOOL=/path/to/appimagetool \
+  cmake --build build --target appimage
+```
+
+The script needs `qmake6`, [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy),
+and [appimagetool](https://github.com/AppImage/appimagetool). The CMake target
+builds Okular and creates `build/appimage/Okular-bundled-x86_64.AppImage`.
+The AppImage bundles Qt and KDE shared libraries; they are not statically
+linked. Build it on the oldest Linux distribution you intend to support, since
+the host glibc remains a runtime requirement.
+
 ### Android APK
 
 With Docker, an initialized Android Craft root next to the main checkout (`craft-kde-android`), Android SDK build tools 36.0.0, and an Android debug keystore, build and sign the arm64 APK with:

@@ -2299,7 +2299,13 @@ QList<KPluginMetaData> DocumentPrivate::availableGenerators()
 {
     static QList<KPluginMetaData> result;
     if (result.isEmpty()) {
+#ifdef OKULAR_STATIC_LIBRARIES
+        result = KPluginMetaData::findPlugins(QStringLiteral("okular_generators"), [](const KPluginMetaData &metadata) {
+            return metadata.isStaticPlugin();
+        });
+#else
         result = KPluginMetaData::findPlugins(QStringLiteral("okular_generators"));
+#endif
     }
     return result;
 }

@@ -18,3 +18,4 @@ This is Okular, a human-maintained KDE document viewer. Keep changes small, read
 ## Communication
 
 - Reply to the repository owner in concise Chinese. Keep technical terms in English when the Chinese translation is awkward or less clear.
+- Write all text posted to GitHub in English, including issue titles, descriptions, and comments; pull or merge request titles, descriptions, reviews, and comments; and commit messages. Do not post Chinese or bilingual versions.

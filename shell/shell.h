@@ -29,7 +29,7 @@
 
 #include "welcomescreen.h"
 
-class Sidebar;
+class ShellSidebar;
 class KRecentFilesAction;
 class KToggleAction;
 class QTabWidget;
@@ -179,7 +179,7 @@ private:
     KToggleAction *m_openInTab;
     WelcomeScreen *m_welcomeScreen;
     QStackedWidget *m_centralStackedWidget;
-    Sidebar *m_sidebar = nullptr;
+    ShellSidebar *m_sidebar = nullptr;
 
     struct TabState {
         explicit TabState(KParts::ReadWritePart *p)

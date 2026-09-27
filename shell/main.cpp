@@ -24,6 +24,7 @@
 #include <QCommandLineParser>
 #include <QFileOpenEvent>
 #include <QObject>
+#include <QResource>
 #include <QStringList>
 #include <QTextStream>
 #include <QtGlobal>
@@ -65,6 +66,10 @@ protected:
 
 int main(int argc, char **argv)
 {
+#ifdef OKULAR_STATIC_LIBRARIES
+    Q_INIT_RESOURCE(builtin);
+    Q_INIT_RESOURCE(part);
+#endif
     /**
      * trigger initialisation of proper icon theme
      */

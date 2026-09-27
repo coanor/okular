@@ -25,6 +25,7 @@
 #include <KLocalizedString>
 #include <KMessageBox>
 #include <KPluginFactory>
+#include <KPluginMetaData>
 #include <KRecentFilesAction>
 #include <KSharedConfig>
 #include <KStandardAction>
@@ -103,12 +104,12 @@ public:
  * allowing the user to dock it to the left and right sides of the window,
  * or detach it from the window altogether.
  */
-class Sidebar : public QDockWidget
+class ShellSidebar : public QDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit Sidebar(QWidget *parent = nullptr)
+    explicit ShellSidebar(QWidget *parent = nullptr)
         : QDockWidget(parent)
     {
         setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
@@ -195,7 +196,15 @@ Shell::Shell(const QString &serializedOptions)
     // name which is a bad idea usually.. but it's alright in this
     // case since our Part is made for this Shell
 
-    const auto result = KPluginFactory::loadFactory(KPluginMetaData(QStringLiteral("kf6/parts/okularpart")));
+#ifdef OKULAR_STATIC_LIBRARIES
+    const auto staticParts = KPluginMetaData::findPlugins(QStringLiteral("kf6/parts"), [](const KPluginMetaData &metadata) {
+        return metadata.pluginId() == QStringLiteral("okularpart") && metadata.isStaticPlugin();
+    });
+    const auto partMetaData = staticParts.isEmpty() ? KPluginMetaData() : staticParts.constFirst();
+#else
+    const KPluginMetaData partMetaData(QStringLiteral("kf6/parts/okularpart"));
+#endif
+    const auto result = KPluginFactory::loadFactory(partMetaData);
 
     if (!result) {
         // if we couldn't find our Part, we exit since the Shell by
@@ -241,7 +250,7 @@ Shell::Shell(const QString &serializedOptions)
         connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, &Shell::closeTab);
         connect(m_tabWidget->tabBar(), &QTabBar::tabMoved, this, &Shell::moveTabData);
 
-        m_sidebar = new Sidebar;
+        m_sidebar = new ShellSidebar;
         m_sidebar->setObjectName(QStringLiteral("okular_sidebar"));
         m_sidebar->setContextMenuPolicy(Qt::ActionsContextMenu);
         m_sidebar->setWindowTitle(i18n("Sidebar"));
@@ -620,7 +629,7 @@ void Shell::setupActions()
     m_lockSidebarAction->setCheckable(true);
     m_lockSidebarAction->setIcon(QIcon::fromTheme(QStringLiteral("lock")));
     m_lockSidebarAction->setText(i18n("Lock Sidebar"));
-    connect(m_lockSidebarAction, &QAction::triggered, m_sidebar, &Sidebar::setLocked);
+    connect(m_lockSidebarAction, &QAction::triggered, m_sidebar, &ShellSidebar::setLocked);
     m_sidebar->addAction(m_lockSidebarAction);
 }
 
@@ -910,7 +919,7 @@ void Shell::setActiveTab(int tab)
     Q_ASSERT(m_showSidebarAction);
     m_showSidebarAction->disconnect(m_sidebar);
     m_showSidebarAction->setChecked(m_sidebar->isVisibleTo(this));
-    connect(m_showSidebarAction, &QAction::triggered, m_sidebar, &Sidebar::setVisible);
+    connect(m_showSidebarAction, &QAction::triggered, m_sidebar, &ShellSidebar::setVisible);
 
     m_printAction->setEnabled(m_tabs[tab].printEnabled);
     m_closeAction->setEnabled(m_tabs[tab].closeEnabled);

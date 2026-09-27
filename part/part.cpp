@@ -189,7 +189,7 @@ private:
 };
 #endif
 
-K_PLUGIN_FACTORY_WITH_JSON(OkularPartFactory, "okular_part.json", registerPlugin<Okular::Part>();)
+K_PLUGIN_FACTORY_WITH_JSON(okularpart_factory, "okular_part.json", registerPlugin<Okular::Part>();)
 
 static QAction *actionForExportFormat(const Okular::ExportFormat &format, QObject *parent = Q_NULLPTR)
 {

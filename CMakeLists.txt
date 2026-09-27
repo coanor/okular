@@ -8,6 +8,8 @@ set (RELEASE_SERVICE_VERSION "${RELEASE_SERVICE_VERSION_MAJOR}.${RELEASE_SERVICE
 
 project(okular VERSION ${RELEASE_SERVICE_VERSION})
 
+option(BUILD_SHARED_LIBS "Build Okular libraries and plugins as shared libraries" ON)
+
 set(QT_REQUIRED_VERSION "6.6.0") # Remember to update the QT_DEPRECATED_WARNINGS_SINCE below
 set(KF_REQUIRED_VERSION "5.240.0") # Remember to update the KF_DEPRECATED_WARNINGS_SINCE below
 
@@ -419,7 +421,10 @@ ki18n_wrap_ui(okularcore_SRCS
 
 kconfig_add_kcfg_files(okularcore_SRCS GENERATE_MOC conf/settings_core.kcfgc)
 
-add_library(okularcore SHARED ${okularcore_SRCS})
+add_library(okularcore ${okularcore_SRCS})
+if(NOT BUILD_SHARED_LIBS)
+    target_compile_definitions(okularcore PRIVATE OKULAR_STATIC_LIBRARIES)
+endif()
 generate_export_header(okularcore BASE_NAME okularcore EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/core/okularcore_export.h")
 target_include_directories(okularcore PUBLIC "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}>")
 
@@ -589,7 +594,11 @@ endif()
 
 kconfig_add_kcfg_files(okularpart_SRCS GENERATE_MOC conf/settings.kcfgc)
 
-add_library(okularpart SHARED ${okularpart_SRCS})
+if(BUILD_SHARED_LIBS)
+    add_library(okularpart SHARED ${okularpart_SRCS})
+else()
+    kcoreaddons_add_plugin(okularpart STATIC INSTALL_NAMESPACE "kf6/parts" SOURCES ${okularpart_SRCS})
+endif()
 generate_export_header(okularpart BASE_NAME okularpart)
 
 target_link_libraries(okularpart okularcore
@@ -631,10 +640,17 @@ if (Qt6TextToSpeech_FOUND)
 endif()
 
 #instead install the part to this path so it can be found
-install(TARGETS okularpart DESTINATION ${KDE_INSTALL_PLUGINDIR}/kf6/parts/ )
+if(BUILD_SHARED_LIBS)
+    install(TARGETS okularpart DESTINATION ${KDE_INSTALL_PLUGINDIR}/kf6/parts/ )
+endif()
 
 endif()# End of BUILD_DESKTOP if
 
+if(NOT BUILD_SHARED_LIBS AND BUILD_DESKTOP)
+    target_compile_definitions(okular PRIVATE OKULAR_STATIC_LIBRARIES)
+    kcoreaddons_target_static_plugins(okular TARGETS okularpart)
+    kcoreaddons_target_static_plugins(okular NAMESPACE "okular_generators")
+endif()
 
 ########### install files ###############
 

@@ -147,6 +147,7 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
         if (m_questionSubmitted) {
             m_conversation = m_beforeRequest;
             m_questionSubmitted = false;
+            m_prompt->setPlainText(m_pendingMessage.content);
             if (AiProfile *profile = currentProfile()) {
                 AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
             }
@@ -175,7 +176,6 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
         if (AiProfile *profile = currentProfile()) {
             saved = AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
         }
-        m_prompt->clear();
         m_selection.clear();
         m_selectionLabel->hide();
         renderConversation();
@@ -186,6 +186,7 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
         if (m_questionSubmitted) {
             m_conversation = m_beforeRequest;
             m_questionSubmitted = false;
+            m_prompt->setPlainText(m_pendingMessage.content);
             if (AiProfile *profile = currentProfile()) {
                 AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
             }
@@ -449,6 +450,7 @@ void AiReadingAssistant::submitQuestion(const QString &pageImage)
     m_pendingMessage.pageImage = pageImage;
     m_conversation.messages.append(m_pendingMessage);
     AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
+    m_prompt->clear();
     renderConversation();
     showStatus(i18n("Waiting for %1…", profile->name));
     m_provider.send(*profile, m_conversation, m_pendingMessage);
@@ -510,4 +512,5 @@ void AiReadingAssistant::updateControls()
     m_send->setEnabled(!busy && m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
     m_cancel->setEnabled(busy);
     m_profileCombo->setEnabled(!busy);
+    m_prompt->setEnabled(!busy);
 }

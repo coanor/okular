@@ -42,10 +42,18 @@ docker run --rm "${docker_mounts[@]}" \
     -e GRADLE_USER_HOME=/home/user/CraftRoot/gradle-home \
     -e "OKULAR_SOURCE_DIR=$container_source" \
     "$image" bash -euo pipefail -c '
+        set +u
         source /home/user/CraftRoot/craft/craftenv.sh
-        craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" okular
-
+        set -u
         build_dir=/home/user/CraftRoot/build/kde/applications/okular/work/build
+        if [[ -f "$build_dir/CMakeCache.txt" ]]; then
+            cached_source=$(sed -n "s/^CMAKE_HOME_DIRECTORY:INTERNAL=//p" "$build_dir/CMakeCache.txt")
+            if [[ -n "$cached_source" && "$cached_source" != "$OKULAR_SOURCE_DIR" ]]; then
+                rm -rf "$build_dir"
+            fi
+        fi
+        craft -i --options "okular.srcDir=$OKULAR_SOURCE_DIR" okular
+
         ninja -C "$build_dir" install
         craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --package okular
 

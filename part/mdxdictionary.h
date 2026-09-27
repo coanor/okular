@@ -8,5 +8,8 @@
 
 namespace MdxDictionary
 {
+QString word(QString text);
+QString summary(QString definition);
 QString lookup(const QString &filePath, const QString &word);
+void invalidate(const QString &filePath);
 }

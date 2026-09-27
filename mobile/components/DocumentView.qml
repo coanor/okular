@@ -20,10 +20,50 @@ QQC2.ScrollView {
     property DocumentItem document
     property PageItem page: mouseArea.currPageDelegate.pageItem
     signal clicked
+    onPageChanged: {
+        dictionaryTimer.stop()
+        DictionaryLookup.clear()
+    }
 
     signal urlOpened
 
     clip: true
+
+    Timer {
+        id: dictionaryTimer
+        interval: 350
+        onTriggered: {
+            if (root.page && root.page.selectedWord) {
+                DictionaryLookup.lookup(root.page.selectedWord)
+            }
+        }
+    }
+    Connections {
+        target: root.page
+        function onSelectionChanged() {
+            dictionaryTimer.stop()
+            if (!root.page || !root.page.selectedWord) {
+                DictionaryLookup.clear()
+            } else if (DictionaryLookup.autoLookupEnabled) {
+                dictionaryTimer.start()
+            }
+        }
+    }
+    Connections {
+        target: DictionaryLookup
+        function onDictionaryFileChanged() {
+            if (DictionaryLookup.autoLookupEnabled && root.page && root.page.selectedWord) {
+                dictionaryTimer.restart()
+            }
+        }
+        function onAutoLookupEnabledChanged() {
+            if (DictionaryLookup.autoLookupEnabled && root.page && root.page.selectedWord) {
+                dictionaryTimer.restart()
+            } else {
+                dictionaryTimer.stop()
+            }
+        }
+    }
     
     //NOTE: on some themes it tries to set the flickable to interactive
     //but we need it always non interactive as we need to manage
@@ -222,20 +262,41 @@ QQC2.ScrollView {
                     id: selectionMenu
                     z: 5
                     visible: root.page.hasSelection
+                    width: Math.min(mouseArea.width - 16, Math.max(280, selectionActions.implicitWidth))
                     x: Math.max(0, Math.min(mouseArea.width - width,
                                             root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).x - width / 2))
                     y: Math.max(0, root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).y - height - 12)
 
-                    contentItem: Row {
-                        QQC2.ToolButton {
-                            text: i18n("Copy")
-                            enabled: root.page.canCopySelection
-                            onClicked: root.page.copySelection()
+                    contentItem: Column {
+                        spacing: 4
+                        Row {
+                            id: selectionActions
+                            QQC2.ToolButton {
+                                text: i18n("Copy")
+                                enabled: root.page.canCopySelection
+                                onClicked: root.page.copySelection()
+                            }
+                            QQC2.ToolButton {
+                                text: i18n("Highlight")
+                                enabled: root.page.canHighlightSelection
+                                onClicked: root.page.highlightSelection()
+                            }
+                            QQC2.ToolButton {
+                                text: i18n("Look up")
+                                enabled: !!root.page.selectedWord
+                                onClicked: DictionaryLookup.retry(root.page.selectedWord)
+                            }
                         }
-                        QQC2.ToolButton {
-                            text: i18n("Highlight")
-                            enabled: root.page.canHighlightSelection
-                            onClicked: root.page.highlightSelection()
+                        QQC2.Label {
+                            width: parent.width
+                            visible: !!DictionaryLookup.word && DictionaryLookup.word === root.page.selectedWord &&
+                                     (DictionaryLookup.loading || !!DictionaryLookup.definition || !!DictionaryLookup.error)
+                            text: DictionaryLookup.loading ? i18n("Looking up %1…", DictionaryLookup.word) :
+                                  DictionaryLookup.word + "\n" + (DictionaryLookup.definition || DictionaryLookup.error)
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 8
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
                         }
                     }
                 }

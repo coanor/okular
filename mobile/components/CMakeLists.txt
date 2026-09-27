@@ -19,6 +19,9 @@ target_sources(okularplugin PRIVATE
     ${CMAKE_SOURCE_DIR}/gui/debug_ui.cpp
     ${CMAKE_SOURCE_DIR}/gui/recentitemsmodel.cpp
     pageitem.cpp
+    dictionarylookup.cpp
+    dictionarylookup.h
+    ${CMAKE_SOURCE_DIR}/part/mdxdictionary.cpp
     documentitem.cpp
     thumbnailitem.cpp
     okularsingleton.cpp
@@ -40,6 +43,7 @@ target_link_libraries(okularplugin PRIVATE
     Qt6::Quick
     Qt6::Qml
     Qt6::Core
+    Qt6::Concurrent
     Qt6::Xml
     Qt6::Svg
     KF6::Bookmarks
@@ -47,6 +51,11 @@ target_link_libraries(okularplugin PRIVATE
     KF6::Service
     okularcore
 )
+
+okular_enable_mdict(okularplugin)
+if(MDICT_FOUND)
+    target_link_libraries(okularplugin PRIVATE ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
+endif()
 
 ecm_finalize_qml_module(okularplugin DESTINATION ${KDE_INSTALL_QMLDIR} EXPORT OkularTargets)
 

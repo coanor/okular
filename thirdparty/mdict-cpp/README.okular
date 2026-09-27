@@ -1,0 +1,10 @@
+This directory contains the mdict-cpp parser from https://github.com/dictlab/mdict-cpp,
+commit 6661d75d443a2cd24f23f548e4586b677b628346, downloaded on 2026-09-27.
+Its BSD-3-Clause license and AUTHORS file are included.
+
+Okular builds this copy for Android mobile builds, which do not provide a
+platform mdict-cpp package.
+The upstream miniz include was replaced with the platform zlib header, and the
+upstream TurboBase64 dependency was replaced with a small compatible encoder
+in src/turbobase64/turbob64.h. mdict_lookup now catches parser exceptions at
+the C API boundary. The mdict-cpp command-line tool is omitted.

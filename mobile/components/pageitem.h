@@ -76,6 +76,7 @@ class PageItem : public QQuickItem, public Okular::View
     Q_PROPERTY(QPointF selectionEnd READ selectionEnd NOTIFY selectionChanged)
     Q_PROPERTY(bool canCopySelection READ canCopySelection NOTIFY selectionChanged)
     Q_PROPERTY(bool canHighlightSelection READ canHighlightSelection NOTIFY selectionChanged)
+    Q_PROPERTY(QString selectedWord READ selectedWord NOTIFY selectionChanged)
 
 public:
     explicit PageItem(QQuickItem *parent = nullptr);
@@ -133,6 +134,7 @@ public:
     QPointF selectionEnd() const;
     bool canCopySelection() const;
     bool canHighlightSelection() const;
+    QString selectedWord() const;
 
     Q_INVOKABLE bool selectWordAt(qreal x, qreal y);
     Q_INVOKABLE void moveSelectionHandle(bool start, qreal x, qreal y);

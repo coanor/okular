@@ -4,6 +4,9 @@
 
 #include "mdxdictionary.h"
 
+#include <QRegularExpression>
+#include <QTextDocument>
+
 #if HAVE_MDICT
 #include <mdict_extern.h>
 
@@ -27,6 +30,12 @@ struct DictionaryHandle {
         }
     }
 };
+
+DictionaryHandle &dictionaryHandle()
+{
+    static DictionaryHandle dictionary;
+    return dictionary;
+}
 
 QString lookupExact(void *handle, const QString &word)
 {
@@ -84,10 +93,45 @@ QStringList fallbackWords(const QString &word)
 }
 #endif
 
+QString MdxDictionary::word(QString text)
+{
+    text = text.trimmed();
+    while (!text.isEmpty() && !text.front().isLetterOrNumber()) {
+        text.remove(0, 1);
+    }
+    while (!text.isEmpty() && !text.back().isLetterOrNumber()) {
+        text.chop(1);
+    }
+
+    static const QRegularExpression wordPattern(QStringLiteral(R"(^[\p{L}\p{N}][\p{L}\p{N}\p{M}]*(?:['\x{2019}\x{2010}\x{2011}-][\p{L}\p{N}\p{M}]+)*$)"));
+    return text.size() <= 128 && wordPattern.match(text).hasMatch() ? text : QString();
+}
+
+QString MdxDictionary::summary(QString definition)
+{
+    definition.truncate(16384);
+    definition.replace(QRegularExpression(QStringLiteral("(?i)</?br\\s*/?>")), QStringLiteral("<br>"));
+    definition.remove(QRegularExpression(QStringLiteral("`[0-9]+`")));
+    QTextDocument document;
+    document.setHtml(definition);
+    const QStringList lines = document.toPlainText().split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    QStringList summary;
+    for (const QString &line : lines) {
+        const QString clean = line.simplified();
+        if (!clean.isEmpty()) {
+            summary.append(clean);
+        }
+        if (summary.size() == 5) {
+            break;
+        }
+    }
+    return summary.join(QLatin1Char('\n')).left(400);
+}
+
 QString MdxDictionary::lookup(const QString &filePath, const QString &word)
 {
 #if HAVE_MDICT
-    static DictionaryHandle dictionary;
+    DictionaryHandle &dictionary = dictionaryHandle();
     std::lock_guard lock(dictionary.mutex);
     if (dictionary.path != filePath) {
         if (dictionary.handle) {
@@ -116,4 +160,21 @@ QString MdxDictionary::lookup(const QString &filePath, const QString &word)
     Q_UNUSED(word)
 #endif
     return {};
+}
+
+void MdxDictionary::invalidate(const QString &filePath)
+{
+#if HAVE_MDICT
+    DictionaryHandle &dictionary = dictionaryHandle();
+    std::lock_guard lock(dictionary.mutex);
+    if (dictionary.path == filePath) {
+        if (dictionary.handle) {
+            mdict_destroy(dictionary.handle);
+            dictionary.handle = nullptr;
+        }
+        dictionary.path.clear();
+    }
+#else
+    Q_UNUSED(filePath)
+#endif
 }

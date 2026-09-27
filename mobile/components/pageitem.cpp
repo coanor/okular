@@ -6,6 +6,7 @@
 
 #include "pageitem.h"
 #include "documentitem.h"
+#include "part/mdxdictionary.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -192,6 +193,14 @@ bool PageItem::canCopySelection() const
 bool PageItem::canHighlightSelection() const
 {
     return hasSelection() && m_documentItem && m_documentItem->document()->isAllowed(Okular::AllowNotes) && m_documentItem->document()->supportsAnnotationSidecar();
+}
+
+QString PageItem::selectedWord() const
+{
+    if (!canCopySelection() || !m_page) {
+        return {};
+    }
+    return MdxDictionary::word(m_page->text(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour));
 }
 
 bool PageItem::selectWordAt(qreal x, qreal y)

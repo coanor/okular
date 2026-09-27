@@ -105,6 +105,50 @@ if(BUILD_DESKTOP)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
 endif()
 
+find_path(MDICT_INCLUDE_DIR mdict_extern.h PATH_SUFFIXES mdict)
+find_library(MDICT_LIBRARY mdict)
+find_library(MDICT_MINIZ_LIBRARY mdictminiz)
+find_library(MDICT_BASE64_LIBRARY mdictbase64)
+option(OKULAR_USE_BUNDLED_MDICT "Build the bundled MDX parser for the mobile application" ${ANDROID})
+if(OKULAR_USE_BUNDLED_MDICT AND BUILD_MOBILE)
+    find_package(ZLIB REQUIRED)
+    set(MDICT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/mdict-cpp/src)
+    add_library(okular_mdict STATIC
+        ${MDICT_SOURCE_DIR}/mdict.cc
+        ${MDICT_SOURCE_DIR}/mdict_extern.cc
+        ${MDICT_SOURCE_DIR}/binutils.cc
+        ${MDICT_SOURCE_DIR}/adler32.cc
+        ${MDICT_SOURCE_DIR}/ripemd128.c
+    )
+    set_target_properties(okular_mdict PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_include_directories(okular_mdict PRIVATE ${MDICT_SOURCE_DIR})
+    target_link_libraries(okular_mdict PRIVATE ZLIB::ZLIB)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(okular_mdict PRIVATE -fexceptions)
+    endif()
+    set(MDICT_INCLUDE_DIR ${MDICT_SOURCE_DIR}/include)
+    set(MDICT_LIBRARY okular_mdict)
+    set(MDICT_MINIZ_LIBRARY "")
+    set(MDICT_BASE64_LIBRARY "")
+    set(MDICT_FOUND TRUE)
+    message(STATUS "MDX dictionary lookup enabled (bundled parser)")
+elseif(MDICT_INCLUDE_DIR AND MDICT_LIBRARY AND MDICT_MINIZ_LIBRARY AND MDICT_BASE64_LIBRARY)
+    message(STATUS "MDX dictionary lookup enabled")
+    set(MDICT_FOUND TRUE)
+else()
+    message(STATUS "MDX dictionary lookup disabled (mdict-cpp not found)")
+    set(MDICT_FOUND FALSE)
+endif()
+
+function(okular_enable_mdict target)
+    if(MDICT_FOUND)
+        target_include_directories(${target} PRIVATE ${MDICT_INCLUDE_DIR})
+        target_compile_definitions(${target} PRIVATE HAVE_MDICT=1)
+    else()
+        target_compile_definitions(${target} PRIVATE HAVE_MDICT=0)
+    endif()
+endfunction()
+
 find_package(KF6 ${KF_REQUIRED_VERSION} REQUIRED COMPONENTS
     Archive
     Bookmarks
@@ -593,18 +637,9 @@ kconfig_add_kcfg_files(okularpart_SRCS GENERATE_MOC conf/settings.kcfgc)
 add_library(okularpart SHARED ${okularpart_SRCS})
 generate_export_header(okularpart BASE_NAME okularpart)
 
-find_path(MDICT_INCLUDE_DIR mdict_extern.h PATH_SUFFIXES mdict)
-find_library(MDICT_LIBRARY mdict)
-find_library(MDICT_MINIZ_LIBRARY mdictminiz)
-find_library(MDICT_BASE64_LIBRARY mdictbase64)
-if(MDICT_INCLUDE_DIR AND MDICT_LIBRARY AND MDICT_MINIZ_LIBRARY AND MDICT_BASE64_LIBRARY)
-    message(STATUS "MDX dictionary lookup enabled")
-    target_include_directories(okularpart PRIVATE ${MDICT_INCLUDE_DIR})
+okular_enable_mdict(okularpart)
+if(MDICT_FOUND)
     target_link_libraries(okularpart ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
-    target_compile_definitions(okularpart PRIVATE HAVE_MDICT=1)
-else()
-    message(STATUS "MDX dictionary lookup disabled (mdict-cpp not found)")
-    target_compile_definitions(okularpart PRIVATE HAVE_MDICT=0)
 endif()
 
 target_link_libraries(okularpart okularcore

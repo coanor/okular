@@ -37,14 +37,12 @@
 #include <QMimeDatabase>
 #include <QNativeGestureEvent>
 #include <QPainter>
-#include <QRegularExpression>
 #include <QScrollBar>
 #include <QScroller>
 #include <QScrollerProperties>
 #include <QSet>
 #include <QTimer>
 #include <QToolTip>
-#include <QTextDocument>
 #include <QUrl>
 #include <QtConcurrent>
 
@@ -128,41 +126,6 @@ static const int searchTextPreviewLength = 21;
 
 // When following a link, only a preview of this length will be used to set the text of the action.
 static const int linkTextPreviewLength = 30;
-
-static QString dictionaryWord(QString text)
-{
-    text = text.trimmed();
-    while (!text.isEmpty() && !text.front().isLetterOrNumber()) {
-        text.remove(0, 1);
-    }
-    while (!text.isEmpty() && !text.back().isLetterOrNumber()) {
-        text.chop(1);
-    }
-
-    static const QRegularExpression wordPattern(QStringLiteral(R"(^[\p{L}\p{N}][\p{L}\p{N}\p{M}]*(?:['\x{2019}\x{2010}\x{2011}-][\p{L}\p{N}\p{M}]+)*$)"));
-    return text.size() <= 128 && wordPattern.match(text).hasMatch() ? text : QString();
-}
-
-static QString dictionarySummary(QString definition)
-{
-    definition.truncate(16384);
-    definition.replace(QRegularExpression(QStringLiteral("(?i)</?br\\s*/?>")), QStringLiteral("<br>"));
-    definition.remove(QRegularExpression(QStringLiteral("`[0-9]+`")));
-    QTextDocument document;
-    document.setHtml(definition);
-    const QStringList lines = document.toPlainText().split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-    QStringList summary;
-    for (const QString &line : lines) {
-        const QString clean = line.simplified();
-        if (!clean.isEmpty()) {
-            summary.append(clean);
-        }
-        if (summary.size() == 5) {
-            break;
-        }
-    }
-    return summary.join(QLatin1Char('\n')).left(400);
-}
 
 static inline double normClamp(double value, double def)
 {
@@ -395,7 +358,7 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->messageWindow = new PageViewMessage(this);
     d->dictionaryLookupTimer.setSingleShot(true);
     connect(&d->dictionaryLookupTimer, &QTimer::timeout, this, [this] {
-        if (dictionaryWord(d->selectedText()) == d->pendingDictionaryWord) {
+        if (MdxDictionary::word(d->selectedText()) == d->pendingDictionaryWord) {
             lookupSelectedWord(d->pendingDictionaryWord);
         }
     });
@@ -1091,7 +1054,7 @@ void PageView::lookupSelectedWord(const QString &text, bool waitForTripleClick)
         return;
     }
 
-    const QString word = dictionaryWord(text);
+    const QString word = MdxDictionary::word(text);
     if (word.isEmpty()) {
         return;
     }
@@ -1121,10 +1084,10 @@ void PageView::lookupSelectedWord(const QString &text, bool waitForTripleClick)
         connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, request, word, position] {
             const QString definition = watcher->result();
             watcher->deleteLater();
-            if (request != d->dictionaryLookupRequest || dictionaryWord(d->selectedText()) != word) {
+            if (request != d->dictionaryLookupRequest || MdxDictionary::word(d->selectedText()) != word) {
                 return;
             }
-            const QString summary = definition.isEmpty() ? i18n("No definition found in the selected MDX dictionary.") : dictionarySummary(definition);
+            const QString summary = definition.isEmpty() ? i18n("No definition found in the selected MDX dictionary.") : MdxDictionary::summary(definition);
             const QString tooltip = QStringLiteral("<b>%1</b><br>%2").arg(word.toHtmlEscaped(), summary.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br>")));
             QToolTip::showText(position, tooltip, viewport());
         });

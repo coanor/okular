@@ -15,6 +15,8 @@ Mark **This model accepts page images** only if that model supports image input.
 
 API keys are saved in KWallet when available; otherwise they remain in memory for this Okular process. Named profiles and conversations are local. Conversations are separated by document content hash and profile ID. The local conversation record contains questions, answers, selected text, extracted page text and the most recent page image. When a new question is sent through a stateless API, earlier page images are discarded while earlier text stays in the request history. Responses and Codex store a remote session ID as well; their providers keep the full conversation.
 
+To start a fresh conversation for the current document and model, open the arrow menu on **Models…** and choose **Start new conversation**. Okular removes its local conversation record and starts a new provider session on the next question. Saved annotations and the provider's earlier session history remain available outside Okular.
+
 ## Answers and annotations
 
 Answers render offline with Markdown and KaTeX math (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`). Raw HTML and Mermaid are not supported. Remote images are shown as links; external links open in the browser.

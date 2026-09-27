@@ -22,12 +22,14 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QTextEdit>
 #include <QTimer>
+#include <QToolButton>
 #include <QUuid>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -152,13 +154,22 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     m_profileCombo = new QComboBox(this);
     m_profileCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     top->addWidget(m_profileCombo);
-    auto *profilesButton = new QPushButton(i18n("Models…"), this);
-    top->addWidget(profilesButton);
+    m_modelsButton = new QToolButton(this);
+    m_modelsButton->setObjectName(QStringLiteral("aiModelsButton"));
+    m_modelsButton->setText(i18n("Models…"));
+    m_modelsButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    m_modelsButton->setPopupMode(QToolButton::MenuButtonPopup);
+    auto *modelsMenu = new QMenu(m_modelsButton);
+    m_newConversationAction = modelsMenu->addAction(i18n("Start new conversation"));
+    m_newConversationAction->setObjectName(QStringLiteral("aiNewConversation"));
+    m_modelsButton->setMenu(modelsMenu);
+    top->addWidget(m_modelsButton);
     layout->addLayout(top);
     for (const AiProfile &profile : std::as_const(m_profiles)) {
         m_profileCombo->addItem(profile.name, profile.id);
     }
-    connect(profilesButton, &QPushButton::clicked, this, &AiReadingAssistant::editProfiles);
+    connect(m_modelsButton, &QToolButton::clicked, this, &AiReadingAssistant::editProfiles);
+    connect(m_newConversationAction, &QAction::triggered, this, &AiReadingAssistant::clearConversation);
     connect(m_profileCombo, &QComboBox::currentIndexChanged, this, &AiReadingAssistant::loadSelectedConversation);
 
     m_view = new AiMarkdownView(this);
@@ -506,6 +517,25 @@ void AiReadingAssistant::cancelQuestion()
     updateControls();
 }
 
+void AiReadingAssistant::clearConversation()
+{
+    AiProfile *profile = currentProfile();
+    if (!profile || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty()) || m_provider.isBusy() || m_pendingPage >= 0) {
+        return;
+    }
+    if (QMessageBox::question(this, i18n("Start new conversation"), i18n("Remove the current conversation from Okular? Saved annotations will remain.")) != QMessageBox::Yes) {
+        return;
+    }
+    if (!AiStore::clearConversation(m_documentKey, profile->id)) {
+        showStatus(i18n("Could not remove the local conversation record."));
+        return;
+    }
+    m_conversation = {};
+    renderConversation();
+    showStatus(i18n("New conversation started."));
+    updateControls();
+}
+
 void AiReadingAssistant::renderConversation()
 {
     QJsonArray json;
@@ -541,5 +571,7 @@ void AiReadingAssistant::updateControls()
     m_prompt->setActionText(busy ? i18n("Cancel") : i18n("Ask"));
     m_actionButton->setEnabled(busy ? !m_cancelling : m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
     m_profileCombo->setEnabled(!busy);
+    m_modelsButton->setEnabled(!busy);
+    m_newConversationAction->setEnabled(!busy && !m_documentKey.isEmpty() && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty()));
     m_prompt->setReadOnly(busy);
 }

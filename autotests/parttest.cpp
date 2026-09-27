@@ -47,6 +47,7 @@
 #include <QTextEdit>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTreeView>
 #include <QUrl>
 #include <QUuid>
@@ -1158,6 +1159,11 @@ void PartTest::testAiPanelOpens()
     action->trigger();
     QVERIFY(action->isChecked());
     QVERIFY(part.m_aiPanel);
+    QToolButton *modelsButton = part.m_aiPanel->findChild<QToolButton *>(QStringLiteral("aiModelsButton"));
+    QVERIFY(modelsButton);
+    QCOMPARE(modelsButton->popupMode(), QToolButton::MenuButtonPopup);
+    QVERIFY(modelsButton->menu());
+    QVERIFY(part.m_aiPanel->findChild<QAction *>(QStringLiteral("aiNewConversation")));
     QPushButton *promptAction = part.m_aiPanel->findChild<QPushButton *>(QStringLiteral("aiPromptAction"));
     QVERIFY(promptAction);
     QTextEdit *prompt = part.m_aiPanel->findChild<QTextEdit *>();

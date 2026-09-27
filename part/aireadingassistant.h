@@ -9,10 +9,12 @@
 
 class AiMarkdownView;
 class AiPromptEdit;
+class QAction;
 class QComboBox;
 class QLabel;
 class QPushButton;
 class QTimer;
+class QToolButton;
 
 namespace Okular
 {
@@ -41,6 +43,7 @@ private:
     void sendQuestion();
     void submitQuestion(const QString &pageImage);
     void cancelQuestion();
+    void clearConversation();
     void pageImageReady();
     void renderConversation();
     void saveMessage(int messageIndex);
@@ -62,6 +65,8 @@ private:
     int m_imageHeight = 0;
     QTimer *m_imageTimer;
     QComboBox *m_profileCombo;
+    QToolButton *m_modelsButton;
+    QAction *m_newConversationAction;
     QLabel *m_selectionLabel;
     QLabel *m_status;
     AiPromptEdit *m_prompt;

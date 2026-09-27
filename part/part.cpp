@@ -995,7 +995,7 @@ void Part::setupActions()
     connect(m_openCloudBook, &QAction::triggered, this, &Part::openCloudBook);
 
     m_syncCloudLibrary = ac->addAction(QStringLiteral("cloud_sync_book_files"));
-    m_syncCloudLibrary->setText(i18n("Sync Cloud Book Files Now…"));
+    m_syncCloudLibrary->setText(i18n("Sync Cloud Library Now…"));
     m_syncCloudLibrary->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
     connect(m_syncCloudLibrary, &QAction::triggered, this, &Part::syncCloudBookFiles);
 #endif
@@ -1115,7 +1115,7 @@ void Part::openCloudBook()
         choices.insert(i18n("%1 (%2)", originalName, entry.fileName().left(12)), sourcePath);
     }
     if (choices.isEmpty()) {
-        KMessageBox::information(widget(), i18n("No cloud books are stored on this device yet. Use Sync Cloud Book Files Now to download them."));
+        KMessageBox::information(widget(), i18n("No cloud books are stored on this device yet. Use Sync Cloud Library Now to download them."));
         return;
     }
     bool accepted = false;
@@ -1137,9 +1137,19 @@ void Part::syncCloudBookFiles()
         KMessageBox::error(widget(), i18n("Cloud library is not configured: %1", error));
         return;
     }
+    if (m_document->isOpened() && isModified()) {
+        if (!m_document->canSaveAnnotationsToSidecar()) {
+            KMessageBox::information(widget(), i18n("Save the open document before syncing the cloud library."));
+            return;
+        }
+        if (!saveFile()) {
+            return;
+        }
+    }
     m_syncCloudLibrary->setEnabled(false);
     m_addToCloudLibrary->setEnabled(false);
-    auto *progress = new QProgressDialog(i18n("Synchronizing cloud book files…"), QString(), 0, 0, widget());
+    const QString activeDocumentPath = m_document->isOpened() && url().isLocalFile() ? url().toLocalFile() : QString();
+    auto *progress = new QProgressDialog(i18n("Synchronizing cloud library…"), QString(), 0, 0, widget());
     progress->setCancelButton(nullptr);
     progress->show();
     auto *watcher = new QFutureWatcher<BookSyncResult>(this);
@@ -1151,14 +1161,27 @@ void Part::syncCloudBookFiles()
         m_syncCloudLibrary->setEnabled(true);
         m_addToCloudLibrary->setEnabled(true);
         if (!result.successful()) {
-            KMessageBox::error(widget(), i18n("Cloud book file sync failed: %1", result.error));
+            KMessageBox::error(widget(), i18n("Cloud library sync failed: %1", result.error));
         } else {
-            KMessageBox::information(widget(), i18n("Cloud book files synchronized. Uploaded: %1. Downloaded: %2.", result.uploaded, result.downloaded));
+            QString message = i18n("Cloud library synchronized. Books: %1 uploaded, %2 downloaded. Annotation changes: %3 uploaded, %4 applied. Snapshots: %5 uploaded. Conflicts: %6.",
+                                   result.uploaded,
+                                   result.downloaded,
+                                   result.annotationsUploaded,
+                                   result.annotationsApplied,
+                                   result.snapshotsUploaded,
+                                   result.annotationConflicts);
+            if (result.annotationsDeferred) {
+                message += QLatin1Char('\n') + i18n("%1 annotation changes for the open PDF are waiting. Close the PDF and sync again to apply them.", result.annotationsDeferred);
+            }
+            if (result.annotationConflicts) {
+                message += QLatin1Char('\n') + i18n("Both versions of each conflicting annotation are retained in the cloud and in the book's annotation-conflicts.json file.");
+            }
+            KMessageBox::information(widget(), message);
         }
     });
-    watcher->setFuture(QtConcurrent::run([configuration, root] {
+    watcher->setFuture(QtConcurrent::run([configuration, root, activeDocumentPath] {
         S3Transport store(configuration);
-        return BookLibrarySync(store, root).synchronizeSources();
+        return BookLibrarySync(store, root).synchronizeAll(activeDocumentPath);
     }));
 }
 #endif

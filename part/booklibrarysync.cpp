@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "booklibrarysync.h"
+#include "annotationsync.h"
+
+#include "core/annotationsidecar_p.h"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -9,6 +12,7 @@
 #include <QJsonObject>
 #include <QLockFile>
 #include <QMap>
+#include <QMimeDatabase>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QTemporaryDir>
@@ -241,5 +245,81 @@ BookSyncResult BookLibrarySync::synchronizeSources() const
         staging.setAutoRemove(false);
         ++result.downloaded;
     }
+    return result;
+}
+
+BookSyncResult BookLibrarySync::synchronizeAnnotations(const QString &deferHash) const
+{
+    BookSyncResult result;
+    if (m_libraryRoot.isEmpty() || !QDir().mkpath(m_libraryRoot)) {
+        result.error = QStringLiteral("Choose a writable managed library directory");
+        return result;
+    }
+    QLockFile lock(QDir(m_libraryRoot).filePath(QStringLiteral(".sync.lock")));
+    if (!lock.tryLock(0)) {
+        result.error = QStringLiteral("This managed library is already syncing");
+        return result;
+    }
+    if (!ensureLibraryIdentity(&result.error)) {
+        return result;
+    }
+    const QDir books(QDir(m_libraryRoot).filePath(QStringLiteral("books")));
+    const QRegularExpression projectId(QStringLiteral("^[a-f0-9]{64}$"));
+    for (const QFileInfo &entry : books.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QString id = entry.fileName();
+        if (entry.isSymLink() || !projectId.match(id).hasMatch()) {
+            result.error = QStringLiteral("The managed library contains an invalid project directory");
+            return result;
+        }
+        QFile manifestFile(QDir(entry.filePath()).filePath(QStringLiteral("manifest.json")));
+        Manifest manifest;
+        if (!manifestFile.open(QIODevice::ReadOnly) || !parseManifest(manifestFile.readAll(), id, &manifest)) {
+            result.error = QStringLiteral("The local project %1 has an invalid manifest").arg(id);
+            return result;
+        }
+        const QString sourcePath = QDir(entry.filePath()).filePath(manifest.storedName);
+        if (hashFile(sourcePath) != id) {
+            result.error = QStringLiteral("The local project %1 is incomplete or changed").arg(id);
+            return result;
+        }
+        if (QMimeDatabase().mimeTypeForFile(sourcePath, QMimeDatabase::MatchContent).name() != QLatin1String("application/pdf")) {
+            continue;
+        }
+        const AnnotationSyncResult synced = AnnotationSync::synchronize(m_store, m_libraryRoot, id, id == deferHash);
+        if (!synced.successful()) {
+            result.error = QStringLiteral("Book %1: %2").arg(id, synced.error);
+            return result;
+        }
+        result.annotationsUploaded += synced.uploaded;
+        result.annotationsApplied += synced.applied;
+        result.annotationConflicts += synced.conflicts;
+        result.annotationsDeferred += synced.deferred;
+        result.snapshotsUploaded += synced.snapshotsUploaded;
+    }
+    return result;
+}
+
+BookSyncResult BookLibrarySync::synchronizeAll(const QString &activePdfPath) const
+{
+    BookSyncResult result = synchronizeSources();
+    if (!result.successful()) {
+        return result;
+    }
+    QString deferHash;
+    if (!activePdfPath.isEmpty()) {
+        QString hashError;
+        deferHash = Okular::AnnotationSidecar::pdfHash(activePdfPath, &hashError);
+        if (!hashError.isEmpty()) {
+            result.error = QStringLiteral("Could not identify the open PDF: ") + hashError;
+            return result;
+        }
+    }
+    const BookSyncResult annotations = synchronizeAnnotations(deferHash);
+    result.annotationsUploaded = annotations.annotationsUploaded;
+    result.annotationsApplied = annotations.annotationsApplied;
+    result.annotationConflicts = annotations.annotationConflicts;
+    result.annotationsDeferred = annotations.annotationsDeferred;
+    result.snapshotsUploaded = annotations.snapshotsUploaded;
+    result.error = annotations.error;
     return result;
 }

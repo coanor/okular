@@ -85,9 +85,13 @@ ecm_add_test(annotationsidecartest.cpp
 )
 
 if(BUILD_DESKTOP)
-    ecm_add_test(booklibrarysynctest.cpp ../part/booklibrarysync.cpp ../part/booklibrary.cpp
+    ecm_add_test(annotationsynctest.cpp ../part/annotationsync.cpp
+        TEST_NAME "annotationsynctest"
+        LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
+    )
+    ecm_add_test(booklibrarysynctest.cpp ../part/booklibrarysync.cpp ../part/annotationsync.cpp ../part/booklibrary.cpp
         TEST_NAME "booklibrarysynctest"
-        LINK_LIBRARIES Qt6::Test
+        LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
     )
     if(CURL_FOUND)
         ecm_add_test(s3transporttest.cpp ../part/s3transport.cpp ../part/s3configuration.cpp

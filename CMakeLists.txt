@@ -100,7 +100,7 @@ ecm_setup_version(${PROJECT_VERSION}
                   VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/core/version.h"
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
-find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml)
+find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql)
 
 find_package(KF6 ${KF_REQUIRED_VERSION} REQUIRED COMPONENTS
     Archive
@@ -328,6 +328,7 @@ endif(NOT WIN32)
 # okularcore
 
 set(okularcore_SRCS
+   core/annotationsidecar.cpp
    core/action.cpp
    core/annotations.cpp
    core/area.cpp
@@ -440,6 +441,7 @@ endif(WIN32)
 
 target_link_libraries(okularcore
 PRIVATE
+    Qt6::Sql
     ${OKULAR_IOKIT}
     ${SHLWAPI}
     KF6::Archive

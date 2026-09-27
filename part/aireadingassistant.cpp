@@ -117,10 +117,6 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     connect(profilesButton, &QPushButton::clicked, this, &AiReadingAssistant::editProfiles);
     connect(m_profileCombo, &QComboBox::currentIndexChanged, this, &AiReadingAssistant::loadSelectedConversation);
 
-    auto *newConversation = new QPushButton(i18n("Start new conversation"), this);
-    layout->addWidget(newConversation);
-    connect(newConversation, &QPushButton::clicked, this, &AiReadingAssistant::clearConversation);
-
     m_view = new AiMarkdownView(this);
     layout->addWidget(m_view, 1);
     connect(m_view, &AiMarkdownView::saveRequested, this, &AiReadingAssistant::saveMessage);
@@ -133,29 +129,9 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     m_prompt->setPlaceholderText(i18n("Ask about the current page, for example: Explain equation 1.2"));
     m_prompt->setMaximumHeight(100);
     layout->addWidget(m_prompt);
-    auto *actions = new QHBoxLayout;
     m_send = new QPushButton(i18n("Ask"), this);
-    m_cancel = new QPushButton(i18n("Cancel"), this);
-    actions->addWidget(m_send);
-    actions->addWidget(m_cancel);
-    layout->addLayout(actions);
+    layout->addWidget(m_send);
     connect(m_send, &QPushButton::clicked, this, &AiReadingAssistant::sendQuestion);
-    connect(m_cancel, &QPushButton::clicked, this, [this] {
-        m_provider.cancel();
-        m_imageTimer->stop();
-        m_pendingPage = -1;
-        if (m_questionSubmitted) {
-            m_conversation = m_beforeRequest;
-            m_questionSubmitted = false;
-            m_prompt->setPlainText(m_pendingMessage.content);
-            if (AiProfile *profile = currentProfile()) {
-                AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
-            }
-            renderConversation();
-        }
-        showStatus(i18n("Request canceled."));
-        updateControls();
-    });
     m_status = new QLabel(this);
     m_status->setWordWrap(true);
     layout->addWidget(m_status);
@@ -457,26 +433,6 @@ void AiReadingAssistant::submitQuestion(const QString &pageImage)
     updateControls();
 }
 
-void AiReadingAssistant::clearConversation()
-{
-    AiProfile *profile = currentProfile();
-    if (!profile || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty())) {
-        return;
-    }
-    if (QMessageBox::question(this, i18n("Start new conversation"), i18n("Remove the current conversation from Okular? Saved annotations will remain.")) != QMessageBox::Yes) {
-        return;
-    }
-    m_provider.cancel();
-    m_questionSubmitted = false;
-    if (!AiStore::clearConversation(m_documentKey, profile->id)) {
-        showStatus(i18n("Could not remove the local conversation record."));
-        return;
-    }
-    m_conversation = {};
-    renderConversation();
-    updateControls();
-}
-
 void AiReadingAssistant::renderConversation()
 {
     QJsonArray json;
@@ -510,7 +466,6 @@ void AiReadingAssistant::updateControls()
 {
     const bool busy = m_provider.isBusy() || m_pendingPage >= 0;
     m_send->setEnabled(!busy && m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
-    m_cancel->setEnabled(busy);
     m_profileCombo->setEnabled(!busy);
     m_prompt->setEnabled(!busy);
 }

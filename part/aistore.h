@@ -40,5 +40,4 @@ public:
     static QString documentKey(const QUrl &url);
     static AiConversation loadConversation(const QString &documentKey, const QString &profileId);
     static bool saveConversation(const QString &documentKey, const QString &profileId, const AiConversation &conversation);
-    static bool clearConversation(const QString &documentKey, const QString &profileId);
 };

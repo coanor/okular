@@ -41,7 +41,6 @@ private:
     void sendQuestion();
     void submitQuestion(const QString &pageImage);
     void pageImageReady();
-    void clearConversation();
     void renderConversation();
     void saveMessage(int messageIndex);
     AiProfile *currentProfile();
@@ -65,6 +64,5 @@ private:
     QLabel *m_status;
     QTextEdit *m_prompt;
     QPushButton *m_send;
-    QPushButton *m_cancel;
     AiMarkdownView *m_view;
 };

@@ -210,9 +210,3 @@ bool AiStore::saveConversation(const QString &documentKey, const QString &profil
     }
     return file.commit();
 }
-
-bool AiStore::clearConversation(const QString &documentKey, const QString &profileId)
-{
-    const QString path = conversationPath(documentKey, profileId);
-    return !QFile::exists(path) || QFile::remove(path);
-}

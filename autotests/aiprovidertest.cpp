@@ -140,7 +140,9 @@ private Q_SLOTS:
         QVERIFY(directory.isValid());
         QFile script(directory.filePath(QStringLiteral("codex")));
         QVERIFY(script.open(QIODevice::WriteOnly));
-        script.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$OKULAR_AI_TEST_ARGS\"\ncat > \"$OKULAR_AI_TEST_STDIN\"\nprintf '%s' \"$AWS_SECRET_ACCESS_KEY$OKULAR_S3_BUCKET\" > \"$OKULAR_AI_TEST_CLOUD_ENV\"\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}'\n");
+        script.write(
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$OKULAR_AI_TEST_ARGS\"\ncat > \"$OKULAR_AI_TEST_STDIN\"\nprintf '%s' \"$AWS_SECRET_ACCESS_KEY$OKULAR_S3_BUCKET\" > \"$OKULAR_AI_TEST_CLOUD_ENV\"\nprintf '%s\\n' "
+            "'{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}'\n");
         script.close();
         QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
         const QByteArray previousPath = qgetenv("PATH");

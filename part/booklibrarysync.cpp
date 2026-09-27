@@ -30,10 +30,9 @@ bool parseManifest(const QByteArray &bytes, const QString &id, Manifest *manifes
     const QJsonObject json = QJsonDocument::fromJson(bytes).object();
     const QString storedName = json.value(QStringLiteral("storedName")).toString();
     const QString originalName = json.value(QStringLiteral("originalName")).toString();
-    if (json.value(QStringLiteral("schemaVersion")).toInt() != 1 || json.value(QStringLiteral("sha256")).toString() != id || storedName.isEmpty()
-        || (storedName != QLatin1String("source") && !storedName.startsWith(QLatin1String("source."))) || QFileInfo(storedName).fileName() != storedName
-        || storedName.contains(QLatin1Char('\\'))
-        || originalName.isEmpty() || QFileInfo(originalName).fileName() != originalName || originalName.contains(QLatin1Char('\\'))) {
+    if (json.value(QStringLiteral("schemaVersion")).toInt() != 1 || json.value(QStringLiteral("sha256")).toString() != id || storedName.isEmpty() ||
+        (storedName != QLatin1String("source") && !storedName.startsWith(QLatin1String("source."))) || QFileInfo(storedName).fileName() != storedName || storedName.contains(QLatin1Char('\\')) || originalName.isEmpty() ||
+        QFileInfo(originalName).fileName() != originalName || originalName.contains(QLatin1Char('\\'))) {
         return false;
     }
     *manifest = {id, storedName, originalName, bytes};
@@ -174,8 +173,7 @@ BookSyncResult BookLibrarySync::synchronizeSources() const
         }
         QFile manifestFile(QDir(entry.filePath()).filePath(QStringLiteral("manifest.json")));
         Manifest manifest;
-        if (!manifestFile.open(QIODevice::ReadOnly) || !parseManifest(manifestFile.readAll(), id, &manifest)
-            || hashFile(QDir(entry.filePath()).filePath(manifest.storedName)) != id) {
+        if (!manifestFile.open(QIODevice::ReadOnly) || !parseManifest(manifestFile.readAll(), id, &manifest) || hashFile(QDir(entry.filePath()).filePath(manifest.storedName)) != id) {
             result.error = QStringLiteral("The local project %1 is incomplete or changed").arg(id);
             return result;
         }

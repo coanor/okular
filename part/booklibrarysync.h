@@ -10,7 +10,10 @@ struct BookSyncResult {
     int downloaded = 0;
     QString error;
 
-    bool successful() const { return error.isEmpty(); }
+    bool successful() const
+    {
+        return error.isEmpty();
+    }
 };
 
 // Source-file synchronization. Call from a worker thread; annotation and

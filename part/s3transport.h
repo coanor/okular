@@ -11,7 +11,10 @@ struct S3Response {
     QByteArray body;
     QString error;
 
-    bool successful() const { return status >= 200 && status < 300 && error.isEmpty(); }
+    bool successful() const
+    {
+        return status >= 200 && status < 300 && error.isEmpty();
+    }
 };
 
 class BookObjectStore

@@ -73,8 +73,8 @@ bool S3Configuration::fromEnvironment(const QProcessEnvironment &environment, S3
         endpointText = QStringLiteral("https://s3.%1.amazonaws.com").arg(result.region);
     }
     result.endpoint = QUrl(endpointText);
-    if (!result.endpoint.isValid() || result.endpoint.host().isEmpty() || (result.endpoint.scheme() != QLatin1String("https") && result.endpoint.scheme() != QLatin1String("http"))
-        || !result.endpoint.userInfo().isEmpty() || result.endpoint.hasQuery() || result.endpoint.hasFragment()) {
+    if (!result.endpoint.isValid() || result.endpoint.host().isEmpty() || (result.endpoint.scheme() != QLatin1String("https") && result.endpoint.scheme() != QLatin1String("http")) || !result.endpoint.userInfo().isEmpty() ||
+        result.endpoint.hasQuery() || result.endpoint.hasFragment()) {
         return fail(QStringLiteral("Set a valid AWS_ENDPOINT_URL_S3"), error);
     }
 

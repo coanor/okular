@@ -49,9 +49,8 @@ public:
                 QByteArray body;
                 if (requestLine.value(1).contains("list-type=2")) {
                     ++listPages;
-                    body = listPages == 1
-                        ? "<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>next token</NextContinuationToken><Contents><Key>cloud/books/a/manifest.json</Key></Contents></ListBucketResult>"
-                        : "<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>cloud/books/b/manifest.json</Key></Contents></ListBucketResult>";
+                    body = listPages == 1 ? "<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>next token</NextContinuationToken><Contents><Key>cloud/books/a/manifest.json</Key></Contents></ListBucketResult>"
+                                          : "<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>cloud/books/b/manifest.json</Key></Contents></ListBucketResult>";
                 } else if (requestLine.value(0) == "GET") {
                     body = requestLine.value(1).contains("source.pdf") ? QByteArray("source file contents") : QByteArray("{\"schemaVersion\":1}");
                 }
@@ -129,9 +128,7 @@ private Q_SLOTS:
         QCOMPARE(server.requests.at(4).body, QByteArray("source file contents"));
 
         const QString destinationPath = temp.filePath(QStringLiteral("download.pdf"));
-        auto fileDownload = std::async(std::launch::async, [&transport, &destinationPath, &hash] {
-            return transport.downloadFile(QStringLiteral("books/a/source.pdf"), destinationPath, hash);
-        });
+        auto fileDownload = std::async(std::launch::async, [&transport, &destinationPath, &hash] { return transport.downloadFile(QStringLiteral("books/a/source.pdf"), destinationPath, hash); });
         QTRY_COMPARE(server.requests.size(), 6);
         QVERIFY(fileDownload.get().successful());
         QFile downloadedFile(destinationPath);
@@ -139,9 +136,7 @@ private Q_SLOTS:
         QCOMPARE(downloadedFile.readAll(), QByteArray("source file contents"));
         downloadedFile.close();
 
-        auto corruptDownload = std::async(std::launch::async, [&transport, &destinationPath] {
-            return transport.downloadFile(QStringLiteral("books/a/source.pdf"), destinationPath, QStringLiteral("wrong-hash"));
-        });
+        auto corruptDownload = std::async(std::launch::async, [&transport, &destinationPath] { return transport.downloadFile(QStringLiteral("books/a/source.pdf"), destinationPath, QStringLiteral("wrong-hash")); });
         QTRY_COMPARE(server.requests.size(), 7);
         QVERIFY(!corruptDownload.get().successful());
         QVERIFY(downloadedFile.open(QIODevice::ReadOnly));

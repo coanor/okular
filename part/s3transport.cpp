@@ -167,8 +167,8 @@ S3Response S3Transport::request(const QByteArray &method,
     const QByteArray signing = QStringLiteral("aws:amz:%1:s3").arg(m_configuration.region).toUtf8();
     char curlError[CURL_ERROR_SIZE] = {};
     QByteArray responseBody;
-    Upload upload{body, uploadPath.isEmpty() ? nullptr : &uploadFile, 0};
-    Download download{&responseBody, downloadPath.isEmpty() ? nullptr : &downloadFile, &downloadHash};
+    Upload upload {body, uploadPath.isEmpty() ? nullptr : &uploadFile, 0};
+    Download download {&responseBody, downloadPath.isEmpty() ? nullptr : &downloadFile, &downloadHash};
     curl_slist *headers = nullptr;
     const auto appendHeader = [&headers](const QByteArray &header) {
         curl_slist *next = curl_slist_append(headers, header.constData());

@@ -115,8 +115,8 @@ bool BookLibrary::importFile(const QString &sourcePath, const QString &libraryRo
         storedName = manifest.value(QStringLiteral("storedName")).toString();
         originalName = manifest.value(QStringLiteral("originalName")).toString();
         const QFileInfo storedInfo(QDir(projectPath).filePath(storedName));
-        if (manifest.value(QStringLiteral("schemaVersion")).toInt() != 1 || manifest.value(QStringLiteral("sha256")).toString() != id || storedName.isEmpty()
-            || originalName.isEmpty() || QFileInfo(storedName).fileName() != storedName || storedInfo.isSymLink() || hashFile(storedInfo.filePath()) != id) {
+        if (manifest.value(QStringLiteral("schemaVersion")).toInt() != 1 || manifest.value(QStringLiteral("sha256")).toString() != id || storedName.isEmpty() || originalName.isEmpty() || QFileInfo(storedName).fileName() != storedName ||
+            storedInfo.isSymLink() || hashFile(storedInfo.filePath()) != id) {
             return fail(QStringLiteral("The existing book project is invalid"), error);
         }
     } else {

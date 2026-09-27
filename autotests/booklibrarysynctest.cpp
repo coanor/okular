@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#include "../part/booklibrary.h"
 #include "../part/booklibrarysync.h"
+#include "../part/booklibrary.h"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -18,7 +18,7 @@ public:
 
     S3Response getObject(const QString &key) const override
     {
-        return objects.contains(key) ? S3Response{200, objects.value(key), {}} : S3Response{404, {}, {}};
+        return objects.contains(key) ? S3Response {200, objects.value(key), {}} : S3Response {404, {}, {}};
     }
 
     S3Response putObjectIfAbsent(const QString &key, const QByteArray &body) const override

@@ -48,9 +48,9 @@
 #include <QMap>
 #include <QMenu>
 #include <QMenuBar>
-#include <QMouseEvent>
 #include <QMimeData>
 #include <QMimeDatabase>
+#include <QMouseEvent>
 #include <QPrintDialog>
 #include <QPrintPreviewDialog>
 #ifdef OKULAR_HAVE_S3_CURL
@@ -72,11 +72,11 @@
 #include <KAboutPluginDialog>
 #include <KActionCollection>
 #include <KActionMenu>
-#include <KConfigGroup>
 #include <KBookmarkAction>
 #include <KColorSchemeManager>
 #include <KColorSchemeMenu>
 #include <KCompressionDevice>
+#include <KConfigGroup>
 #include <KDirWatch>
 #include <KFilterBase>
 #include <KHamburgerMenu>
@@ -90,8 +90,8 @@
 #include <KParts/GUIActivateEvent>
 #include <KPasswordDialog>
 #include <KPluginMetaData>
-#include <KSharedDataCache>
 #include <KSharedConfig>
+#include <KSharedDataCache>
 #include <KStandardShortcut>
 #include <KToggleAction>
 #include <KToggleFullScreenAction>
@@ -1108,8 +1108,8 @@ void Part::openCloudBook()
         const QString storedName = manifest.value(QStringLiteral("storedName")).toString();
         const QString originalName = manifest.value(QStringLiteral("originalName")).toString();
         const QString sourcePath = QDir(entry.filePath()).filePath(storedName);
-        if (manifest.value(QStringLiteral("sha256")).toString() != entry.fileName() || originalName.isEmpty() || storedName.isEmpty() || QFileInfo(storedName).fileName() != storedName
-            || storedName.contains(QLatin1Char('\\')) || !QFileInfo(sourcePath).isFile() || QFileInfo(sourcePath).isSymLink()) {
+        if (manifest.value(QStringLiteral("sha256")).toString() != entry.fileName() || originalName.isEmpty() || storedName.isEmpty() || QFileInfo(storedName).fileName() != storedName || storedName.contains(QLatin1Char('\\')) ||
+            !QFileInfo(sourcePath).isFile() || QFileInfo(sourcePath).isSymLink()) {
             continue;
         }
         choices.insert(i18n("%1 (%2)", originalName, entry.fileName().left(12)), sourcePath);

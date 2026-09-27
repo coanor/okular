@@ -88,6 +88,10 @@ bool BookLibrary::importFile(const QString &sourcePath, const QString &libraryRo
     if (!QDir().mkpath(booksPath)) {
         return fail(QStringLiteral("Could not create the managed library directory"), error);
     }
+    QLockFile libraryLock(QDir(libraryRoot).filePath(QStringLiteral(".sync.lock")));
+    if (!libraryLock.tryLock(30000)) {
+        return fail(QStringLiteral("The managed library is busy"), error);
+    }
     QLockFile lock(QDir(booksPath).filePath(id + QStringLiteral(".lock")));
     if (!lock.tryLock(30000)) {
         return fail(QStringLiteral("Could not lock the book project"), error);

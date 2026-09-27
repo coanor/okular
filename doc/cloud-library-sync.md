@@ -1,8 +1,9 @@
 # Cloud book library sync
 
-This feature is being developed in `feature/s3-library-sync`. The first
-implemented slice is local import into a managed library; S3 transfer and UI
-are not yet available.
+This feature is being developed in `feature/s3-library-sync`. See
+[`spec.md`](../spec.md) for the full first-release contract. The current
+desktop actions cover local import, opening managed books, and manual source
+file sync. PDF annotations and model settings are not synced yet.
 
 ## Project identity and local import
 
@@ -26,9 +27,21 @@ associated because both already use the source bytes' hash.
 
 ## Planned remote data
 
-The S3 bucket and prefix come from Okular-specific environment variables;
-AWS credentials, profile, region and S3 endpoint use the standard AWS
-environment variables. Secrets and Codex login state stay on each device.
+Set `OKULAR_S3_BUCKET` and optionally `OKULAR_S3_PREFIX`. Set `AWS_REGION`,
+and use either `AWS_ACCESS_KEY_ID` plus `AWS_SECRET_ACCESS_KEY` (with optional
+`AWS_SESSION_TOKEN`) or a static profile selected by `AWS_PROFILE` in the AWS
+shared credentials file. `AWS_ENDPOINT_URL_S3` selects a compatible endpoint;
+otherwise Okular uses the regional AWS S3 endpoint. This transport currently
+supports static shared-credentials profiles, not SSO or role-based credential
+resolution. Secrets and Codex login state stay on each device.
+
+With libcurl available at build time, the desktop **File** menu offers **Add
+Current Book to Cloud Library**, **Open Cloud Book**, and **Sync Cloud Book
+Files Now**. The first action asks for a managed directory and moves the
+current local file into it after closing the document. The sync action runs
+in the background and reports uploads or downloads. It synchronizes source
+files only at this stage.
+
 `version.json` at the prefix root identifies the library format. Projects
 live under `books/<sha256>/` and carry their own metadata. The global file
 must not become a mutable list that every device rewrites.

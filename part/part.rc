@@ -1,10 +1,13 @@
 <?xml version="1.0"?>
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui name="okular_part" version="56">
+<gui name="okular_part" version="57">
 <MenuBar>
   <Menu name="file"><text>&amp;File</text>
     <Action name="get_new_stuff" group="file_open"/>
     <Action name="import_ps" group="file_open"/>
+    <Action name="cloud_add_book" group="file_open"/>
+    <Action name="cloud_open_book" group="file_open"/>
+    <Action name="cloud_sync_book_files" group="file_open"/>
     <Action name="file_save" group="file_save"/>
     <Action name="file_save_as" group="file_save"/>
     <Action name="file_reload" group="file_save"/>

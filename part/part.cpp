@@ -37,10 +37,15 @@
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
+#ifdef OKULAR_HAVE_S3_CURL
+#include <QFutureWatcher>
+#endif
 #include <QInputDialog>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QLabel>
 #include <QLayout>
+#include <QMap>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
@@ -48,6 +53,10 @@
 #include <QMimeDatabase>
 #include <QPrintDialog>
 #include <QPrintPreviewDialog>
+#ifdef OKULAR_HAVE_S3_CURL
+#include <QProcessEnvironment>
+#include <QProgressDialog>
+#endif
 #include <QPrinter>
 #include <QScopedValueRollback>
 #include <QScrollBar>
@@ -63,6 +72,7 @@
 #include <KAboutPluginDialog>
 #include <KActionCollection>
 #include <KActionMenu>
+#include <KConfigGroup>
 #include <KBookmarkAction>
 #include <KColorSchemeManager>
 #include <KColorSchemeMenu>
@@ -81,6 +91,7 @@
 #include <KPasswordDialog>
 #include <KPluginMetaData>
 #include <KSharedDataCache>
+#include <KSharedConfig>
 #include <KStandardShortcut>
 #include <KToggleAction>
 #include <KToggleFullScreenAction>
@@ -101,6 +112,11 @@
 #include "aireadingassistant.h"
 #include "annotationpopup.h"
 #include "bookmarklist.h"
+#ifdef OKULAR_HAVE_S3_CURL
+#include "booklibrary.h"
+#include "booklibrarysync.h"
+#include "s3configuration.h"
+#endif
 #include "core/action.h"
 #include "core/annotations.h"
 #include "core/bookmarkmanager.h"
@@ -124,6 +140,9 @@
 #include "presentationwidget.h"
 #include "propertiesdialog.h"
 #include "searchwidget.h"
+#ifdef OKULAR_HAVE_S3_CURL
+#include "s3transport.h"
+#endif
 #include "settings.h"
 #include "side_reviews.h"
 #include "sidebar.h"
@@ -133,6 +152,9 @@
 
 #include <memory>
 #include <type_traits>
+#ifdef OKULAR_HAVE_S3_CURL
+#include <QtConcurrent>
+#endif
 
 #ifdef OKULAR_KEEP_FILE_OPEN
 class FileKeeper
@@ -961,6 +983,23 @@ void Part::setupActions()
     importPS->setIcon(QIcon::fromTheme(QStringLiteral("document-import")));
     connect(importPS, &QAction::triggered, this, &Part::slotImportPSFile);
 
+#ifdef OKULAR_HAVE_S3_CURL
+    m_addToCloudLibrary = ac->addAction(QStringLiteral("cloud_add_book"));
+    m_addToCloudLibrary->setText(i18n("Add Current Book to Cloud Library…"));
+    m_addToCloudLibrary->setIcon(QIcon::fromTheme(QStringLiteral("document-import")));
+    connect(m_addToCloudLibrary, &QAction::triggered, this, &Part::addCurrentBookToCloudLibrary);
+
+    m_openCloudBook = ac->addAction(QStringLiteral("cloud_open_book"));
+    m_openCloudBook->setText(i18n("Open Cloud Book…"));
+    m_openCloudBook->setIcon(QIcon::fromTheme(QStringLiteral("document-open")));
+    connect(m_openCloudBook, &QAction::triggered, this, &Part::openCloudBook);
+
+    m_syncCloudLibrary = ac->addAction(QStringLiteral("cloud_sync_book_files"));
+    m_syncCloudLibrary->setText(i18n("Sync Cloud Book Files Now…"));
+    m_syncCloudLibrary->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
+    connect(m_syncCloudLibrary, &QAction::triggered, this, &Part::syncCloudBookFiles);
+#endif
+
     KToggleAction *blackscreenAction = new KToggleAction(i18n("Switch Blackscreen Mode"), ac);
     ac->addAction(QStringLiteral("switch_blackscreen_mode"), blackscreenAction);
     ac->setDefaultShortcut(blackscreenAction, QKeySequence(Qt::Key_B));
@@ -983,6 +1022,146 @@ void Part::setupActions()
     ac->addAction(QStringLiteral("presentation_play_pause"), playPauseAction);
     playPauseAction->setEnabled(false);
 }
+
+#ifdef OKULAR_HAVE_S3_CURL
+QString Part::cloudLibraryRoot()
+{
+    auto config = KSharedConfig::openConfig();
+    KConfigGroup group(config, QStringLiteral("Cloud Book Library"));
+    QString root = group.readEntry("ManagedDirectory", QString());
+    if (root.isEmpty()) {
+        root = QFileDialog::getExistingDirectory(widget(), i18n("Choose Managed Book Library Directory"));
+        if (!root.isEmpty()) {
+            group.writeEntry("ManagedDirectory", root);
+            config->sync();
+        }
+    }
+    return root;
+}
+
+void Part::addCurrentBookToCloudLibrary()
+{
+    if (!m_document->isOpened() || !url().isLocalFile()) {
+        KMessageBox::error(widget(), i18n("Open a local book before adding it to the cloud library."));
+        return;
+    }
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    const QUrl originalUrl = url();
+    if (!closeUrl()) {
+        return;
+    }
+    m_addToCloudLibrary->setEnabled(false);
+    m_syncCloudLibrary->setEnabled(false);
+    auto *progress = new QProgressDialog(i18n("Moving book into the managed library…"), QString(), 0, 0, widget());
+    progress->setCancelButton(nullptr);
+    progress->show();
+    struct Outcome {
+        BookProject project;
+        QString error;
+        bool success = false;
+    };
+    auto *watcher = new QFutureWatcher<Outcome>(this);
+    connect(watcher, &QFutureWatcher<Outcome>::finished, this, [this, watcher, progress, originalUrl] {
+        const Outcome outcome = watcher->result();
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        m_addToCloudLibrary->setEnabled(true);
+        m_syncCloudLibrary->setEnabled(true);
+        if (!outcome.success) {
+            KMessageBox::error(widget(), i18n("Could not add book: %1", outcome.error));
+            if (QFile::exists(originalUrl.toLocalFile())) {
+                openUrl(originalUrl);
+            }
+            return;
+        }
+        openUrl(QUrl::fromLocalFile(outcome.project.sourcePath));
+        syncCloudBookFiles();
+    });
+    watcher->setFuture(QtConcurrent::run([sourcePath = originalUrl.toLocalFile(), root] {
+        Outcome outcome;
+        outcome.success = BookLibrary::importFile(sourcePath, root, &outcome.project, &outcome.error);
+        return outcome;
+    }));
+}
+
+void Part::openCloudBook()
+{
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    const QDir books(QDir(root).filePath(QStringLiteral("books")));
+    QMap<QString, QString> choices;
+    for (const QFileInfo &entry : books.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        if (entry.isSymLink()) {
+            continue;
+        }
+        QFile manifestFile(QDir(entry.filePath()).filePath(QStringLiteral("manifest.json")));
+        if (!manifestFile.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        const QJsonObject manifest = QJsonDocument::fromJson(manifestFile.readAll()).object();
+        const QString storedName = manifest.value(QStringLiteral("storedName")).toString();
+        const QString originalName = manifest.value(QStringLiteral("originalName")).toString();
+        const QString sourcePath = QDir(entry.filePath()).filePath(storedName);
+        if (manifest.value(QStringLiteral("sha256")).toString() != entry.fileName() || originalName.isEmpty() || storedName.isEmpty() || QFileInfo(storedName).fileName() != storedName
+            || storedName.contains(QLatin1Char('\\')) || !QFileInfo(sourcePath).isFile() || QFileInfo(sourcePath).isSymLink()) {
+            continue;
+        }
+        choices.insert(i18n("%1 (%2)", originalName, entry.fileName().left(12)), sourcePath);
+    }
+    if (choices.isEmpty()) {
+        KMessageBox::information(widget(), i18n("No cloud books are stored on this device yet. Use Sync Cloud Book Files Now to download them."));
+        return;
+    }
+    bool accepted = false;
+    const QString selected = QInputDialog::getItem(widget(), i18n("Open Cloud Book"), i18n("Book:"), choices.keys(), 0, false, &accepted);
+    if (accepted && choices.contains(selected)) {
+        openUrl(QUrl::fromLocalFile(choices.value(selected)));
+    }
+}
+
+void Part::syncCloudBookFiles()
+{
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    S3Configuration configuration;
+    QString error;
+    if (!S3Configuration::fromEnvironment(QProcessEnvironment::systemEnvironment(), &configuration, &error)) {
+        KMessageBox::error(widget(), i18n("Cloud library is not configured: %1", error));
+        return;
+    }
+    m_syncCloudLibrary->setEnabled(false);
+    m_addToCloudLibrary->setEnabled(false);
+    auto *progress = new QProgressDialog(i18n("Synchronizing cloud book files…"), QString(), 0, 0, widget());
+    progress->setCancelButton(nullptr);
+    progress->show();
+    auto *watcher = new QFutureWatcher<BookSyncResult>(this);
+    connect(watcher, &QFutureWatcher<BookSyncResult>::finished, this, [this, watcher, progress] {
+        const BookSyncResult result = watcher->result();
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        m_syncCloudLibrary->setEnabled(true);
+        m_addToCloudLibrary->setEnabled(true);
+        if (!result.successful()) {
+            KMessageBox::error(widget(), i18n("Cloud book file sync failed: %1", result.error));
+        } else {
+            KMessageBox::information(widget(), i18n("Cloud book files synchronized. Uploaded: %1. Downloaded: %2.", result.uploaded, result.downloaded));
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([configuration, root] {
+        S3Transport store(configuration);
+        return BookLibrarySync(store, root).synchronizeSources();
+    }));
+}
+#endif
 
 Part::~Part()
 {

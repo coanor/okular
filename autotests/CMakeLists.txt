@@ -85,6 +85,20 @@ ecm_add_test(annotationsidecartest.cpp
 )
 
 if(BUILD_DESKTOP)
+    ecm_add_test(booklibrarysynctest.cpp ../part/booklibrarysync.cpp ../part/booklibrary.cpp
+        TEST_NAME "booklibrarysynctest"
+        LINK_LIBRARIES Qt6::Test
+    )
+    if(CURL_FOUND)
+        ecm_add_test(s3transporttest.cpp ../part/s3transport.cpp ../part/s3configuration.cpp
+            TEST_NAME "s3transporttest"
+            LINK_LIBRARIES Qt6::Test Qt6::Network CURL::libcurl
+        )
+    endif()
+    ecm_add_test(s3configurationtest.cpp ../part/s3configuration.cpp
+        TEST_NAME "s3configurationtest"
+        LINK_LIBRARIES Qt6::Test
+    )
     ecm_add_test(booklibrarytest.cpp ../part/booklibrary.cpp
         TEST_NAME "booklibrarytest"
         LINK_LIBRARIES Qt6::Test

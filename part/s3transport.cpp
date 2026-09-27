@@ -85,9 +85,9 @@ S3Response S3Transport::putObjectIfAbsent(const QString &relativeKey, const QByt
     return request("PUT", relativeKey, &body, true);
 }
 
-S3Response S3Transport::putFileIfAbsent(const QString &relativeKey, const QString &sourcePath) const
+S3Response S3Transport::putFileIfAbsent(const QString &relativeKey, const QString &sourcePath, const QString &expectedSha256) const
 {
-    return request("PUT", relativeKey, nullptr, true, false, {}, {}, sourcePath);
+    return request("PUT", relativeKey, nullptr, true, false, {}, {}, sourcePath, {}, expectedSha256);
 }
 
 S3Response S3Transport::downloadFile(const QString &relativeKey, const QString &destinationPath, const QString &expectedSha256) const
@@ -118,6 +118,9 @@ S3Response S3Transport::request(const QByteArray &method,
             return {0, {}, QStringLiteral("Could not hash the source file for S3 upload")};
         }
         uploadDigest = hash.result().toHex();
+        if (uploadDigest != expectedSha256.toLatin1()) {
+            return {0, {}, QStringLiteral("The source file changed before S3 upload")};
+        }
         uploadSize = uploadFile.size();
     } else if (body) {
         uploadDigest = QCryptographicHash::hash(*body, QCryptographicHash::Sha256).toHex();

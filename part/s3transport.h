@@ -20,7 +20,7 @@ public:
     virtual ~BookObjectStore() = default;
     virtual S3Response getObject(const QString &relativeKey) const = 0;
     virtual S3Response putObjectIfAbsent(const QString &relativeKey, const QByteArray &body) const = 0;
-    virtual S3Response putFileIfAbsent(const QString &relativeKey, const QString &sourcePath) const = 0;
+    virtual S3Response putFileIfAbsent(const QString &relativeKey, const QString &sourcePath, const QString &expectedSha256) const = 0;
     virtual S3Response downloadFile(const QString &relativeKey, const QString &destinationPath, const QString &expectedSha256) const = 0;
     virtual bool listObjects(const QString &relativePrefix, QStringList *relativeKeys, QString *error) const = 0;
 };
@@ -33,7 +33,7 @@ public:
     explicit S3Transport(S3Configuration configuration);
     S3Response getObject(const QString &relativeKey) const override;
     S3Response putObjectIfAbsent(const QString &relativeKey, const QByteArray &body) const override;
-    S3Response putFileIfAbsent(const QString &relativeKey, const QString &sourcePath) const override;
+    S3Response putFileIfAbsent(const QString &relativeKey, const QString &sourcePath, const QString &expectedSha256) const override;
     S3Response downloadFile(const QString &relativeKey, const QString &destinationPath, const QString &expectedSha256) const override;
     bool listObjects(const QString &relativePrefix, QStringList *relativeKeys, QString *error) const override;
 

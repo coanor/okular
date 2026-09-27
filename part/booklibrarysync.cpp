@@ -188,7 +188,7 @@ BookSyncResult BookLibrarySync::synchronizeSources() const
         }
         const QString sourcePath = books.filePath(it.key() + QLatin1Char('/') + it->storedName);
         const QString sourceKey = QStringLiteral("books/%1/source").arg(it.key());
-        const S3Response uploaded = m_store.putFileIfAbsent(sourceKey, sourcePath);
+        const S3Response uploaded = m_store.putFileIfAbsent(sourceKey, sourcePath, it.key());
         if (uploaded.status == 412 && uploaded.error.isEmpty()) {
             const QString incomingPath = QDir(m_libraryRoot).filePath(QStringLiteral(".incoming"));
             QDir().mkpath(incomingPath);

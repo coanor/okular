@@ -120,13 +120,15 @@ private Q_SLOTS:
         QVERIFY(source.open(QIODevice::WriteOnly));
         QCOMPARE(source.write("source file contents"), 20);
         source.close();
-        auto fileUpload = std::async(std::launch::async, [&transport, &sourcePath] { return transport.putFileIfAbsent(QStringLiteral("books/a/source.pdf"), sourcePath); });
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash("source file contents", QCryptographicHash::Sha256).toHex());
+        QVERIFY(!transport.putFileIfAbsent(QStringLiteral("books/a/source.pdf"), sourcePath, QStringLiteral("wrong-hash")).successful());
+        QCOMPARE(server.requests.size(), 4);
+        auto fileUpload = std::async(std::launch::async, [&transport, &sourcePath, &hash] { return transport.putFileIfAbsent(QStringLiteral("books/a/source.pdf"), sourcePath, hash); });
         QTRY_COMPARE(server.requests.size(), 5);
         QVERIFY(fileUpload.get().successful());
         QCOMPARE(server.requests.at(4).body, QByteArray("source file contents"));
 
         const QString destinationPath = temp.filePath(QStringLiteral("download.pdf"));
-        const QString hash = QString::fromLatin1(QCryptographicHash::hash("source file contents", QCryptographicHash::Sha256).toHex());
         auto fileDownload = std::async(std::launch::async, [&transport, &destinationPath, &hash] {
             return transport.downloadFile(QStringLiteral("books/a/source.pdf"), destinationPath, hash);
         });

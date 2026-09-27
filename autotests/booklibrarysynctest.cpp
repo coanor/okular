@@ -30,13 +30,17 @@ public:
         return {200, {}, {}};
     }
 
-    S3Response putFileIfAbsent(const QString &key, const QString &sourcePath) const override
+    S3Response putFileIfAbsent(const QString &key, const QString &sourcePath, const QString &expectedSha256) const override
     {
         QFile file(sourcePath);
         if (!file.open(QIODevice::ReadOnly)) {
             return {0, {}, QStringLiteral("Cannot read source")};
         }
-        return putObjectIfAbsent(key, file.readAll());
+        const QByteArray contents = file.readAll();
+        if (QString::fromLatin1(QCryptographicHash::hash(contents, QCryptographicHash::Sha256).toHex()) != expectedSha256) {
+            return {0, {}, QStringLiteral("Source hash mismatch")};
+        }
+        return putObjectIfAbsent(key, contents);
     }
 
     S3Response downloadFile(const QString &key, const QString &destinationPath, const QString &expectedSha256) const override
@@ -150,6 +154,29 @@ private Q_SLOTS:
         const BookSyncResult result = BookLibrarySync(store, temp.filePath(QStringLiteral("library"))).synchronizeSources();
         QVERIFY(!result.successful());
         QVERIFY(result.error.contains(QStringLiteral("conditional writes")));
+    }
+
+    void refusesChangedManagedSource()
+    {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const QString sourcePath = temp.filePath(QStringLiteral("book.pdf"));
+        QFile source(sourcePath);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QCOMPARE(source.write("original"), 8);
+        source.close();
+        const QString root = temp.filePath(QStringLiteral("library"));
+        BookProject project;
+        QString error;
+        QVERIFY2(BookLibrary::importFile(sourcePath, root, &project, &error), qPrintable(error));
+        QFile managed(project.sourcePath);
+        QVERIFY(managed.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(managed.write("modified"), 8);
+        managed.close();
+        MemoryBookStore store;
+        const BookSyncResult result = BookLibrarySync(store, root).synchronizeSources();
+        QVERIFY(!result.successful());
+        QVERIFY(!store.objects.contains(QStringLiteral("books/%1/manifest.json").arg(project.id)));
     }
 };
 

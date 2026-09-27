@@ -83,6 +83,7 @@ QList<AiProfile> AiStore::loadProfiles(WId windowId)
         profile.kind = static_cast<AiProfile::Kind>(json.value(QStringLiteral("kind")).toInt());
         profile.endpoint = json.value(QStringLiteral("endpoint")).toString();
         profile.model = json.value(QStringLiteral("model")).toString();
+        profile.extraArguments = json.value(QStringLiteral("extraArguments")).toString();
         profile.vision = json.value(QStringLiteral("vision")).toBool(true);
         if (profile.id.isEmpty() || profile.name.isEmpty()) {
             continue;
@@ -124,6 +125,7 @@ bool AiStore::saveProfiles(const QList<AiProfile> &profiles, WId windowId, QStri
         json.insert(QStringLiteral("kind"), static_cast<int>(profile.kind));
         json.insert(QStringLiteral("endpoint"), profile.endpoint);
         json.insert(QStringLiteral("model"), profile.model);
+        json.insert(QStringLiteral("extraArguments"), profile.extraArguments);
         json.insert(QStringLiteral("vision"), profile.vision);
         list.append(json);
 #if HAVE_KWALLET

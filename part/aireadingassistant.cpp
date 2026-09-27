@@ -18,13 +18,16 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QTextEdit>
@@ -98,6 +101,8 @@ bool editProfile(AiProfile &profile, QWidget *parent)
     endpoint->setPlaceholderText(i18n("Base URL, for example https://api.openai.com/v1"));
     auto *model = new QLineEdit(profile.model, &dialog);
     model->setPlaceholderText(i18n("Model name; leave empty for Codex default"));
+    auto *extra = new QPlainTextEdit(profile.extraArguments, &dialog);
+    extra->setMaximumHeight(72);
     auto *key = new QLineEdit(&dialog);
     key->setEchoMode(QLineEdit::Password);
     key->setPlaceholderText(profile.apiKey.isEmpty() ? i18n("API key") : i18n("Leave blank to keep the current key"));
@@ -107,24 +112,37 @@ bool editProfile(AiProfile &profile, QWidget *parent)
     form->addRow(i18n("Protocol:"), kind);
     form->addRow(i18n("Base URL:"), endpoint);
     form->addRow(i18n("Model:"), model);
+    form->addRow(i18n("Extra arguments:"), extra);
     form->addRow(i18n("API key:"), key);
     form->addRow(QString(), vision);
-    const auto updateFields = [kind, endpoint, key] {
+    const auto updateFields = [kind, endpoint, key, extra] {
         const bool codex = kind->currentData().toInt() == static_cast<int>(AiProfile::Kind::Codex);
         endpoint->setEnabled(!codex);
         key->setEnabled(!codex);
+        extra->setPlaceholderText(codex ? i18n("Codex CLI options, e.g. -c model_reasoning_effort=medium (default: low)")
+                                        : i18n("JSON request fields, e.g. {\"temperature\":0.2}"));
     };
     QObject::connect(kind, &QComboBox::currentIndexChanged, &dialog, updateFields);
     updateFields();
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     layout->addWidget(buttons);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+        if (name->text().trimmed().isEmpty()) {
+            QMessageBox::warning(&dialog, i18n("AI model"), i18n("Give this model a name."));
+            return;
+        }
+        if (kind->currentData().toInt() != static_cast<int>(AiProfile::Kind::Codex) && !extra->toPlainText().trimmed().isEmpty()) {
+            QJsonParseError error;
+            const QJsonDocument document = QJsonDocument::fromJson(extra->toPlainText().toUtf8(), &error);
+            if (error.error != QJsonParseError::NoError || !document.isObject()) {
+                QMessageBox::warning(&dialog, i18n("AI model"), i18n("Extra arguments must be a JSON object for this provider."));
+                return;
+            }
+        }
+        dialog.accept();
+    });
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     if (dialog.exec() != QDialog::Accepted) {
-        return false;
-    }
-    if (name->text().trimmed().isEmpty()) {
-        QMessageBox::warning(parent, i18n("AI model"), i18n("Give this model a name."));
         return false;
     }
     if (profile.id.isEmpty()) {
@@ -134,6 +152,7 @@ bool editProfile(AiProfile &profile, QWidget *parent)
     profile.kind = static_cast<AiProfile::Kind>(kind->currentData().toInt());
     profile.endpoint = endpoint->text().trimmed();
     profile.model = model->text().trimmed();
+    profile.extraArguments = extra->toPlainText().trimmed();
     profile.vision = vision->isChecked();
     if (!key->text().isEmpty()) {
         profile.apiKey = key->text();

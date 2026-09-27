@@ -14,6 +14,7 @@ struct AiProfile {
     Kind kind = Kind::OpenAiChat;
     QString endpoint;
     QString model;
+    QString extraArguments; // CLI options for Codex, JSON request fields for HTTP providers.
     bool vision = true;
     QString apiKey; // Kept in memory and, when available, in KWallet.
 };

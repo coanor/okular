@@ -43,6 +43,7 @@ private:
     QProcess *m_process = nullptr;
     QTemporaryFile *m_imageFile = nullptr;
     AiProfile m_profile;
+    QJsonObject m_extraPayload;
     AiConversation m_conversation;
     AiMessage m_message;
     QString m_sessionId;

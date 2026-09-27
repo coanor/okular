@@ -83,27 +83,33 @@ private Q_SLOTS:
         profile.model = QStringLiteral("test-model");
         profile.apiKey = QStringLiteral("test-key");
         profile.kind = AiProfile::Kind::OpenAiChat;
+        profile.extraArguments = QStringLiteral("{\"temperature\":0.2,\"model\":\"ignored\"}");
         profile.endpoint = QStringLiteral("http://127.0.0.1:%1/v1").arg(server.serverPort());
         provider.send(profile, history, current);
         QVERIFY(completed.wait(5000));
         QVERIFY(failed.isEmpty());
         QCOMPARE(completed.takeFirst().at(0).toString(), QStringLiteral("chat answer"));
         QCOMPARE(server.requests.last().path, QByteArray("/v1/chat/completions"));
+        QCOMPARE(server.requests.last().body.value(QStringLiteral("temperature")).toDouble(), 0.2);
+        QCOMPARE(server.requests.last().body.value(QStringLiteral("model")).toString(), QStringLiteral("test-model"));
         const QJsonArray chatMessages = server.requests.last().body.value(QStringLiteral("messages")).toArray();
         QCOMPARE(chatMessages.size(), 4);
         QVERIFY(chatMessages.at(1).toObject().value(QStringLiteral("content")).toArray().at(0).toObject().value(QStringLiteral("text")).toString().contains(QStringLiteral("earlier page text")));
         QCOMPARE(chatMessages.at(3).toObject().value(QStringLiteral("content")).toArray().size(), 2);
 
         profile.kind = AiProfile::Kind::Anthropic;
+        profile.extraArguments = QStringLiteral("{\"max_tokens\":512}");
         profile.endpoint = QStringLiteral("http://127.0.0.1:%1/v1").arg(server.serverPort());
         provider.send(profile, history, current);
         QVERIFY(completed.wait(5000));
         QVERIFY(failed.isEmpty());
         QCOMPARE(completed.takeFirst().at(0).toString(), QStringLiteral("anthropic answer"));
         QCOMPARE(server.requests.last().path, QByteArray("/v1/messages"));
+        QCOMPARE(server.requests.last().body.value(QStringLiteral("max_tokens")).toInt(), 512);
         QCOMPARE(server.requests.last().body.value(QStringLiteral("messages")).toArray().size(), 3);
 
         profile.kind = AiProfile::Kind::OpenAiResponses;
+        profile.extraArguments = QStringLiteral("{\"reasoning\":{\"effort\":\"low\"}}");
         profile.endpoint = QStringLiteral("http://127.0.0.1:%1/v1").arg(server.serverPort());
         provider.send(profile, history, current);
         QVERIFY(completed.wait(5000));
@@ -113,7 +119,15 @@ private Q_SLOTS:
         QCOMPARE(response.at(1).toString(), QStringLiteral("conv-123"));
         QCOMPARE(server.requests.at(server.requests.size() - 2).path, QByteArray("/v1/conversations"));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("conversation")).toString(), QStringLiteral("conv-123"));
+        QCOMPARE(server.requests.last().body.value(QStringLiteral("reasoning")).toObject().value(QStringLiteral("effort")).toString(), QStringLiteral("low"));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("input")).toArray().at(0).toObject().value(QStringLiteral("content")).toArray().size(), 2);
+
+        const qsizetype requestCount = server.requests.size();
+        profile.kind = AiProfile::Kind::OpenAiChat;
+        profile.extraArguments = QStringLiteral("not JSON");
+        provider.send(profile, history, current);
+        QCOMPARE(failed.size(), 1);
+        QCOMPARE(server.requests.size(), requestCount);
     }
 
     void codexSessionResume()
@@ -145,7 +159,9 @@ private Q_SLOTS:
         QCOMPARE(completed.takeFirst().at(1).toString(), QStringLiteral("test-thread"));
         QFile args(directory.filePath(QStringLiteral("args.txt")));
         QVERIFY(args.open(QIODevice::ReadOnly));
-        QVERIFY(!args.readAll().contains("resume"));
+        const QByteArray initialArgs = args.readAll();
+        QVERIFY(!initialArgs.contains("resume"));
+        QVERIFY(initialArgs.contains("model_reasoning_effort=low"));
         args.close();
 
         conversation.sessionId = QStringLiteral("test-thread");
@@ -157,6 +173,18 @@ private Q_SLOTS:
         const QByteArray resumedArgs = args.readAll();
         QVERIFY(resumedArgs.contains("resume"));
         QVERIFY(resumedArgs.contains("test-thread"));
+        QVERIFY(resumedArgs.contains("model_reasoning_effort=low"));
+        args.close();
+
+        profile.extraArguments = QStringLiteral("-c model_reasoning_effort=medium");
+        provider.send(profile, conversation, question);
+        QVERIFY(completed.wait(5000));
+        QVERIFY(failed.isEmpty());
+        completed.takeFirst();
+        QVERIFY(args.open(QIODevice::ReadOnly));
+        const QByteArray overriddenArgs = args.readAll();
+        QVERIFY(overriddenArgs.contains("model_reasoning_effort=medium"));
+        QVERIFY(!overriddenArgs.contains("model_reasoning_effort=low"));
         qputenv("PATH", previousPath);
         qunsetenv("OKULAR_AI_TEST_ARGS");
     }

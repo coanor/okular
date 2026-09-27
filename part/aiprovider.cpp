@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonParseError>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QStandardPaths>
@@ -57,6 +58,16 @@ void AiProvider::send(const AiProfile &profile, const AiConversation &conversati
     m_lastAnswer.clear();
     m_outputBuffer.clear();
     m_errorBuffer.clear();
+    m_extraPayload = {};
+    if (profile.kind != AiProfile::Kind::Codex && !profile.extraArguments.trimmed().isEmpty()) {
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(profile.extraArguments.toUtf8(), &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject()) {
+            Q_EMIT failed(QStringLiteral("Extra arguments must be a JSON object"));
+            return;
+        }
+        m_extraPayload = document.object();
+    }
 
     switch (profile.kind) {
     case AiProfile::Kind::OpenAiChat:
@@ -159,7 +170,9 @@ void AiProvider::sendOpenAiChat()
         }
         messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
     }
-    QJsonObject payload{{QStringLiteral("model"), m_profile.model}, {QStringLiteral("messages"), messages}};
+    QJsonObject payload = m_extraPayload;
+    payload.insert(QStringLiteral("model"), m_profile.model);
+    payload.insert(QStringLiteral("messages"), messages);
     m_reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     finishHttp(m_reply, [this](const QJsonObject &json) {
         const QJsonArray choices = json.value(QStringLiteral("choices")).toArray();
@@ -201,10 +214,11 @@ void AiProvider::sendOpenAiResponse()
         content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("input_image")},
                                    {QStringLiteral("image_url"), imageUrl}});
     }
-    QJsonObject payload{{QStringLiteral("model"), m_profile.model},
-                        {QStringLiteral("conversation"), m_sessionId},
-                        {QStringLiteral("instructions"), instructions},
-                        {QStringLiteral("input"), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}}}}};
+    QJsonObject payload = m_extraPayload;
+    payload.insert(QStringLiteral("model"), m_profile.model);
+    payload.insert(QStringLiteral("conversation"), m_sessionId);
+    payload.insert(QStringLiteral("instructions"), instructions);
+    payload.insert(QStringLiteral("input"), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}}});
     m_reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     finishHttp(m_reply, [this](const QJsonObject &json) {
         QString answer;
@@ -246,10 +260,13 @@ void AiProvider::sendAnthropic()
         }
         messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
     }
-    QJsonObject payload{{QStringLiteral("model"), m_profile.model},
-                        {QStringLiteral("max_tokens"), 4096},
-                        {QStringLiteral("system"), instructions},
-                        {QStringLiteral("messages"), messages}};
+    QJsonObject payload = m_extraPayload;
+    payload.insert(QStringLiteral("model"), m_profile.model);
+    if (!payload.contains(QStringLiteral("max_tokens"))) {
+        payload.insert(QStringLiteral("max_tokens"), 4096);
+    }
+    payload.insert(QStringLiteral("system"), instructions);
+    payload.insert(QStringLiteral("messages"), messages);
     m_reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     finishHttp(m_reply, [this](const QJsonObject &json) {
         QString answer;
@@ -289,6 +306,25 @@ void AiProvider::sendCodex()
     if (!m_profile.model.isEmpty()) {
         args << QStringLiteral("-m") << m_profile.model;
     }
+    const QStringList extraArgs = QProcess::splitCommand(m_profile.extraArguments);
+    args << extraArgs;
+    bool hasReasoningEffort = false;
+    for (qsizetype index = 0; index < extraArgs.size(); ++index) {
+        const QString &arg = extraArgs[index];
+        if ((arg == QLatin1String("-c") || arg == QLatin1String("--config")) && index + 1 < extraArgs.size()
+            && extraArgs[index + 1].startsWith(QLatin1String("model_reasoning_effort="))) {
+            hasReasoningEffort = true;
+            break;
+        }
+        if (arg.startsWith(QLatin1String("--config=model_reasoning_effort=")) || arg.startsWith(QLatin1String("-cmodel_reasoning_effort="))) {
+            hasReasoningEffort = true;
+            break;
+        }
+    }
+    if (!hasReasoningEffort) {
+        args << QStringLiteral("-c") << QStringLiteral("model_reasoning_effort=low");
+    }
+    args << QStringLiteral("-c") << QStringLiteral("sandbox_mode=read-only");
     if (!m_message.pageImage.isEmpty()) {
         m_imageFile = new QTemporaryFile(directory + QStringLiteral("/page-XXXXXX.jpg"), this);
         if (!m_imageFile->open()) {

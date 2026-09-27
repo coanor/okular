@@ -18,6 +18,7 @@
 #include "../core/form.h"
 #include "../core/misc.h"
 #include "../core/page.h"
+#include "../part/aireadingassistant.h"
 #include "../part/pageview.h"
 #include "../part/part.h"
 #include "../part/presentationwidget.h"
@@ -1157,6 +1158,13 @@ void PartTest::testAiPanelOpens()
     action->trigger();
     QVERIFY(action->isChecked());
     QVERIFY(part.m_aiPanel);
+    QPushButton *promptAction = part.m_aiPanel->findChild<QPushButton *>(QStringLiteral("aiPromptAction"));
+    QVERIFY(promptAction);
+    QTextEdit *prompt = part.m_aiPanel->findChild<QTextEdit *>();
+    QCOMPARE(promptAction->parentWidget(), prompt);
+    prompt->resize(350, 100);
+    QCoreApplication::processEvents();
+    QVERIFY(prompt->rect().contains(promptAction->geometry()));
     action->trigger();
     QVERIFY(!action->isChecked());
 }

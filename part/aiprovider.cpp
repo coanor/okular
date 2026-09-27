@@ -29,7 +29,7 @@ AiProvider::AiProvider(QObject *parent)
 
 bool AiProvider::isBusy() const
 {
-    return m_reply || (m_process && m_process->state() != QProcess::NotRunning);
+    return m_reply || m_process;
 }
 
 void AiProvider::cancel()

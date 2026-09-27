@@ -25,12 +25,56 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QTextEdit>
 #include <QTimer>
 #include <QUuid>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <utility>
+
+class AiPromptEdit final : public QTextEdit
+{
+public:
+    explicit AiPromptEdit(QWidget *parent)
+        : QTextEdit(parent)
+        , m_button(new QPushButton(this))
+    {
+        m_button->setObjectName(QStringLiteral("aiPromptAction"));
+        m_button->setFocusPolicy(Qt::NoFocus);
+    }
+
+    QPushButton *actionButton() const
+    {
+        return m_button;
+    }
+
+    void setActionText(const QString &text)
+    {
+        if (m_button->text() == text) {
+            return;
+        }
+        m_button->setText(text);
+        m_button->adjustSize();
+        setViewportMargins(0, 0, m_button->width() + 12, 0);
+        positionButton();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QTextEdit::resizeEvent(event);
+        positionButton();
+    }
+
+private:
+    void positionButton()
+    {
+        m_button->move(width() - frameWidth() - m_button->width() - 4, height() - frameWidth() - m_button->height() - 4);
+    }
+
+    QPushButton *m_button;
+};
 
 namespace
 {
@@ -125,13 +169,18 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     m_selectionLabel->setWordWrap(true);
     m_selectionLabel->hide();
     layout->addWidget(m_selectionLabel);
-    m_prompt = new QTextEdit(this);
+    m_prompt = new AiPromptEdit(this);
     m_prompt->setPlaceholderText(i18n("Ask about the current page, for example: Explain equation 1.2"));
     m_prompt->setMaximumHeight(100);
     layout->addWidget(m_prompt);
-    m_send = new QPushButton(i18n("Ask"), this);
-    layout->addWidget(m_send);
-    connect(m_send, &QPushButton::clicked, this, &AiReadingAssistant::sendQuestion);
+    m_actionButton = m_prompt->actionButton();
+    connect(m_actionButton, &QPushButton::clicked, this, [this] {
+        if (m_provider.isBusy() || m_pendingPage >= 0) {
+            cancelQuestion();
+        } else {
+            sendQuestion();
+        }
+    });
     m_status = new QLabel(this);
     m_status->setWordWrap(true);
     layout->addWidget(m_status);
@@ -171,7 +220,10 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
         showStatus(error);
         updateControls();
     });
-    connect(&m_provider, &AiProvider::stopped, this, &AiReadingAssistant::updateControls);
+    connect(&m_provider, &AiProvider::stopped, this, [this] {
+        m_cancelling = false;
+        updateControls();
+    });
 
     m_document->addObserver(this);
     updateControls();
@@ -185,6 +237,7 @@ AiReadingAssistant::~AiReadingAssistant()
 
 void AiReadingAssistant::setDocumentUrl(const QUrl &url)
 {
+    m_cancelling = m_provider.isBusy();
     m_provider.cancel();
     m_pendingPage = -1;
     m_questionSubmitted = false;
@@ -300,6 +353,7 @@ void AiReadingAssistant::editProfiles()
 
 void AiReadingAssistant::loadSelectedConversation()
 {
+    m_cancelling = m_provider.isBusy();
     m_provider.cancel();
     m_pendingPage = -1;
     m_questionSubmitted = false;
@@ -433,6 +487,25 @@ void AiReadingAssistant::submitQuestion(const QString &pageImage)
     updateControls();
 }
 
+void AiReadingAssistant::cancelQuestion()
+{
+    m_cancelling = m_provider.isBusy();
+    m_provider.cancel();
+    m_imageTimer->stop();
+    m_pendingPage = -1;
+    if (m_questionSubmitted) {
+        m_conversation = m_beforeRequest;
+        m_questionSubmitted = false;
+        m_prompt->setPlainText(m_pendingMessage.content);
+        if (AiProfile *profile = currentProfile()) {
+            AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
+        }
+        renderConversation();
+    }
+    showStatus(i18n("Request canceled."));
+    updateControls();
+}
+
 void AiReadingAssistant::renderConversation()
 {
     QJsonArray json;
@@ -465,7 +538,8 @@ void AiReadingAssistant::saveMessage(int messageIndex)
 void AiReadingAssistant::updateControls()
 {
     const bool busy = m_provider.isBusy() || m_pendingPage >= 0;
-    m_send->setEnabled(!busy && m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
+    m_prompt->setActionText(busy ? i18n("Cancel") : i18n("Ask"));
+    m_actionButton->setEnabled(busy ? !m_cancelling : m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
     m_profileCombo->setEnabled(!busy);
-    m_prompt->setEnabled(!busy);
+    m_prompt->setReadOnly(busy);
 }

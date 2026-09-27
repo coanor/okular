@@ -8,10 +8,10 @@
 #include <QWidget>
 
 class AiMarkdownView;
+class AiPromptEdit;
 class QComboBox;
 class QLabel;
 class QPushButton;
-class QTextEdit;
 class QTimer;
 
 namespace Okular
@@ -40,6 +40,7 @@ private:
     void loadSelectedConversation();
     void sendQuestion();
     void submitQuestion(const QString &pageImage);
+    void cancelQuestion();
     void pageImageReady();
     void renderConversation();
     void saveMessage(int messageIndex);
@@ -52,6 +53,7 @@ private:
     AiConversation m_conversation;
     AiConversation m_beforeRequest;
     bool m_questionSubmitted = false;
+    bool m_cancelling = false;
     QString m_documentKey;
     QString m_selection;
     AiMessage m_pendingMessage;
@@ -62,7 +64,7 @@ private:
     QComboBox *m_profileCombo;
     QLabel *m_selectionLabel;
     QLabel *m_status;
-    QTextEdit *m_prompt;
-    QPushButton *m_send;
+    AiPromptEdit *m_prompt;
+    QPushButton *m_actionButton;
     AiMarkdownView *m_view;
 };

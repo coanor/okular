@@ -1,6 +1,6 @@
 # AI reading assistant (desktop)
 
-Open a document and choose **View → AI Reading Assistant**. Add a model in **Models…**, then ask a question about the current page. For a selected passage, right-click it and choose **Ask AI about Selected Text**; the panel opens with the selection as context, and waits for a question.
+Open a document and choose **View → AI Reading Assistant**. Add a model in **Models…**, then ask a question about the current page. The **Ask** button is inside the prompt field and changes to **Cancel** while a request is running. Canceling restores the question for another try. For a selected passage, right-click it and choose **Ask AI about Selected Text**; the panel opens with the selection as context, and waits for a question.
 
 Each question sends the current page's extracted text when available. Vision profiles also send a JPEG rendering of the current page. Page content is sent only after the reader presses **Ask**. The assistant may use its own knowledge to answer; it is not limited to passages in the document. The first version does not search the whole book.
 

@@ -144,15 +144,16 @@ int PageItem::pageNumber() const
 
 void PageItem::setPageNumber(int number)
 {
-    if ((m_page && m_viewPort.pageNumber == number) || !m_documentItem || !m_documentItem.data()->isOpened() || number < 0) {
+    if ((m_page && m_viewPort.pageNumber == number) || !m_documentItem || number < 0) {
         return;
     }
 
     clearSelection();
     m_viewPort.pageNumber = number;
-    refreshPage();
+    if (m_documentItem->isOpened()) {
+        refreshPage();
+    }
     Q_EMIT pageNumberChanged();
-    checkBookmarksChanged();
 }
 
 void PageItem::refreshPage()
@@ -166,6 +167,7 @@ void PageItem::refreshPage()
 
     Q_EMIT implicitWidthChanged();
     Q_EMIT implicitHeightChanged();
+    checkBookmarksChanged();
 
     m_redrawTimer->start();
 }

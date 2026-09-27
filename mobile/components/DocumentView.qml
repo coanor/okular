@@ -71,6 +71,8 @@ QQC2.ScrollView {
     Component.onCompleted: flick.interactive = false
     Flickable {
         id: flick
+        width: root.availableWidth
+        height: root.availableHeight
         interactive: false
         onWidthChanged: resizeTimer.restart()
         onHeightChanged: resizeTimer.restart()

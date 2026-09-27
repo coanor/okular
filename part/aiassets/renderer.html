@@ -32,6 +32,25 @@
 <script>
 const md = window.markdownit({html: false, linkify: true});
 let labels = {image: 'Image: ', question: 'Question', answer: 'AI answer', save: 'Save as annotation', source: 'View source'};
+const root = document.getElementById('messages');
+let followLatest = false;
+let scrollScheduled = false;
+function scrollToLatest() {
+  scrollScheduled = false;
+  if (followLatest && root.lastElementChild) {
+    root.lastElementChild.scrollIntoView({block: 'end'});
+  }
+}
+function scheduleScrollToLatest() {
+  if (followLatest && !scrollScheduled) {
+    scrollScheduled = true;
+    requestAnimationFrame(scrollToLatest);
+  }
+}
+new ResizeObserver(scheduleScrollToLatest).observe(root);
+for (const eventName of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+  window.addEventListener(eventName, () => { followLatest = false; }, {passive: true});
+}
 md.renderer.rules.image = (tokens, index) => {
   const url = tokens[index].attrGet('src') || '';
   const alt = tokens[index].content || url;
@@ -42,7 +61,7 @@ md.renderer.rules.image = (tokens, index) => {
 
 function setMessages(messages, translatedLabels) {
   labels = translatedLabels;
-  const root = document.getElementById('messages');
+  followLatest = true;
   root.replaceChildren();
   messages.forEach((message, index) => {
     const article = document.createElement('article');
@@ -84,7 +103,7 @@ function setMessages(messages, translatedLabels) {
     }
     root.appendChild(article);
   });
-  window.scrollTo(0, document.body.scrollHeight);
+  scheduleScrollToLatest();
 }
 </script>
 </body>

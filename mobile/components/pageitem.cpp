@@ -7,14 +7,21 @@
 #include "pageitem.h"
 #include "documentitem.h"
 
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QPainter>
 #include <QQuickWindow>
 #include <QSGSimpleTextureNode>
 #include <QStyleOptionGraphicsItem>
 #include <QTimer>
+#include <QTransform>
 
+#include <KLocalizedString>
+
+#include <core/annotations.h>
 #include <core/bookmarkmanager.h>
 #include <core/generator.h>
+#include <core/misc.h>
 #include <core/page.h>
 
 #include "gui/pagepainter.h"
@@ -22,6 +29,26 @@
 #include "settings.h"
 
 #define REDRAW_TIMEOUT 250
+
+static QTransform pageRotation(Okular::Rotation rotation)
+{
+    QTransform matrix;
+    matrix.rotate(static_cast<int>(rotation) * 90);
+    switch (rotation) {
+    case Okular::Rotation90:
+        matrix.translate(0, -1);
+        break;
+    case Okular::Rotation180:
+        matrix.translate(-1, -1);
+        break;
+    case Okular::Rotation270:
+        matrix.translate(-1, 0);
+        break;
+    case Okular::Rotation0:
+        break;
+    }
+    return matrix;
+}
 
 PageItem::PageItem(QQuickItem *parent)
     : QQuickItem(parent)
@@ -95,6 +122,7 @@ void PageItem::setDocument(DocumentItem *doc)
         return;
     }
 
+    clearSelection();
     m_page = nullptr;
     disconnect(doc, nullptr, this, nullptr);
     m_documentItem = doc;
@@ -119,6 +147,7 @@ void PageItem::setPageNumber(int number)
         return;
     }
 
+    clearSelection();
     m_viewPort.pageNumber = number;
     refreshPage();
     Q_EMIT pageNumberChanged();
@@ -127,6 +156,7 @@ void PageItem::setPageNumber(int number)
 
 void PageItem::refreshPage()
 {
+    clearSelection();
     if (uint(m_viewPort.pageNumber) < m_documentItem.data()->document()->pages()) {
         m_page = m_documentItem.data()->document()->page(m_viewPort.pageNumber);
     } else {
@@ -137,6 +167,165 @@ void PageItem::refreshPage()
     Q_EMIT implicitHeightChanged();
 
     m_redrawTimer->start();
+}
+
+bool PageItem::hasSelection() const
+{
+    return m_selectedArea && !m_selectedArea->isEmpty();
+}
+
+QPointF PageItem::selectionStart() const
+{
+    return QPointF(m_selectionStart.x() * width(), m_selectionStart.y() * height());
+}
+
+QPointF PageItem::selectionEnd() const
+{
+    return QPointF(m_selectionEnd.x() * width(), m_selectionEnd.y() * height());
+}
+
+bool PageItem::canCopySelection() const
+{
+    return hasSelection() && m_documentItem && m_documentItem->document()->isAllowed(Okular::AllowCopy);
+}
+
+bool PageItem::canHighlightSelection() const
+{
+    return hasSelection() && m_documentItem && m_documentItem->document()->isAllowed(Okular::AllowNotes) && m_documentItem->document()->supportsAnnotationSidecar();
+}
+
+bool PageItem::selectWordAt(qreal x, qreal y)
+{
+    if (!m_page || !m_documentItem || width() <= 0 || height() <= 0 || x < 0 || x > width() || y < 0 || y > height()) {
+        return false;
+    }
+
+    if (!m_page->hasTextPage()) {
+        m_documentItem->document()->requestTextPage(m_viewPort.pageNumber);
+    }
+
+    const QTransform rotation = pageRotation(m_page->rotation());
+    const QPointF unrotated = rotation.inverted().map(QPointF(x / width(), y / height()));
+    auto word = m_page->wordAt(Okular::NormalizedPoint(unrotated.x(), unrotated.y()));
+    if (word) {
+        word->transform(rotation);
+    }
+    if (!word || word->isEmpty() || m_page->text(word.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour).trimmed().isEmpty()) {
+        return false;
+    }
+
+    clearSelection();
+    const auto &first = word->first();
+    const auto &last = word->last();
+    m_selectionStart = QPointF(first.left, (first.top + first.bottom) / 2);
+    m_selectionEnd = QPointF(last.right, (last.top + last.bottom) / 2);
+    m_selectedArea = std::make_unique<Okular::RegularAreaRect>(*word);
+    m_documentItem->document()->setPageTextSelection(m_viewPort.pageNumber, std::move(word), QColor(74, 144, 226, 120));
+    Q_EMIT selectionChanged();
+    return true;
+}
+
+void PageItem::moveSelectionHandle(bool start, qreal x, qreal y)
+{
+    if (!hasSelection() || !m_page || width() <= 0 || height() <= 0) {
+        return;
+    }
+
+    const QPointF point(qBound(0.0, x / width(), 1.0), qBound(0.0, y / height(), 1.0));
+    const QPointF first = start ? point : m_selectionStart;
+    const QPointF last = start ? m_selectionEnd : point;
+    if (first == last) {
+        return;
+    }
+
+    const QTransform unrotate = pageRotation(m_page->rotation()).inverted();
+    const QPointF unrotatedFirst = unrotate.map(first);
+    const QPointF unrotatedLast = unrotate.map(last);
+    Okular::TextSelection selection(Okular::NormalizedPoint(unrotatedFirst.x(), unrotatedFirst.y()), Okular::NormalizedPoint(unrotatedLast.x(), unrotatedLast.y()));
+    auto area = m_page->textArea(selection);
+    if (!area || area->isEmpty()) {
+        return;
+    }
+
+    m_selectionStart = first;
+    m_selectionEnd = last;
+    m_selectedArea = std::make_unique<Okular::RegularAreaRect>(*area);
+    m_documentItem->document()->setPageTextSelection(m_viewPort.pageNumber, std::move(area), QColor(74, 144, 226, 120));
+    Q_EMIT selectionChanged();
+}
+
+void PageItem::clearSelection()
+{
+    if (!hasSelection()) {
+        return;
+    }
+
+    m_selectedArea.reset();
+    if (m_documentItem && m_documentItem->isOpened() && uint(m_viewPort.pageNumber) < m_documentItem->document()->pages()) {
+        m_documentItem->document()->setPageTextSelection(m_viewPort.pageNumber, nullptr, QColor());
+    }
+    Q_EMIT selectionChanged();
+}
+
+void PageItem::copySelection()
+{
+    if (!canCopySelection() || !m_page) {
+        return;
+    }
+
+    QString text = m_page->text(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    if (text.endsWith(QLatin1Char('\n'))) {
+        text.chop(1);
+    }
+    QGuiApplication::clipboard()->setText(text);
+    clearSelection();
+}
+
+bool PageItem::highlightSelection()
+{
+    if (!canHighlightSelection() || !m_page) {
+        return false;
+    }
+
+    auto *highlight = new Okular::HighlightAnnotation();
+    highlight->setHighlightType(Okular::HighlightAnnotation::Highlight);
+
+    Okular::NormalizedRect bounds = m_selectedArea->first();
+    for (const Okular::NormalizedRect &rect : std::as_const(*m_selectedArea)) {
+        bounds.left = qMin(bounds.left, rect.left);
+        bounds.top = qMin(bounds.top, rect.top);
+        bounds.right = qMax(bounds.right, rect.right);
+        bounds.bottom = qMax(bounds.bottom, rect.bottom);
+
+        Okular::HighlightAnnotation::Quad quad;
+        quad.setCapStart(false);
+        quad.setCapEnd(false);
+        quad.setFeather(1.0);
+        quad.setPoint(Okular::NormalizedPoint(rect.left, rect.bottom), 0);
+        quad.setPoint(Okular::NormalizedPoint(rect.right, rect.bottom), 1);
+        quad.setPoint(Okular::NormalizedPoint(rect.right, rect.top), 2);
+        quad.setPoint(Okular::NormalizedPoint(rect.left, rect.top), 3);
+        highlight->highlightQuads().append(quad);
+    }
+
+    highlight->setBoundingRectangle(bounds);
+    QString selectedText = m_page->text(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    selectedText.replace(QStringLiteral("-\n"), QString()).replace(QLatin1Char('\n'), QLatin1Char(' '));
+    highlight->setContents(selectedText.simplified());
+    highlight->style().setColor(QColor(255, 235, 59));
+    highlight->style().setOpacity(0.5);
+
+    Okular::Document *document = m_documentItem->document();
+    document->addPageAnnotation(m_viewPort.pageNumber, highlight);
+    QString error;
+    if (!document->saveAnnotationsToSidecar(&error)) {
+        document->removePageAnnotation(m_viewPort.pageNumber, highlight);
+        Q_EMIT m_documentItem->error(i18n("Could not save highlight: %1", error), -1);
+        return false;
+    }
+
+    clearSelection();
+    return true;
 }
 
 int PageItem::customImplicitWidth() const
@@ -272,6 +461,9 @@ void PageItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeomet
         // Why aren't they automatically emitted?
         Q_EMIT widthChanged();
         Q_EMIT heightChanged();
+        if (hasSelection()) {
+            Q_EMIT selectionChanged();
+        }
     }
 }
 
@@ -325,7 +517,7 @@ void PageItem::requestPixmap()
 void PageItem::paint()
 {
     Observer *observer = m_isThumbnail ? m_documentItem.data()->thumbnailObserver() : m_documentItem.data()->pageviewObserver();
-    const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations;
+    const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::TextSelection | PagePainter::Annotations;
 
     const qreal dpr = window()->devicePixelRatio();
     const QRect limits(QPoint(0, 0), QSize(width() * dpr, height() * dpr));

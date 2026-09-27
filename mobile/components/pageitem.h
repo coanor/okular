@@ -8,9 +8,12 @@
 #define QPAGEITEM_H
 
 #include <QImage>
+#include <QPointF>
 #include <QPointer>
 #include <QQuickItem>
 #include <qqmlregistration.h>
+
+#include <memory>
 
 #include <core/document.h>
 #include <core/view.h>
@@ -23,6 +26,7 @@ namespace Okular
 {
 class Document;
 class Page;
+class RegularAreaRect;
 }
 
 class PageItem : public QQuickItem, public Okular::View
@@ -66,6 +70,12 @@ class PageItem : public QQuickItem, public Okular::View
      * list of bookmarks urls valid on this page
      */
     Q_PROPERTY(QStringList bookmarks READ bookmarks NOTIFY bookmarksChanged)
+
+    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    Q_PROPERTY(QPointF selectionStart READ selectionStart NOTIFY selectionChanged)
+    Q_PROPERTY(QPointF selectionEnd READ selectionEnd NOTIFY selectionChanged)
+    Q_PROPERTY(bool canCopySelection READ canCopySelection NOTIFY selectionChanged)
+    Q_PROPERTY(bool canHighlightSelection READ canHighlightSelection NOTIFY selectionChanged)
 
 public:
     explicit PageItem(QQuickItem *parent = nullptr);
@@ -118,6 +128,18 @@ public:
      */
     Q_INVOKABLE void removeBookmark(const QString &bookmark);
 
+    bool hasSelection() const;
+    QPointF selectionStart() const;
+    QPointF selectionEnd() const;
+    bool canCopySelection() const;
+    bool canHighlightSelection() const;
+
+    Q_INVOKABLE bool selectWordAt(qreal x, qreal y);
+    Q_INVOKABLE void moveSelectionHandle(bool start, qreal x, qreal y);
+    Q_INVOKABLE void clearSelection();
+    Q_INVOKABLE void copySelection();
+    Q_INVOKABLE bool highlightSelection();
+
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
     QSGNode *updatePaintNode(QSGNode *, QQuickItem::UpdatePaintNodeData *) override;
@@ -128,6 +150,7 @@ Q_SIGNALS:
     void pageNumberChanged();
     void bookmarkedChanged();
     void bookmarksChanged();
+    void selectionChanged();
 
 protected:
     void setIsThumbnail(bool thumbnail);
@@ -150,6 +173,9 @@ private:
     QPointer<QQuickItem> m_flickable;
     Okular::DocumentViewport m_viewPort;
     QImage m_buffer;
+    std::unique_ptr<Okular::RegularAreaRect> m_selectedArea;
+    QPointF m_selectionStart;
+    QPointF m_selectionEnd;
 };
 
 #endif

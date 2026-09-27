@@ -1003,6 +1003,7 @@ public:
 
     /** Save locally created PDF annotations by exact PDF hash, leaving the PDF unchanged. */
     bool canSaveAnnotationsToSidecar() const;
+    bool supportsAnnotationSidecar() const;
     bool hasSeparatePdfAnnotations() const;
     bool saveAnnotationsToSidecar(QString *errorText);
 

@@ -14,7 +14,10 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
+#include <QTemporaryFile>
 #include <QUuid>
+
+#include <sqlite3.h>
 
 using namespace Okular;
 
@@ -201,6 +204,21 @@ bool AnnotationSidecar::load(const QString &hash, QList<SidecarAnnotation> *anno
             return false;
         }
     }
+    if (!query.exec(QStringLiteral("SELECT annotation_id, page, subtype, xml, hidden_native, contents, author, color FROM annotations"))) {
+        *error = query.lastError().text();
+        return false;
+    }
+    while (query.next()) {
+        const QString key = annotationKey(query.value(1).toInt(), query.value(0).toString());
+        auto entry = state.find(key);
+        // The index is only a metadata cache. Never let a stale index replace
+        // annotation state reconstructed from the authoritative event stream.
+        if (entry != state.end() && entry->subtype == query.value(2).toInt() && entry->xml == query.value(3).toString() && entry->hiddenNative == query.value(4).toBool()) {
+            entry->contents = query.value(5).toString();
+            entry->author = query.value(6).toString();
+            entry->color = query.value(7).toString();
+        }
+    }
     *annotations = state.values();
     return true;
 }
@@ -343,6 +361,89 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
     }
     if (newRevision) {
         *newRevision = revision;
+    }
+    return true;
+}
+
+bool AnnotationSidecar::snapshot(const QString &hash, const QString &destination, QString *error, qint64 *revision)
+{
+    error->clear();
+    if (revision) {
+        *revision = 0;
+    }
+    const QString sourcePath = pathForHash(hash);
+    if (!QFileInfo::exists(sourcePath) || QFileInfo::exists(destination) || !QDir().mkpath(QFileInfo(destination).absolutePath())) {
+        *error = QStringLiteral("Annotation source is missing or snapshot destination is unavailable");
+        return false;
+    }
+
+    QTemporaryFile staging(QFileInfo(destination).absolutePath() + QStringLiteral("/.annotation-snapshot-XXXXXX"));
+    if (!staging.open()) {
+        *error = staging.errorString();
+        return false;
+    }
+    staging.close();
+
+    sqlite3 *source = nullptr;
+    sqlite3 *target = nullptr;
+    const QByteArray sourceName = QFile::encodeName(sourcePath);
+    const QByteArray targetName = QFile::encodeName(staging.fileName());
+    int code = sqlite3_open_v2(sourceName.constData(), &source, SQLITE_OPEN_READONLY, nullptr);
+    if (code == SQLITE_OK) {
+        code = sqlite3_open_v2(targetName.constData(), &target, SQLITE_OPEN_READWRITE, nullptr);
+    }
+    if (code == SQLITE_OK) {
+        sqlite3_busy_timeout(source, 5000);
+        sqlite3_busy_timeout(target, 5000);
+        sqlite3_backup *backup = sqlite3_backup_init(target, "main", source, "main");
+        if (backup) {
+            code = sqlite3_backup_step(backup, -1);
+            const int finishCode = sqlite3_backup_finish(backup);
+            if (code == SQLITE_DONE) {
+                code = finishCode;
+            }
+        } else {
+            code = sqlite3_errcode(target);
+        }
+    }
+    if (code != SQLITE_OK) {
+        *error = target || source ? QString::fromUtf8(sqlite3_errmsg(target ? target : source)) : QStringLiteral("Could not open annotation database");
+    }
+    if (target) {
+        sqlite3_close(target);
+    }
+    if (source) {
+        sqlite3_close(source);
+    }
+    if (code != SQLITE_OK) {
+        return false;
+    }
+
+    qint64 snapshotRevision = 0;
+    {
+        Connection check(staging.fileName());
+        if (!check.open(error) || !checkMetadata(check.db(), hash, error)) {
+            return false;
+        }
+        QSqlQuery query(check.db());
+        if (!query.exec(QStringLiteral("PRAGMA quick_check")) || !query.next() || query.value(0).toString() != QLatin1String("ok")) {
+            *error = QStringLiteral("Annotation snapshot failed SQLite integrity check");
+            return false;
+        }
+        if (!query.exec(QStringLiteral("SELECT COALESCE(MAX(sequence), 0) FROM events")) || !query.next()) {
+            *error = query.lastError().text();
+            return false;
+        }
+        snapshotRevision = query.value(0).toLongLong();
+    }
+    // Close the connection before renaming, as Windows cannot rename an open DB.
+    if (!QFile::rename(staging.fileName(), destination)) {
+        *error = QStringLiteral("Could not install annotation snapshot");
+        return false;
+    }
+    staging.setAutoRemove(false);
+    if (revision) {
+        *revision = snapshotRevision;
     }
     return true;
 }

@@ -85,6 +85,32 @@ ecm_add_test(annotationsidecartest.cpp
 )
 
 if(BUILD_DESKTOP)
+    ecm_add_test(annotationsynctest.cpp ../part/annotationsync.cpp
+        TEST_NAME "annotationsynctest"
+        LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
+    )
+    ecm_add_test(modelsettingssynctest.cpp ../part/modelsettingssync.cpp
+        TEST_NAME "modelsettingssynctest"
+        LINK_LIBRARIES Qt6::Test Qt6::Core
+    )
+    ecm_add_test(booklibrarysynctest.cpp ../part/booklibrarysync.cpp ../part/annotationsync.cpp ../part/booklibrary.cpp
+        TEST_NAME "booklibrarysynctest"
+        LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
+    )
+    if(CURL_FOUND)
+        ecm_add_test(s3transporttest.cpp ../part/s3transport.cpp ../part/s3configuration.cpp
+            TEST_NAME "s3transporttest"
+            LINK_LIBRARIES Qt6::Test Qt6::Network CURL::libcurl
+        )
+    endif()
+    ecm_add_test(s3configurationtest.cpp ../part/s3configuration.cpp
+        TEST_NAME "s3configurationtest"
+        LINK_LIBRARIES Qt6::Test
+    )
+    ecm_add_test(booklibrarytest.cpp ../part/booklibrary.cpp
+        TEST_NAME "booklibrarytest"
+        LINK_LIBRARIES Qt6::Test
+    )
     ecm_add_test(aiprovidertest.cpp ../part/aiprovider.cpp
         TEST_NAME "aiprovidertest"
         LINK_LIBRARIES Qt6::Test Qt6::Network

@@ -101,8 +101,16 @@ ecm_setup_version(${PROJECT_VERSION}
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
 find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql)
+find_package(SQLite3 REQUIRED)
+if(TARGET SQLite3::SQLite3)
+    set(OKULAR_SQLITE_TARGET SQLite3::SQLite3)
+else()
+    set(OKULAR_SQLITE_TARGET SQLite::SQLite3)
+endif()
 if(BUILD_DESKTOP)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
+    find_package(Qt6Concurrent ${QT_REQUIRED_VERSION} CONFIG QUIET)
+    find_package(CURL QUIET)
 endif()
 
 find_package(KF6 ${KF_REQUIRED_VERSION} REQUIRED COMPONENTS
@@ -445,6 +453,7 @@ endif(WIN32)
 target_link_libraries(okularcore
 PRIVATE
     Qt6::Sql
+    ${OKULAR_SQLITE_TARGET}
     ${OKULAR_IOKIT}
     ${SHLWAPI}
     KF6::Archive
@@ -523,6 +532,11 @@ if(BUILD_DESKTOP)
     part/part.cpp
     part/aimarkdownview.cpp
     part/aistore.cpp
+    part/booklibrary.cpp
+    part/booklibrarysync.cpp
+    part/annotationsync.cpp
+    part/modelsettingssync.cpp
+    part/s3configuration.cpp
     part/aiprovider.cpp
     part/aireadingassistant.cpp
     part/extensions.cpp
@@ -580,6 +594,9 @@ if(BUILD_DESKTOP)
     part/part.qrc
     part/aiassets/aiassets.qrc
   )
+  if(CURL_FOUND AND TARGET Qt6::Concurrent)
+    list(APPEND okularpart_SRCS part/s3transport.cpp)
+  endif()
   ki18n_wrap_ui(okularpart_SRCS part/selectcertificatedialog.ui)
 
 if (Qt6TextToSpeech_FOUND)
@@ -608,6 +625,10 @@ target_link_libraries(okularpart okularcore
     KF6::TextWidgets
     KF6::ColorScheme
 )
+if(CURL_FOUND AND TARGET Qt6::Concurrent)
+    target_link_libraries(okularpart CURL::libcurl Qt6::Concurrent)
+    target_compile_definitions(okularpart PRIVATE OKULAR_HAVE_S3_CURL)
+endif()
 if (TARGET Qt6::DBus)
     target_link_libraries(okularpart Qt6::DBus)
 endif()

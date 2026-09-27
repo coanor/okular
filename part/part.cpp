@@ -1913,7 +1913,12 @@ bool Part::queryClose()
 
     // Not all things are saveable (e.g. files opened from stdin, folders)
     if (m_save->isEnabled()) {
-        const int res = KMessageBox::warningTwoActionsCancel(widget(), i18n("Do you want to save your changes to \"%1\" or discard them?", url().fileName()), i18n("Close Document"), KStandardGuiItem::save(), KStandardGuiItem::discard());
+        const bool saveAnnotationsSeparately = m_document->canSaveAnnotationsToSidecar();
+        const QString message = saveAnnotationsSeparately
+            ? i18n("Do you want to save your annotations for \"%1\" to the separate annotation database or discard them? The PDF file will not be changed.", url().fileName())
+            : i18n("Do you want to save your changes to \"%1\" or discard them?", url().fileName());
+        const KGuiItem saveAction = saveAnnotationsSeparately ? KGuiItem(i18n("Save Annotations"), QStringLiteral("document-save")) : KStandardGuiItem::save();
+        const int res = KMessageBox::warningTwoActionsCancel(widget(), message, i18n("Close Document"), saveAction, KStandardGuiItem::discard());
 
         switch (res) {
         case KMessageBox::PrimaryAction: // Save

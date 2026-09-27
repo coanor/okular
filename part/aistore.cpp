@@ -177,6 +177,7 @@ AiConversation AiStore::loadConversation(const QString &documentKey, const QStri
     }
     const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
     conversation.sessionId = root.value(QStringLiteral("sessionId")).toString();
+    conversation.instructions = root.value(QStringLiteral("instructions")).toString();
     for (const QJsonValue &value : root.value(QStringLiteral("messages")).toArray()) {
         AiMessage message = messageFromJson(value.toObject());
         if (message.role == QLatin1String("user") || message.role == QLatin1String("assistant")) {
@@ -198,6 +199,7 @@ bool AiStore::saveConversation(const QString &documentKey, const QString &profil
     QJsonObject root;
     root.insert(QStringLiteral("version"), 1);
     root.insert(QStringLiteral("sessionId"), conversation.sessionId);
+    root.insert(QStringLiteral("instructions"), conversation.instructions);
     QJsonArray messages;
     for (const AiMessage &message : conversation.messages) {
         messages.append(messageToJson(message));

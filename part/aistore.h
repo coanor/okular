@@ -30,6 +30,7 @@ struct AiMessage {
 
 struct AiConversation {
     QString sessionId;
+    QString instructions;
     QList<AiMessage> messages;
 };
 

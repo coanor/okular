@@ -74,6 +74,7 @@ private Q_SLOTS:
         QSignalSpy failed(&provider, &AiProvider::failed);
 
         AiConversation history;
+        history.instructions = QStringLiteral("Answer in Chinese with a patient tone.");
         history.messages.append(AiMessage{QStringLiteral("user"), QStringLiteral("earlier question"), 0, QStringLiteral("earlier page text"), {}, {}});
         history.messages.append(AiMessage{QStringLiteral("assistant"), QStringLiteral("earlier answer"), -1, {}, {}, {}});
         AiMessage current{QStringLiteral("user"), QStringLiteral("explain equation 1.2"), 1, QStringLiteral("equation 1.2"), {}, QStringLiteral("Zm9v")};
@@ -94,6 +95,7 @@ private Q_SLOTS:
         QCOMPARE(server.requests.last().body.value(QStringLiteral("model")).toString(), QStringLiteral("test-model"));
         const QJsonArray chatMessages = server.requests.last().body.value(QStringLiteral("messages")).toArray();
         QCOMPARE(chatMessages.size(), 4);
+        QVERIFY(chatMessages.first().toObject().value(QStringLiteral("content")).toString().contains(history.instructions));
         QVERIFY(chatMessages.at(1).toObject().value(QStringLiteral("content")).toArray().at(0).toObject().value(QStringLiteral("text")).toString().contains(QStringLiteral("earlier page text")));
         QCOMPARE(chatMessages.at(3).toObject().value(QStringLiteral("content")).toArray().size(), 2);
 
@@ -106,6 +108,7 @@ private Q_SLOTS:
         QCOMPARE(completed.takeFirst().at(0).toString(), QStringLiteral("anthropic answer"));
         QCOMPARE(server.requests.last().path, QByteArray("/v1/messages"));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("max_tokens")).toInt(), 512);
+        QVERIFY(server.requests.last().body.value(QStringLiteral("system")).toString().contains(history.instructions));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("messages")).toArray().size(), 3);
 
         profile.kind = AiProfile::Kind::OpenAiResponses;
@@ -119,6 +122,7 @@ private Q_SLOTS:
         QCOMPARE(response.at(1).toString(), QStringLiteral("conv-123"));
         QCOMPARE(server.requests.at(server.requests.size() - 2).path, QByteArray("/v1/conversations"));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("conversation")).toString(), QStringLiteral("conv-123"));
+        QVERIFY(server.requests.last().body.value(QStringLiteral("instructions")).toString().contains(history.instructions));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("reasoning")).toObject().value(QStringLiteral("effort")).toString(), QStringLiteral("low"));
         QCOMPARE(server.requests.last().body.value(QStringLiteral("input")).toArray().at(0).toObject().value(QStringLiteral("content")).toArray().size(), 2);
 
@@ -136,7 +140,7 @@ private Q_SLOTS:
         QVERIFY(directory.isValid());
         QFile script(directory.filePath(QStringLiteral("codex")));
         QVERIFY(script.open(QIODevice::WriteOnly));
-        script.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$OKULAR_AI_TEST_ARGS\"\ncat >/dev/null\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}'\n");
+        script.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$OKULAR_AI_TEST_ARGS\"\ncat > \"$OKULAR_AI_TEST_STDIN\"\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}'\n");
         script.close();
         QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
         const QByteArray previousPath = qgetenv("PATH");
@@ -145,6 +149,7 @@ private Q_SLOTS:
         testPath += previousPath;
         qputenv("PATH", testPath);
         qputenv("OKULAR_AI_TEST_ARGS", QFile::encodeName(directory.filePath(QStringLiteral("args.txt"))));
+        qputenv("OKULAR_AI_TEST_STDIN", QFile::encodeName(directory.filePath(QStringLiteral("stdin.txt"))));
 
         AiProvider provider;
         QSignalSpy completed(&provider, &AiProvider::completed);
@@ -153,6 +158,7 @@ private Q_SLOTS:
         profile.kind = AiProfile::Kind::Codex;
         AiMessage question{QStringLiteral("user"), QStringLiteral("Why?"), 0, QStringLiteral("page text"), {}, {}};
         AiConversation conversation;
+        conversation.instructions = QStringLiteral("Answer in Chinese with a patient tone.");
         provider.send(profile, conversation, question);
         QVERIFY(completed.wait(5000));
         QVERIFY(failed.isEmpty());
@@ -163,6 +169,10 @@ private Q_SLOTS:
         QVERIFY(!initialArgs.contains("resume"));
         QVERIFY(initialArgs.contains("model_reasoning_effort=low"));
         args.close();
+        QFile stdinFile(directory.filePath(QStringLiteral("stdin.txt")));
+        QVERIFY(stdinFile.open(QIODevice::ReadOnly));
+        QVERIFY(stdinFile.readAll().contains(conversation.instructions.toUtf8()));
+        stdinFile.close();
 
         conversation.sessionId = QStringLiteral("test-thread");
         provider.send(profile, conversation, question);
@@ -175,6 +185,9 @@ private Q_SLOTS:
         QVERIFY(resumedArgs.contains("test-thread"));
         QVERIFY(resumedArgs.contains("model_reasoning_effort=low"));
         args.close();
+        QVERIFY(stdinFile.open(QIODevice::ReadOnly));
+        QVERIFY(stdinFile.readAll().contains(conversation.instructions.toUtf8()));
+        stdinFile.close();
 
         profile.extraArguments = QStringLiteral("-c model_reasoning_effort=medium");
         provider.send(profile, conversation, question);
@@ -187,6 +200,7 @@ private Q_SLOTS:
         QVERIFY(!overriddenArgs.contains("model_reasoning_effort=low"));
         qputenv("PATH", previousPath);
         qunsetenv("OKULAR_AI_TEST_ARGS");
+        qunsetenv("OKULAR_AI_TEST_STDIN");
     }
 };
 

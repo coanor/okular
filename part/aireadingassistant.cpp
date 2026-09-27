@@ -179,6 +179,8 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     m_modelsButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     m_modelsButton->setPopupMode(QToolButton::MenuButtonPopup);
     auto *modelsMenu = new QMenu(m_modelsButton);
+    m_conversationInstructionsAction = modelsMenu->addAction(i18n("Conversation instructions…"));
+    m_conversationInstructionsAction->setObjectName(QStringLiteral("aiConversationInstructions"));
     m_newConversationAction = modelsMenu->addAction(i18n("Start new conversation"));
     m_newConversationAction->setObjectName(QStringLiteral("aiNewConversation"));
     m_modelsButton->setMenu(modelsMenu);
@@ -188,6 +190,7 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
         m_profileCombo->addItem(profile.name, profile.id);
     }
     connect(m_modelsButton, &QToolButton::clicked, this, &AiReadingAssistant::editProfiles);
+    connect(m_conversationInstructionsAction, &QAction::triggered, this, &AiReadingAssistant::editConversationInstructions);
     connect(m_newConversationAction, &QAction::triggered, this, &AiReadingAssistant::clearConversation);
     connect(m_profileCombo, &QComboBox::currentIndexChanged, this, &AiReadingAssistant::loadSelectedConversation);
 
@@ -381,6 +384,41 @@ void AiReadingAssistant::editProfiles()
     loadSelectedConversation();
 }
 
+void AiReadingAssistant::editConversationInstructions()
+{
+    AiProfile *profile = currentProfile();
+    if (!profile || m_documentKey.isEmpty() || m_provider.isBusy() || m_pendingPage >= 0) {
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(i18n("Conversation instructions"));
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *description = new QLabel(i18n("Set preferences for this conversation, such as answer language and tone. They apply to future answers."), &dialog);
+    description->setWordWrap(true);
+    layout->addWidget(description);
+    auto *editor = new QPlainTextEdit(m_conversation.instructions, &dialog);
+    editor->setObjectName(QStringLiteral("aiConversationInstructionsEdit"));
+    editor->setPlaceholderText(i18n("For example: Answer in Chinese. Use a concise, patient tone."));
+    layout->addWidget(editor);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    dialog.resize(420, 260);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    const QString previous = m_conversation.instructions;
+    m_conversation.instructions = editor->toPlainText().trimmed();
+    if (!AiStore::saveConversation(m_documentKey, profile->id, m_conversation)) {
+        m_conversation.instructions = previous;
+        showStatus(i18n("Could not save these conversation instructions locally."));
+    } else {
+        showStatus(i18n("Conversation instructions saved."));
+        updateControls();
+    }
+}
+
 void AiReadingAssistant::loadSelectedConversation()
 {
     m_cancelling = m_provider.isBusy();
@@ -539,7 +577,8 @@ void AiReadingAssistant::cancelQuestion()
 void AiReadingAssistant::clearConversation()
 {
     AiProfile *profile = currentProfile();
-    if (!profile || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty()) || m_provider.isBusy() || m_pendingPage >= 0) {
+    if (!profile || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty() && m_conversation.instructions.isEmpty()) || m_provider.isBusy()
+        || m_pendingPage >= 0) {
         return;
     }
     if (QMessageBox::question(this, i18n("Start new conversation"), i18n("Remove the current conversation from Okular? Saved annotations will remain.")) != QMessageBox::Yes) {
@@ -591,6 +630,8 @@ void AiReadingAssistant::updateControls()
     m_actionButton->setEnabled(busy ? !m_cancelling : m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
     m_profileCombo->setEnabled(!busy);
     m_modelsButton->setEnabled(!busy);
-    m_newConversationAction->setEnabled(!busy && !m_documentKey.isEmpty() && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty()));
+    m_conversationInstructionsAction->setEnabled(!busy && !m_documentKey.isEmpty() && m_profileCombo->currentIndex() >= 0);
+    m_newConversationAction->setEnabled(!busy && !m_documentKey.isEmpty()
+                                        && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty() || !m_conversation.instructions.isEmpty()));
     m_prompt->setReadOnly(busy);
 }

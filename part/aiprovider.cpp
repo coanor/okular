@@ -15,7 +15,7 @@
 
 namespace
 {
-const QString instructions = QStringLiteral(
+const QString readingInstructions = QStringLiteral(
     "You are a reading assistant. Answer the reader's question using the supplied page as context and your own knowledge. "
     "Explain concepts and equations clearly. Do not claim the answer must be found in the book. "
     "Do not fabricate a quotation from the book. Use Markdown and LaTeX math ($...$ or $$...$$). "
@@ -120,6 +120,14 @@ QString AiProvider::contextText(const AiMessage &message) const
     return text;
 }
 
+QString AiProvider::conversationInstructions() const
+{
+    if (m_conversation.instructions.trimmed().isEmpty()) {
+        return readingInstructions;
+    }
+    return readingInstructions + QStringLiteral("\n\nReader's conversation preferences:\n") + m_conversation.instructions.trimmed();
+}
+
 void AiProvider::finishHttp(QNetworkReply *reply, const std::function<void(const QJsonObject &)> &onSuccess)
 {
     connect(reply, &QNetworkReply::finished, this, [this, reply, onSuccess] {
@@ -154,7 +162,7 @@ void AiProvider::sendOpenAiChat()
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + m_profile.apiKey.toUtf8());
     QJsonArray messages;
-    messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), instructions}});
+    messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), conversationInstructions()}});
     for (const AiMessage &message : std::as_const(m_conversation.messages)) {
         if (message.role == QLatin1String("assistant")) {
             messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), message.content}});
@@ -217,7 +225,7 @@ void AiProvider::sendOpenAiResponse()
     QJsonObject payload = m_extraPayload;
     payload.insert(QStringLiteral("model"), m_profile.model);
     payload.insert(QStringLiteral("conversation"), m_sessionId);
-    payload.insert(QStringLiteral("instructions"), instructions);
+    payload.insert(QStringLiteral("instructions"), conversationInstructions());
     payload.insert(QStringLiteral("input"), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}}});
     m_reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     finishHttp(m_reply, [this](const QJsonObject &json) {
@@ -265,7 +273,7 @@ void AiProvider::sendAnthropic()
     if (!payload.contains(QStringLiteral("max_tokens"))) {
         payload.insert(QStringLiteral("max_tokens"), 4096);
     }
-    payload.insert(QStringLiteral("system"), instructions);
+    payload.insert(QStringLiteral("system"), conversationInstructions());
     payload.insert(QStringLiteral("messages"), messages);
     m_reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     finishHttp(m_reply, [this](const QJsonObject &json) {
@@ -377,7 +385,7 @@ void AiProvider::sendCodex()
         Q_EMIT failed(error);
         return;
     }
-    m_process->write((instructions + QStringLiteral("\n\n") + contextText(m_message)).toUtf8());
+    m_process->write((conversationInstructions() + QStringLiteral("\n\n") + contextText(m_message)).toUtf8());
     m_process->closeWriteChannel();
 }
 

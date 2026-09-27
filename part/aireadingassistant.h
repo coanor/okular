@@ -39,6 +39,7 @@ Q_SIGNALS:
 
 private:
     void editProfiles();
+    void editConversationInstructions();
     void loadSelectedConversation();
     void sendQuestion();
     void submitQuestion(const QString &pageImage);
@@ -66,6 +67,7 @@ private:
     QTimer *m_imageTimer;
     QComboBox *m_profileCombo;
     QToolButton *m_modelsButton;
+    QAction *m_conversationInstructionsAction;
     QAction *m_newConversationAction;
     QLabel *m_selectionLabel;
     QLabel *m_status;

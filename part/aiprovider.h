@@ -37,6 +37,7 @@ private:
     void processCodexOutput();
     QUrl endpoint(const QString &suffix) const;
     QString contextText(const AiMessage &message) const;
+    QString conversationInstructions() const;
 
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;

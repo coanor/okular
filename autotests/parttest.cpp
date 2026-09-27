@@ -1164,6 +1164,7 @@ void PartTest::testAiPanelOpens()
     QCOMPARE(modelsButton->popupMode(), QToolButton::MenuButtonPopup);
     QVERIFY(modelsButton->menu());
     QVERIFY(part.m_aiPanel->findChild<QAction *>(QStringLiteral("aiNewConversation")));
+    QVERIFY(part.m_aiPanel->findChild<QAction *>(QStringLiteral("aiConversationInstructions")));
     QPushButton *promptAction = part.m_aiPanel->findChild<QPushButton *>(QStringLiteral("aiPromptAction"));
     QVERIFY(promptAction);
     QTextEdit *prompt = part.m_aiPanel->findChild<QTextEdit *>();

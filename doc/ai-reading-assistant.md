@@ -15,9 +15,11 @@ Each model profile has an **Extra arguments** field. For Codex, enter CLI option
 
 Mark **This model accepts page images** only if that model supports image input. Text-only profiles require selected text to ask about a page.
 
-API keys are saved in KWallet when available; otherwise they remain in memory for this Okular process. Named profiles and conversations are local. Conversations are separated by document content hash and profile ID. The local conversation record contains questions, answers, selected text, extracted page text and the most recent page image. When a new question is sent through a stateless API, earlier page images are discarded while earlier text stays in the request history. Responses and Codex store a remote session ID as well; their providers keep the full conversation.
+API keys are saved in KWallet when available; otherwise they remain in memory for this Okular process. Named profiles and conversations are local. Conversations are separated by document content hash and profile ID. The local conversation record contains instructions, questions, answers, selected text, extracted page text and the most recent page image. When a new question is sent through a stateless API, earlier page images are discarded while earlier text stays in the request history. Responses and Codex store a remote session ID as well; their providers keep the full conversation.
 
 To start a fresh conversation for the current document and model, open the arrow menu on **Models…** and choose **Start new conversation**. Okular removes its local conversation record and starts a new provider session on the next question. Saved annotations and the provider's earlier session history remain available outside Okular.
+
+Use **Models… → Conversation instructions…** to set a basic prompt for the current document and model conversation, such as “Answer in Chinese with a patient tone.” Okular saves it with the conversation and sends it on every turn, including resumed Codex and Responses sessions. Editing it affects future answers. Starting a new conversation clears it.
 
 ## Answers and annotations
 

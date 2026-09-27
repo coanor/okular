@@ -650,6 +650,22 @@ if(NOT BUILD_SHARED_LIBS AND BUILD_DESKTOP)
     target_compile_definitions(okular PRIVATE OKULAR_STATIC_LIBRARIES)
     kcoreaddons_target_static_plugins(okular TARGETS okularpart)
     kcoreaddons_target_static_plugins(okular NAMESPACE "okular_generators")
+
+    if(UNIX AND NOT APPLE AND NOT ANDROID AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+        set(okular_appimage_output "${CMAKE_BINARY_DIR}/appimage/Okular-bundled-x86_64.AppImage")
+        add_custom_command(
+            OUTPUT "${okular_appimage_output}"
+            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/packaging/build-appimage.sh" "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/appimage"
+            DEPENDS okular
+                "${CMAKE_CURRENT_SOURCE_DIR}/packaging/build-appimage.sh"
+                "${CMAKE_CURRENT_SOURCE_DIR}/shell/org.kde.okular.desktop"
+                "${CMAKE_CURRENT_SOURCE_DIR}/shell/org.kde.okular.appdata.xml"
+                "${CMAKE_CURRENT_SOURCE_DIR}/icons/128-apps-okular.png"
+            COMMENT "Bundling Okular AppImage"
+            VERBATIM
+        )
+        add_custom_target(appimage DEPENDS "${okular_appimage_output}")
+    endif()
 endif()
 
 ########### install files ###############

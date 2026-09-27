@@ -21,12 +21,10 @@ fi
 mkdir -p "$output_dir"
 output_dir="$(realpath "$output_dir")"
 output="$output_dir/Okular-bundled-$arch.AppImage"
-if [[ -e "$output" ]]; then
-    echo "Output already exists: $output" >&2
-    exit 1
-fi
-
 appdir="$(mktemp -d "$output_dir/Okular.AppDir.XXXXXX")"
+staging_dir="$(mktemp -d "$output_dir/Okular.output.XXXXXX")"
+trap 'rm -rf -- "$appdir" "$staging_dir"' EXIT
+staging_output="$staging_dir/Okular-bundled-$arch.AppImage"
 plugin_dir="$("$qmake" -query QT_INSTALL_PLUGINS)"
 export APPIMAGE_EXTRACT_AND_RUN=1
 
@@ -73,6 +71,7 @@ APPRUN
 chmod +x "$appdir/AppRun"
 install -Dm644 "$repo_dir/shell/org.kde.okular.appdata.xml" "$appdir/usr/share/metainfo/org.kde.okular.appdata.xml"
 
-ARCH="$arch" "$appimagetool" --no-appstream "$appdir" "$output"
-QT_QPA_PLATFORM=offscreen "$output" --version
+ARCH="$arch" "$appimagetool" --no-appstream "$appdir" "$staging_output"
+QT_QPA_PLATFORM=offscreen "$staging_output" --version
+mv -f -- "$staging_output" "$output"
 echo "$output"

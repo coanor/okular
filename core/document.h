@@ -1001,6 +1001,11 @@ public:
      */
     bool saveChanges(const QString &fileName, QString *errorText);
 
+    /** Save locally created PDF annotations by exact PDF hash, leaving the PDF unchanged. */
+    bool canSaveAnnotationsToSidecar() const;
+    bool hasSeparatePdfAnnotations() const;
+    bool saveAnnotationsToSidecar(QString *errorText);
+
     /**
      * Register the specified @p view for the current document.
      *

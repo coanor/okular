@@ -522,7 +522,7 @@ Context menu actions like Rename Bookmarks etc.)
                 &okular; has the "document archiving" feature. This is an &okular;-specific format for carrying the document plus various metadata related to it (currently only annotations). You can save a "document archive" from the open document by choosing <menuchoice><guimenu>File</guimenu><guisubmenu>Save As</guisubmenu></menuchoice> and selecting <guilabel>Okular document archive</guilabel> in the <guilabel>Filter</guilabel> selector. Documents saved this way will get <filename>.okular</filename> as their filename extension. To open an &okular; document archive, just open it with &okular; as it would be &eg; a &PDF; document.
 			</para>
 			<para>
-			  You can <emphasis>also</emphasis> save annotations directly into &PDF; files. You can use <menuchoice><guimenu>File</guimenu> <guimenuitem>Save</guimenuitem></menuchoice> to save it over the current file or <menuchoice><guimenu>File</guimenu> <guimenuitem>Save As...</guimenuitem></menuchoice> to save it to a new file.
+			  For a local &PDF; with only text or drawing annotation changes, <menuchoice><guimenu>File</guimenu><guimenuitem>Save</guimenuitem></menuchoice> stores the annotations in a separate SQLite file under &okular;'s application data directory. The file is named after the SHA-256 hash of the original &PDF;, so an identical copy can use the same annotations without changing the &PDF; itself. <menuchoice><guimenu>File</guimenu><guimenuitem>Save As...</guimenuitem></menuchoice> can still save annotations directly into a &PDF; for sharing with other readers.
 			</para>
 				<note>
 					<para>

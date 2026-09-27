@@ -1886,7 +1886,12 @@ bool Part::queryClose()
 
     // Not all things are saveable (e.g. files opened from stdin, folders)
     if (m_save->isEnabled()) {
-        const int res = KMessageBox::warningTwoActionsCancel(widget(), i18n("Do you want to save your changes to \"%1\" or discard them?", url().fileName()), i18n("Close Document"), KStandardGuiItem::save(), KStandardGuiItem::discard());
+        const bool saveAnnotationsSeparately = m_document->canSaveAnnotationsToSidecar();
+        const QString message = saveAnnotationsSeparately
+            ? i18n("Do you want to save your annotations for \"%1\" to the separate annotation database or discard them? The PDF file will not be changed.", url().fileName())
+            : i18n("Do you want to save your changes to \"%1\" or discard them?", url().fileName());
+        const KGuiItem saveAction = saveAnnotationsSeparately ? KGuiItem(i18n("Save Annotations"), QStringLiteral("document-save")) : KStandardGuiItem::save();
+        const int res = KMessageBox::warningTwoActionsCancel(widget(), message, i18n("Close Document"), saveAction, KStandardGuiItem::discard());
 
         switch (res) {
         case KMessageBox::PrimaryAction: // Save
@@ -2588,9 +2593,21 @@ bool Part::saveFile()
 {
     if (!isModified()) {
         return true;
-    } else {
-        return saveAs(url());
     }
+    if (m_document->hasSeparatePdfAnnotations()) {
+        if (!m_document->canSaveAnnotationsToSidecar()) {
+            KMessageBox::information(widget(), i18n("This PDF also has form changes. Use Save As to save a copy with the changes; saving over the PDF would embed its separate annotations."));
+            return false;
+        }
+        QString errorText;
+        if (!m_document->saveAnnotationsToSidecar(&errorText)) {
+            KMessageBox::error(widget(), i18n("Could not save annotations: %1", errorText));
+            return false;
+        }
+        m_document->setHistoryClean(true);
+        return true;
+    }
+    return saveAs(url());
 }
 
 bool Part::slotSaveFileAs(bool showOkularArchiveAsDefaultFormat)

@@ -79,6 +79,11 @@ ecm_add_test(annotationstest.cpp
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
 )
 
+ecm_add_test(annotationsidecartest.cpp
+    TEST_NAME "annotationsidecartest"
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Sql okularcore
+)
+
 if(BUILD_DESKTOP)
     ecm_add_test(annotationclipboardtest.cpp
         TEST_NAME "annotationclipboardtest"

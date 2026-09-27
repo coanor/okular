@@ -43,6 +43,7 @@
 #include <QLayout>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMouseEvent>
 #include <QMimeData>
 #include <QMimeDatabase>
 #include <QPrintDialog>
@@ -51,10 +52,12 @@
 #include <QScopedValueRollback>
 #include <QScrollBar>
 #include <QSlider>
+#include <QSplitter>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
+#include <QUuid>
 #include <QWidgetAction>
 
 #include <KAboutPluginDialog>
@@ -95,6 +98,7 @@
 
 // local includes
 #include "aboutdata.h"
+#include "aireadingassistant.h"
 #include "annotationpopup.h"
 #include "bookmarklist.h"
 #include "core/action.h"
@@ -484,11 +488,21 @@ Part::Part(QObject *parent, const QVariantList &args)
     m_signatureInProgressMessage->addAction(finishSigningAction);
     rightLayout->addWidget(m_signatureInProgressMessage);
 #endif
-    m_pageView = new PageView(rightContainer, m_document);
+    m_aiSplitter = new QSplitter(Qt::Horizontal, rightContainer);
+    rightLayout->addWidget(m_aiSplitter, 1);
+    m_pageView = new PageView(m_aiSplitter, m_document);
+    m_aiSplitter->addWidget(m_pageView);
     rightContainer->setFocusProxy(m_pageView);
     QMetaObject::invokeMethod(m_pageView, "setFocus", Qt::QueuedConnection); // usability setting
     //    m_splitter->setFocusProxy(m_pageView);
     connect(m_pageView.data(), &PageView::rightClick, this, &Part::slotShowMenu);
+    connect(m_pageView.data(), &PageView::askAiAboutSelection, this, [this](const QString &text) {
+        if (m_aiPanelAction) {
+            m_aiPanelAction->setChecked(true);
+        }
+        showAiPanel(true);
+        m_aiPanel->askAboutSelection(text);
+    });
     connect(m_pageView, &PageView::triggerSearch, this, [this](const QString &searchText) {
         m_findBar->startSearch(searchText);
         slotShowFindBar();
@@ -498,7 +512,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_document, &Document::notice, this, &Part::noticeMessage);
     connect(m_document, &Document::sourceReferenceActivated, this, &Part::slotHandleActivatedSourceReference);
     connect(m_pageView.data(), &PageView::fitWindowToPage, this, &Part::fitWindowToPage);
-    rightLayout->addWidget(m_pageView);
+    m_pageView->viewport()->installEventFilter(this);
     m_layers->setPageView(m_pageView);
     m_signaturePanel->setPageView(m_pageView);
     m_findBar = new FindBar(m_document, rightContainer);
@@ -871,6 +885,12 @@ void Part::setupActions()
     m_showLeftPanel->setChecked(Okular::Settings::showLeftPanel());
     slotShowLeftPanel();
 
+    m_aiPanelAction = ac->add<KToggleAction>(QStringLiteral("show_ai_assistant"));
+    m_aiPanelAction->setText(i18n("AI Reading Assistant"));
+    m_aiPanelAction->setIcon(QIcon::fromTheme(QStringLiteral("help-contextual")));
+    m_aiPanelAction->setEnabled(false);
+    connect(m_aiPanelAction, &QAction::toggled, this, &Part::showAiPanel);
+
     m_showBottomBar = ac->add<KToggleAction>(QStringLiteral("show_bottombar"));
     m_showBottomBar->setText(i18n("Show &Page Bar"));
     connect(m_showBottomBar, &QAction::toggled, this, &Part::slotShowBottomBar);
@@ -978,6 +998,7 @@ Part::~Part()
 
     delete m_toc;
     delete m_layers;
+    delete m_aiPanel;
     delete m_pageView;
     delete m_thumbnailList;
     delete m_miniBar;
@@ -1571,6 +1592,12 @@ bool Part::openFile()
 
     // update one-time actions
     const bool ok = openResult == Document::OpenSuccess;
+    if (m_aiPanelAction) {
+        m_aiPanelAction->setEnabled(ok);
+    }
+    if (m_aiPanel) {
+        m_aiPanel->setDocumentUrl(ok ? m_document->currentDocument() : QUrl());
+    }
     Q_EMIT enableCloseAction(ok);
     m_find->setEnabled(ok && canSearch);
     m_findNext->setEnabled(ok && canSearch);
@@ -1919,6 +1946,17 @@ bool Part::closeUrl(bool promptToSave)
         return true; // pretend it worked
     }
 
+    m_aiAnnotationQuestion.clear();
+    m_aiAnnotationAnswer.clear();
+    m_aiAnnotationPage = -1;
+    if (m_aiPanel) {
+        m_aiPanel->setDocumentUrl(QUrl());
+    }
+    if (m_aiPanelAction) {
+        m_aiPanelAction->setChecked(false);
+        m_aiPanelAction->setEnabled(false);
+    }
+
     m_document->setHistoryClean(true);
 
     if (!m_temporaryLocalFile.isNull() && m_temporaryLocalFile != localFilePath()) {
@@ -2002,6 +2040,32 @@ bool Part::closeUrl(bool promptToSave)
 bool Part::closeUrl()
 {
     return closeUrl(true);
+}
+
+void Part::showAiPanel(bool visible)
+{
+    if (visible && !m_aiPanel) {
+        m_aiPanel = new AiReadingAssistant(m_document, m_aiSplitter);
+        m_aiPanel->setMinimumWidth(280);
+        m_aiSplitter->addWidget(m_aiPanel);
+        m_aiSplitter->setStretchFactor(0, 3);
+        m_aiSplitter->setStretchFactor(1, 1);
+        connect(m_aiPanel, &AiReadingAssistant::saveAnswerRequested, this, [this](const QString &question, const QString &answer, int page) {
+            m_aiAnnotationQuestion = question;
+            m_aiAnnotationAnswer = answer;
+            m_aiAnnotationPage = page;
+        });
+        if (m_document->isOpened()) {
+            m_aiPanel->setDocumentUrl(m_document->currentDocument());
+        }
+    }
+    if (m_aiPanel) {
+        m_aiPanel->setVisible(visible);
+        if (visible) {
+            const int total = qMax(650, m_aiSplitter->width());
+            m_aiSplitter->setSizes({total - 350, 350});
+        }
+    }
 }
 
 void Part::guiActivateEvent(KParts::GUIActivateEvent *event)
@@ -3892,6 +3956,41 @@ void Part::rebuildBookmarkMenu(bool unplugActions)
 
 bool Part::eventFilter(QObject *watched, QEvent *event)
 {
+    if (m_pageView && watched == m_pageView->viewport()) {
+        if (event->type() == QEvent::MouseButtonPress && !m_aiAnnotationAnswer.isEmpty()) {
+            auto *mouse = static_cast<QMouseEvent *>(event);
+            if (mouse->button() == Qt::LeftButton) {
+                int page = -1;
+                Okular::NormalizedPoint point;
+                if (!m_pageView->mapGlobalPosToPagePoint(mouse->globalPosition().toPoint(), &page, &point) || page != m_aiAnnotationPage) {
+                    if (m_aiPanel) {
+                        m_aiPanel->showStatus(i18n("Click on page %1 to place this annotation.", m_aiAnnotationPage + 1));
+                    }
+                    return true;
+                }
+                if (!m_document->isAllowed(Okular::AllowNotes)) {
+                    return true;
+                }
+                auto *annotation = new Okular::TextAnnotation;
+                annotation->setTextType(Okular::TextAnnotation::Linked);
+                annotation->setTextIcon(QStringLiteral("Note"));
+                annotation->setUniqueName(QStringLiteral("ai-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+                annotation->setAuthor(i18n("AI Reading Assistant"));
+                annotation->window().setSummary(i18n("AI answer"));
+                annotation->setContents(i18n("## Question\n%1\n\n## Answer\n%2", m_aiAnnotationQuestion, m_aiAnnotationAnswer));
+                annotation->setBoundingRectangle(Okular::NormalizedRect(point.x, point.y, qMin(1.0, point.x + 0.03), qMin(1.0, point.y + 0.03)));
+                m_document->addPageAnnotation(page, annotation);
+                m_aiAnnotationQuestion.clear();
+                m_aiAnnotationAnswer.clear();
+                m_aiAnnotationPage = -1;
+                if (m_aiPanel) {
+                    m_aiPanel->showStatus(saveFile() ? i18n("AI annotation saved.") : i18n("AI annotation added but could not be saved. Use Save to retry."));
+                }
+                return true;
+            }
+        }
+        return KParts::ReadWritePart::eventFilter(watched, event);
+    }
     switch (event->type()) {
     case QEvent::ContextMenu: {
         QContextMenuEvent *e = static_cast<QContextMenuEvent *>(event);

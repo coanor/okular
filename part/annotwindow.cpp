@@ -9,6 +9,7 @@
 */
 
 #include "annotwindow.h"
+#include "aimarkdownview.h"
 
 // qt/kde includes
 #include <KLocalizedString>
@@ -23,6 +24,8 @@
 #include <QFontInfo>
 #include <QFontMetrics>
 #include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLayout>
 #include <QList>
@@ -358,9 +361,34 @@ AnnotWindow::AnnotWindow(QWidget *parent, Okular::Annotation *annot, Okular::Doc
     mainlay->setSpacing(0);
     m_title = new MovableTitle(this, countNumberPreviousAnnotation);
     mainlay->addWidget(m_title);
+    const bool aiAnnotation = m_annot->uniqueName().startsWith(QLatin1String("ai-"));
+    if (aiAnnotation) {
+        m_aiView = new AiMarkdownView(this);
+        mainlay->addWidget(m_aiView, 1);
+        updateAiView();
+        textEdit->hide();
+    }
     mainlay->addWidget(textEdit);
     QHBoxLayout *lowerlay = new QHBoxLayout();
     mainlay->addLayout(lowerlay);
+    if (aiAnnotation && canEditAnnotation) {
+        m_aiEditButton = new QPushButton(i18n("Edit source"), this);
+        lowerlay->addWidget(m_aiEditButton);
+        connect(m_aiEditButton, &QPushButton::clicked, this, [this] {
+            const bool edit = !textEdit->isVisible();
+            if (edit) {
+                m_aiView->hide();
+                textEdit->show();
+                textEdit->setFocus();
+                m_aiEditButton->setText(i18n("Show rendered"));
+            } else {
+                updateAiView();
+                textEdit->hide();
+                m_aiView->show();
+                m_aiEditButton->setText(i18n("Edit source"));
+            }
+        });
+    }
     lowerlay->addItem(new QSpacerItem(5, 5, QSizePolicy::Expanding, QSizePolicy::Fixed));
     QSizeGrip *sb = new QSizeGrip(this);
     lowerlay->addWidget(sb);
@@ -368,7 +396,7 @@ AnnotWindow::AnnotWindow(QWidget *parent, Okular::Annotation *annot, Okular::Doc
     m_latexRenderer = new GuiUtils::LatexRenderer();
     // The Q_EMIT below is not wrong even if emitting signals from the constructor it's usually wrong
     // in this case the signal it's connected to inside MovableTitle constructor a few lines above
-    Q_EMIT containsLatex(GuiUtils::LatexRenderer::mightContainLatex(m_annot->contents())); // clazy:exclude=incorrect-emit
+    Q_EMIT containsLatex(!aiAnnotation && GuiUtils::LatexRenderer::mightContainLatex(m_annot->contents())); // clazy:exclude=incorrect-emit
 
     m_title->setTitle(m_annot->window().summary());
     m_title->connectOptionButton(this, SLOT(slotOptionBtn()));
@@ -407,6 +435,17 @@ Okular::Annotation *AnnotWindow::annotation() const
 void AnnotWindow::updateAnnotation(Okular::Annotation *a)
 {
     m_annot = a;
+    updateAiView();
+}
+
+void AnnotWindow::updateAiView()
+{
+    if (!m_aiView || !m_annot) {
+        return;
+    }
+    m_aiView->setMessages(QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")},
+                                             {QStringLiteral("content"), m_annot->contents()},
+                                             {QStringLiteral("saveAction"), false}}});
 }
 
 void AnnotWindow::reloadInfo()
@@ -459,7 +498,11 @@ void AnnotWindow::showEvent(QShowEvent *event)
     QFrame::showEvent(event);
 
     // focus the content area by default
-    textEdit->setFocus();
+    if (m_aiView && m_aiView->isVisible()) {
+        m_aiView->setFocus();
+    } else {
+        textEdit->setFocus();
+    }
 }
 
 bool AnnotWindow::eventFilter(QObject *watched, QEvent *event)
@@ -538,7 +581,7 @@ void AnnotWindow::slotsaveWindowText()
     const int cursorPos = textEdit->textCursor().position();
     if (contents != m_annot->contents()) {
         m_document->editPageAnnotationContents(m_page, m_annot, contents, cursorPos, m_prevCursorPos, m_prevAnchorPos);
-        Q_EMIT containsLatex(GuiUtils::LatexRenderer::mightContainLatex(textEdit->toPlainText()));
+        Q_EMIT containsLatex(!m_aiView && GuiUtils::LatexRenderer::mightContainLatex(textEdit->toPlainText()));
     }
     m_prevCursorPos = cursorPos;
     m_prevAnchorPos = textEdit->textCursor().anchor();
@@ -546,6 +589,9 @@ void AnnotWindow::slotsaveWindowText()
 
 void AnnotWindow::renderLatex(bool render)
 {
+    if (m_aiView) {
+        return;
+    }
     if (render) {
         textEdit->setReadOnly(true);
         disconnect(textEdit, &KTextEdit::textChanged, this, &AnnotWindow::slotsaveWindowText);
@@ -599,6 +645,7 @@ void AnnotWindow::slotHandleContentsChangedByUndoRedo(Okular::Annotation *annot,
     }
 
     textEdit->setPlainText(contents);
+    updateAiView();
     QTextCursor c = textEdit->textCursor();
     c.setPosition(anchorPos);
     c.setPosition(cursorPos, QTextCursor::KeepAnchor);
@@ -606,7 +653,7 @@ void AnnotWindow::slotHandleContentsChangedByUndoRedo(Okular::Annotation *annot,
     m_prevAnchorPos = anchorPos;
     textEdit->setTextCursor(c);
     textEdit->setFocus();
-    Q_EMIT containsLatex(GuiUtils::LatexRenderer::mightContainLatex(m_annot->contents()));
+    Q_EMIT containsLatex(!m_aiView && GuiUtils::LatexRenderer::mightContainLatex(m_annot->contents()));
 }
 
 #include "annotwindow.moc"

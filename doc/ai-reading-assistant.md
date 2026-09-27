@@ -1,0 +1,28 @@
+# AI reading assistant (desktop)
+
+Open a document and choose **View → AI Reading Assistant**. Add a model in **Models…**, then ask a question about the current page. The **Ask** button is inside the prompt field and changes to **Cancel** while a request is running. Canceling restores the question for another try. For a selected passage, right-click it and choose **Ask AI about Selected Text**; the panel opens with the selection as context, and waits for a question.
+
+Each question sends the current page's extracted text when available. Vision profiles also send a JPEG rendering of the current page. Page content is sent only after the reader presses **Ask**. The assistant may use its own knowledge to answer; it is not limited to passages in the document. The first version does not search the whole book.
+
+## Model profiles
+
+- **OpenAI-compatible Chat Completions:** base URL usually ends in `/v1`; requires a model name and API key. History is replayed from Okular's local record.
+- **Anthropic-compatible Messages:** base URL normally points to the service root; requires a model name and API key. History is replayed from Okular's local record.
+- **OpenAI Responses:** uses `/v1/conversations` and `/v1/responses` so the service keeps conversation state. Requires a supporting endpoint, model and API key.
+- **Local Codex CLI:** uses the installed, signed-in `codex` command and resumes the saved Codex session ID. No API key is entered in Okular. The Codex process runs with a read-only sandbox.
+
+Each model profile has an **Extra arguments** field. For Codex, enter CLI options such as `-c model_reasoning_effort=medium`. Okular uses `low` reasoning effort by default for new and resumed Codex turns; an explicit value in this field overrides it. For HTTP providers, enter a JSON object of additional request fields: for example `{"reasoning_effort":"low"}` for Chat Completions, `{"reasoning":{"effort":"low"}}` for Responses, or `{"max_tokens":512}` for Anthropic. Okular keeps the model, conversation and message fields under its own control.
+
+Mark **This model accepts page images** only if that model supports image input. Text-only profiles require selected text to ask about a page.
+
+API keys are saved in KWallet when available; otherwise they remain in memory for this Okular process. Named profiles and conversations are local. Conversations are separated by document content hash and profile ID. The local conversation record contains instructions, questions, answers, selected text, extracted page text and the most recent page image. When a new question is sent through a stateless API, earlier page images are discarded while earlier text stays in the request history. Responses and Codex store a remote session ID as well; their providers keep the full conversation.
+
+To start a fresh conversation for the current document and model, open the arrow menu on **Models…** and choose **Start new conversation**. Okular removes its local conversation record and starts a new provider session on the next question. Saved annotations and the provider's earlier session history remain available outside Okular.
+
+Use **Models… → Conversation instructions…** to set a basic prompt for the current document and model conversation, such as “Answer in Chinese with a patient tone.” Okular saves it with the conversation and sends it on every turn, including resumed Codex and Responses sessions. Editing it affects future answers. Starting a new conversation clears it.
+
+## Answers and annotations
+
+Answers render offline with Markdown and KaTeX math (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`). Raw HTML and Mermaid are not supported. Remote images are shown as links; external links open in the browser.
+
+Choose **Save as annotation** under an answer and click a point on the answer's PDF page. Okular creates a note containing the question and answer and saves it to the local PDF annotation sidecar. The original PDF bytes remain unchanged. This action is available for local PDFs only. See [annotation-sidecars.md](annotation-sidecars.md) for the sidecar format and location.

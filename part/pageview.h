@@ -169,6 +169,7 @@ Q_SIGNALS:
     void escPressed();
     void fitWindowToPage(const QSize pageViewPortSize, const QSize pageSize);
     void triggerSearch(const QString &text);
+    void askAiAboutSelection(const QString &text);
     /**
      * Requests opening of a newly signed file
      * \param filePath path to signed file

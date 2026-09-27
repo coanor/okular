@@ -101,6 +101,9 @@ ecm_setup_version(${PROJECT_VERSION}
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
 find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql)
+if(BUILD_DESKTOP)
+    find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
+endif()
 
 find_package(KF6 ${KF_REQUIRED_VERSION} REQUIRED COMPONENTS
     Archive
@@ -518,6 +521,10 @@ if(BUILD_DESKTOP)
     part/widgetconfigurationtoolsbase.cpp
     part/widgetdrawingtools.cpp
     part/part.cpp
+    part/aimarkdownview.cpp
+    part/aistore.cpp
+    part/aiprovider.cpp
+    part/aireadingassistant.cpp
     part/extensions.cpp
     part/embeddedfilesdialog.cpp
     part/actionbar.cpp
@@ -571,6 +578,7 @@ if(BUILD_DESKTOP)
     part/signaturepanel.cpp
     part/signingcertificatelistmodel.cpp
     part/part.qrc
+    part/aiassets/aiassets.qrc
   )
   ki18n_wrap_ui(okularpart_SRCS part/selectcertificatedialog.ui)
 
@@ -586,6 +594,8 @@ generate_export_header(okularpart BASE_NAME okularpart)
 
 target_link_libraries(okularpart okularcore
     ${MATH_LIB}
+    Qt6::Network
+    Qt6::WebEngineWidgets
     Qt6::Svg
     KF6::Archive
     KF6::Bookmarks

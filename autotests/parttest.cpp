@@ -18,6 +18,7 @@
 #include "../core/form.h"
 #include "../core/misc.h"
 #include "../core/page.h"
+#include "../part/aireadingassistant.h"
 #include "../part/pageview.h"
 #include "../part/part.h"
 #include "../part/presentationwidget.h"
@@ -46,6 +47,7 @@
 #include <QTextEdit>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTreeView>
 #include <QUrl>
 #include <QUuid>
@@ -87,6 +89,7 @@ private Q_SLOTS:
     void testSaveAsToSymlink();
     void testSaveIsSymlink();
     void testSaveAnnotationsToSidecar();
+    void testAiPanelOpens();
     void testSidebarItemAfterSaving();
     void testViewModeSavingPerFile();
     void testSaveAsUndoStackAnnotations();
@@ -1144,6 +1147,33 @@ void PartTest::testSaveAnnotationsToSidecar()
         QVERIFY(part.m_document->page(0)->annotation(annotationId));
     }
     QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
+}
+
+void PartTest::testAiPanelOpens()
+{
+    Okular::Part part(nullptr, {});
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file1.pdf")));
+    QAction *action = part.actionCollection()->action(QStringLiteral("show_ai_assistant"));
+    QVERIFY(action);
+    QVERIFY(action->isEnabled());
+    action->trigger();
+    QVERIFY(action->isChecked());
+    QVERIFY(part.m_aiPanel);
+    QToolButton *modelsButton = part.m_aiPanel->findChild<QToolButton *>(QStringLiteral("aiModelsButton"));
+    QVERIFY(modelsButton);
+    QCOMPARE(modelsButton->popupMode(), QToolButton::MenuButtonPopup);
+    QVERIFY(modelsButton->menu());
+    QVERIFY(part.m_aiPanel->findChild<QAction *>(QStringLiteral("aiNewConversation")));
+    QVERIFY(part.m_aiPanel->findChild<QAction *>(QStringLiteral("aiConversationInstructions")));
+    QPushButton *promptAction = part.m_aiPanel->findChild<QPushButton *>(QStringLiteral("aiPromptAction"));
+    QVERIFY(promptAction);
+    QTextEdit *prompt = part.m_aiPanel->findChild<QTextEdit *>();
+    QCOMPARE(promptAction->parentWidget(), prompt);
+    prompt->resize(350, 100);
+    QCoreApplication::processEvents();
+    QVERIFY(prompt->rect().contains(promptAction->geometry()));
+    action->trigger();
+    QVERIFY(!action->isChecked());
 }
 
 void PartTest::testSaveAsToSymlink()

@@ -26,6 +26,8 @@ class LatexRenderer;
 }
 
 class KTextEdit;
+class AiMarkdownView;
+class QPushButton;
 class MovableTitle;
 class QMenu;
 
@@ -46,6 +48,8 @@ public:
 private:
     MovableTitle *m_title;
     KTextEdit *textEdit;
+    AiMarkdownView *m_aiView = nullptr;
+    QPushButton *m_aiEditButton = nullptr;
     QColor m_color;
     GuiUtils::LatexRenderer *m_latexRenderer;
     Okular::Annotation *m_annot;
@@ -53,6 +57,7 @@ private:
     int m_page;
     int m_prevCursorPos;
     int m_prevAnchorPos;
+    void updateAiView();
 
 public Q_SLOTS:
     void renderLatex(bool render);

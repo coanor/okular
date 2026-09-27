@@ -45,6 +45,8 @@ class QAction;
 class QWidget;
 class QPrinter;
 class QMenu;
+class QSplitter;
+class AiReadingAssistant;
 
 class KConfigDialog;
 class KDirWatch;
@@ -308,6 +310,7 @@ private:
     void setupViewerActions();
     void setViewerShortcuts();
     void setupActions();
+    void showAiPanel(bool visible);
 
     void setupPrint(QPrinter &printer);
     bool doPrint(QPrinter &printer);
@@ -360,6 +363,12 @@ private:
 
     // main widgets
     Sidebar *m_sidebar;
+    QSplitter *m_aiSplitter = nullptr;
+    AiReadingAssistant *m_aiPanel = nullptr;
+    KToggleAction *m_aiPanelAction = nullptr;
+    QString m_aiAnnotationQuestion;
+    QString m_aiAnnotationAnswer;
+    int m_aiAnnotationPage = -1;
     SearchWidget *m_searchWidget;
     FindBar *m_findBar;
     KMessageWidget *m_migrationMessage;

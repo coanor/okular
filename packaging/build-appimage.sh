@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-build_dir="$(realpath "${1:-$repo_dir/build-own-static}")"
+build_dir="$(realpath "${1:-$repo_dir/build}")"
 output_dir="${2:-$repo_dir/build-appimage}"
 linuxdeploy="${LINUXDEPLOY:-linuxdeploy}"
 appimagetool="${APPIMAGETOOL:-appimagetool}"

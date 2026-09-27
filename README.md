@@ -86,17 +86,17 @@ machine, build Okular's core, part, and generators as static libraries, then
 bundle the remaining runtime libraries:
 
 ```bash
-cmake -S . -B build-own-static \
+cmake -S . -B build \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TESTING=OFF \
   -DFORCE_NOT_REQUIRED_DEPENDENCIES='KF6Wallet;KF6DocTools;Qt6Qml;Qt6TextToSpeech;KF6Purpose;Qt6::MultimediaWidgets;Poppler;Freetype;TIFF;LibSpectre;KExiv2Qt6;DjVuLibre;EPub;QMobiPocket6;Discount'
 LINUXDEPLOY=/path/to/linuxdeploy APPIMAGETOOL=/path/to/appimagetool \
-  cmake --build build-own-static --target appimage
+  cmake --build build --target appimage
 ```
 
 The script needs `qmake6`, [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy),
 and [appimagetool](https://github.com/AppImage/appimagetool). The CMake target
-builds Okular and creates `build-own-static/appimage/Okular-bundled-x86_64.AppImage`.
+builds Okular and creates `build/appimage/Okular-bundled-x86_64.AppImage`.
 The AppImage bundles Qt and KDE shared libraries; they are not statically
 linked. Build it on the oldest Linux distribution you intend to support, since
 the host glibc remains a runtime requirement.

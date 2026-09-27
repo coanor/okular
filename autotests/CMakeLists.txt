@@ -85,6 +85,10 @@ ecm_add_test(annotationsidecartest.cpp
 )
 
 if(BUILD_DESKTOP)
+    ecm_add_test(booklibrarytest.cpp ../part/booklibrary.cpp
+        TEST_NAME "booklibrarytest"
+        LINK_LIBRARIES Qt6::Test
+    )
     ecm_add_test(aiprovidertest.cpp ../part/aiprovider.cpp
         TEST_NAME "aiprovidertest"
         LINK_LIBRARIES Qt6::Test Qt6::Network

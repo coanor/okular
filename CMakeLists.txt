@@ -523,6 +523,7 @@ if(BUILD_DESKTOP)
     part/part.cpp
     part/aimarkdownview.cpp
     part/aistore.cpp
+    part/booklibrary.cpp
     part/aiprovider.cpp
     part/aireadingassistant.cpp
     part/extensions.cpp

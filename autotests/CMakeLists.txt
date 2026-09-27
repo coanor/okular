@@ -79,7 +79,20 @@ ecm_add_test(annotationstest.cpp
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
 )
 
+ecm_add_test(annotationsidecartest.cpp
+    TEST_NAME "annotationsidecartest"
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Sql okularcore
+)
+
 if(BUILD_DESKTOP)
+    ecm_add_test(aiprovidertest.cpp ../part/aiprovider.cpp
+        TEST_NAME "aiprovidertest"
+        LINK_LIBRARIES Qt6::Test Qt6::Network
+    )
+    ecm_add_test(aimarkdownviewtest.cpp ../part/aimarkdownview.cpp ../part/aiassets/aiassets.qrc
+        TEST_NAME "aimarkdownviewtest"
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::WebEngineWidgets KF6::I18n
+    )
     ecm_add_test(annotationclipboardtest.cpp
         TEST_NAME "annotationclipboardtest"
         LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore okularpart

@@ -51,6 +51,7 @@
     <Action name="view_trim_mode"/>
     <Separator/>
     <Action name="view_toggle_forms"/>
+    <Action name="show_ai_assistant"/>
   </Menu>
   <Menu name="go"><text>&amp;Go</text>
     <Action name="go_previous"/>
@@ -114,6 +115,7 @@
   <Action name="mouse_drag"/>
   <Action name="mouse_selecttools"/>
   <Action name="annotation_favorites"/>
+  <Action name="show_ai_assistant"/>
   <Separator/>
   <Action name="hamburger_menu"/>
 </ToolBar>

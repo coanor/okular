@@ -13,6 +13,7 @@
 #include <QTest>
 
 #include "../core/annotations.h"
+#include "../core/annotationsidecar_p.h"
 #include "../core/document_p.h"
 #include "../core/form.h"
 #include "../core/misc.h"
@@ -47,6 +48,7 @@
 #include <QToolBar>
 #include <QTreeView>
 #include <QUrl>
+#include <QUuid>
 
 namespace Okular
 {
@@ -84,6 +86,8 @@ private Q_SLOTS:
     void testSaveAsToNonExistingPath();
     void testSaveAsToSymlink();
     void testSaveIsSymlink();
+    void testSaveAnnotationsToSidecar();
+    void testAiPanelOpens();
     void testSidebarItemAfterSaving();
     void testViewModeSavingPerFile();
     void testSaveAsUndoStackAnnotations();
@@ -1097,6 +1101,64 @@ void PartTest::testSaveAsToNonExistingPath()
     QVERIFY(part.saveAs(QUrl::fromLocalFile(saveFilePath), Part::NoSaveAsFlags));
 
     QFile::remove(saveFilePath);
+}
+
+void PartTest::testSaveAnnotationsToSidecar()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString pdfPath = dir.filePath(QStringLiteral("book.pdf"));
+    QVERIFY(QFile::copy(QStringLiteral(KDESRCDIR "data/file1.pdf"), pdfPath));
+    QFile pdf(pdfPath);
+    QVERIFY(pdf.open(QIODevice::Append));
+    pdf.write("\n% annotation-sidecar-test ");
+    pdf.write(QUuid::createUuid().toString().toLatin1());
+    pdf.write("\n");
+    pdf.close();
+
+    QString error;
+    const QString hash = Okular::AnnotationSidecar::pdfHash(pdfPath, &error);
+    QString annotationId;
+    {
+        Okular::Part part(nullptr, {});
+        QVERIFY(openDocument(&part, pdfPath));
+        auto *highlight = new Okular::HighlightAnnotation();
+        const Okular::NormalizedRect rect(0.36, 0.16, 0.51, 0.17);
+        highlight->setBoundingRectangle(rect);
+        Okular::HighlightAnnotation::Quad quad;
+        quad.setPoint(Okular::NormalizedPoint(rect.left, rect.bottom), 0);
+        quad.setPoint(Okular::NormalizedPoint(rect.right, rect.bottom), 1);
+        quad.setPoint(Okular::NormalizedPoint(rect.right, rect.top), 2);
+        quad.setPoint(Okular::NormalizedPoint(rect.left, rect.top), 3);
+        highlight->highlightQuads().append(quad);
+        part.m_document->addPageAnnotation(0, highlight);
+        annotationId = highlight->uniqueName();
+        QVERIFY(part.isModified());
+        QVERIFY(part.saveFile());
+        QVERIFY(!part.isModified());
+    }
+    QCOMPARE(Okular::AnnotationSidecar::pdfHash(pdfPath, &error), hash);
+    QVERIFY(QFile::exists(Okular::AnnotationSidecar::pathForHash(hash)));
+    {
+        Okular::Part part(nullptr, {});
+        QVERIFY(openDocument(&part, pdfPath));
+        QVERIFY(part.m_document->page(0)->annotation(annotationId));
+    }
+    QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
+}
+
+void PartTest::testAiPanelOpens()
+{
+    Okular::Part part(nullptr, {});
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file1.pdf")));
+    QAction *action = part.actionCollection()->action(QStringLiteral("show_ai_assistant"));
+    QVERIFY(action);
+    QVERIFY(action->isEnabled());
+    action->trigger();
+    QVERIFY(action->isChecked());
+    QVERIFY(part.m_aiPanel);
+    action->trigger();
+    QVERIFY(!action->isChecked());
 }
 
 void PartTest::testSaveAsToSymlink()

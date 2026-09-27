@@ -1939,11 +1939,23 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
              << Poppler::Annotation::AGeom << Poppler::Annotation::AHighlight << Poppler::Annotation::AInk << Poppler::Annotation::AStamp << Poppler::Annotation::ACaret;
 
     std::vector<std::unique_ptr<Poppler::Annotation>> popplerAnnotations = popplerPage->annotations(subtypes);
+    QSet<QString> usedNames;
 
-    for (auto &a : popplerAnnotations) {
+    for (size_t annotationIndex = 0; annotationIndex < popplerAnnotations.size(); ++annotationIndex) {
+        auto &a = popplerAnnotations[annotationIndex];
         bool doDelete = true;
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a.get(), *popplerPage, &doDelete);
         if (newann) {
+            // A PDF annotation without a unique /NM still needs a stable sidecar identity.
+            // The PDF's byte hash pins this index to the exact source file.
+            if (newann->uniqueName().isEmpty() || usedNames.contains(newann->uniqueName())) {
+                QString name = QStringLiteral("okular-native-%1-%2").arg(page->number()).arg(annotationIndex);
+                while (usedNames.contains(name)) {
+                    name.append(QLatin1Char('_'));
+                }
+                newann->setUniqueName(name);
+            }
+            usedNames.insert(newann->uniqueName());
             page->addAnnotation(newann);
 
             if (a->subType() == Poppler::Annotation::AScreen) {

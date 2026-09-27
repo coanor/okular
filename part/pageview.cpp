@@ -3137,6 +3137,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                 QAction *httpLink = nullptr;
                 QAction *textToClipboard = nullptr;
                 QAction *textWithoutLineBreaksToClipboard = nullptr;
+                QAction *askAi = nullptr;
                 QString url;
 
                 QMenu *menu = createProcessLinkMenu(item, eventPos);
@@ -3167,6 +3168,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                     } else {
                         addSearchWithinDocumentAction(menu, d->selectedText());
                         addWebShortcutsMenu(menu, d->selectedText());
+                        askAi = menu->addAction(QIcon::fromTheme(QStringLiteral("edit-comment")), i18n("Ask AI about Selected Text"));
                     }
 
                     // if the right-click was over a link add "Follow This link" instead of "Go to"
@@ -3190,6 +3192,8 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                             copyTextSelection(TextCopyMode::AsProvided);
                         } else if (choice == textWithoutLineBreaksToClipboard) {
                             copyTextSelection(TextCopyMode::WithoutLineBreaks);
+                        } else if (choice == askAi) {
+                            Q_EMIT askAiAboutSelection(d->selectedText());
 #if HAVE_SPEECH
                         } else if (choice == speakText) {
                             const QString text = d->selectedText();

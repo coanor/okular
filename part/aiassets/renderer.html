@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+<link rel="stylesheet" href="katex.min.css">
+<style>
+  :root { color-scheme: light dark; font: 14px system-ui, sans-serif; }
+  body { margin: 0; padding: 12px; overflow-wrap: anywhere; }
+  article { margin: 0 0 16px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, CanvasText 5%, Canvas); }
+  article.user { background: color-mix(in srgb, AccentColor 14%, Canvas); }
+  header { font-size: 12px; opacity: .7; margin-bottom: 8px; }
+  .body > :first-child { margin-top: 0; }
+  .body > :last-child { margin-bottom: 0; }
+  pre { overflow-x: auto; padding: 10px; border-radius: 6px; background: color-mix(in srgb, CanvasText 8%, Canvas); }
+  code { font-family: ui-monospace, monospace; }
+  table { border-collapse: collapse; display: block; max-width: 100%; overflow-x: auto; }
+  td, th { border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); padding: 5px 8px; }
+  blockquote { border-left: 3px solid AccentColor; margin-left: 0; padding-left: 12px; }
+  .katex-display { overflow-x: auto; overflow-y: hidden; }
+  footer { margin-top: 10px; font-size: 12px; }
+  footer a { margin-right: 12px; }
+  details pre { white-space: pre-wrap; }
+</style>
+<script src="markdown-it.umd.min.js"></script>
+<script src="katex.min.js"></script>
+<script src="auto-render.min.js"></script>
+</head>
+<body>
+<main id="messages" aria-live="polite"></main>
+<script>
+const md = window.markdownit({html: false, linkify: true});
+let labels = {image: 'Image: ', question: 'Question', answer: 'AI answer', save: 'Save as annotation', source: 'View source'};
+md.renderer.rules.image = (tokens, index) => {
+  const url = tokens[index].attrGet('src') || '';
+  const alt = tokens[index].content || url;
+  const label = md.utils.escapeHtml(labels.image) + md.utils.escapeHtml(alt);
+  if (!/^https?:\/\//i.test(url)) return label;
+  return '<a href="' + md.utils.escapeHtml(url) + '">' + label + '</a>';
+};
+
+function setMessages(messages, translatedLabels) {
+  labels = translatedLabels;
+  const root = document.getElementById('messages');
+  root.replaceChildren();
+  messages.forEach((message, index) => {
+    const article = document.createElement('article');
+    article.className = message.role === 'user' ? 'user' : 'assistant';
+    const heading = document.createElement('header');
+    heading.textContent = message.role === 'user' ? labels.question : labels.answer;
+    article.appendChild(heading);
+    const body = document.createElement('div');
+    body.className = 'body';
+    body.innerHTML = md.render(message.content || '');
+    article.appendChild(body);
+    renderMathInElement(body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
+      ],
+      throwOnError: false,
+      trust: false
+    });
+    if (message.role === 'assistant') {
+      const footer = document.createElement('footer');
+      if (message.saveAction !== false) {
+        const save = document.createElement('a');
+        save.href = 'okular-ai:save/' + index;
+        save.textContent = labels.save;
+        footer.appendChild(save);
+      }
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = labels.source;
+      details.appendChild(summary);
+      const source = document.createElement('pre');
+      source.textContent = message.content || '';
+      details.appendChild(source);
+      footer.appendChild(details);
+      article.appendChild(footer);
+    }
+    root.appendChild(article);
+  });
+  window.scrollTo(0, document.body.scrollHeight);
+}
+</script>
+</body>
+</html>

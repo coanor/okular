@@ -67,6 +67,7 @@
 #include "action.h"
 #include "annotations.h"
 #include "annotations_p.h"
+#include "annotationsidecar_p.h"
 #include "audioplayer.h"
 #include "bookmarkmanager.h"
 #include "chooseenginedialog_p.h"
@@ -102,6 +103,26 @@
 #endif
 
 using namespace Okular;
+
+static QString sidecarAnnotationKey(int page, const QString &id)
+{
+    return QString::number(page) + QLatin1Char('\x1f') + id;
+}
+
+static SidecarAnnotation sidecarRecord(int page, const Annotation *annotation)
+{
+    QDomDocument xml;
+    QDomElement element = xml.createElement(QStringLiteral("annotation"));
+    xml.appendChild(element);
+    AnnotationUtils::storeAnnotation(annotation, element, xml);
+    return {annotation->uniqueName(),
+            page,
+            annotation->subType(),
+            xml.toString(-1),
+            annotation->contents(),
+            annotation->author(),
+            annotation->style().color().name(QColor::HexArgb)};
+}
 
 struct AllocatedPixmap {
     // owner of the page
@@ -1036,6 +1057,14 @@ void DocumentPrivate::performAddPageAnnotation(int page, Annotation *annotation)
     // add annotation to the page
     kp->addAnnotation(annotation);
 
+    if (!m_loadingAnnotationSidecar && !m_annotationSidecarHash.isEmpty()) {
+        if (annotation->flags() & Annotation::External) {
+            m_externalAnnotationChanges = true;
+        } else {
+            m_localAnnotationChanges = true;
+        }
+    }
+
     // tell the annotation proxy
     if (proxy && proxy->supports(AnnotationProxy::Addition)) {
         proxy->notifyAddition(annotation, page);
@@ -1070,6 +1099,13 @@ void DocumentPrivate::performRemovePageAnnotation(int page, Annotation *annotati
 
     // try to remove the annotation
     if (m_parent->canRemovePageAnnotation(annotation)) {
+        if (!m_loadingAnnotationSidecar && !m_annotationSidecarHash.isEmpty()) {
+            if (annotation->flags() & Annotation::External) {
+                m_externalAnnotationChanges = true;
+            } else {
+                m_localAnnotationChanges = true;
+            }
+        }
         // tell the annotation proxy
         if (proxy && proxy->supports(AnnotationProxy::Removal)) {
             proxy->notifyRemoval(annotation, page);
@@ -1096,6 +1132,14 @@ void DocumentPrivate::performModifyPageAnnotation(int page, Annotation *annotati
     const Page *kp = m_pagesVector[page];
     if (!m_generator || !kp) {
         return;
+    }
+
+    if (!m_loadingAnnotationSidecar && !m_annotationSidecarHash.isEmpty()) {
+        if (annotation->flags() & Annotation::External) {
+            m_externalAnnotationChanges = true;
+        } else {
+            m_localAnnotationChanges = true;
+        }
     }
 
     // tell the annotation proxy
@@ -2463,6 +2507,17 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
         p->d->m_doc = d;
     }
 
+    d->m_nativeAnnotationBaseline.clear();
+    if (mime.inherits(QStringLiteral("application/pdf")) && d->m_url.isLocalFile() && !d->m_archiveData) {
+        for (const Page *page : std::as_const(d->m_pagesVector)) {
+            for (const Annotation *annotation : page->annotations()) {
+                if (annotation->flags() & Annotation::External) {
+                    d->m_nativeAnnotationBaseline.insert(sidecarAnnotationKey(page->number(), annotation->uniqueName()), sidecarRecord(page->number(), annotation));
+                }
+            }
+        }
+    }
+
     d->m_docdataMigrationNeeded = false;
 
     // 2. load Additional Data (bookmarks, local annotations and metadata) about the document
@@ -2477,6 +2532,73 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
         }
         d->loadDocumentInfo(LoadGeneralInfo);
     }
+
+    if (mime.inherits(QStringLiteral("application/pdf")) && d->m_url.isLocalFile() && !d->m_archiveData && !d->m_docdataMigrationNeeded) {
+        QString sidecarError;
+        const QString hash = AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
+        if (!hash.isEmpty()) {
+            QList<SidecarAnnotation> savedAnnotations;
+            qint64 revision = 0;
+            if (AnnotationSidecar::load(hash, &savedAnnotations, &sidecarError, &revision)) {
+                struct ReplayItem {
+                    int page;
+                    QString id;
+                    bool replacesNative;
+                    std::unique_ptr<Annotation> annotation;
+                };
+                std::vector<ReplayItem> restored;
+                for (const SidecarAnnotation &saved : std::as_const(savedAnnotations)) {
+                    if (saved.page < 0 || saved.page >= d->m_pagesVector.size()) {
+                        sidecarError = QStringLiteral("Invalid annotation page in sidecar database");
+                        break;
+                    }
+                    Annotation *existing = d->m_pagesVector[saved.page]->annotation(saved.id);
+                    const bool native = d->m_nativeAnnotationBaseline.contains(sidecarAnnotationKey(saved.page, saved.id));
+                    if ((native && (!existing || !canRemovePageAnnotation(existing))) || (!native && (existing || saved.hiddenNative))) {
+                        sidecarError = QStringLiteral("Invalid or duplicate annotation in sidecar database");
+                        break;
+                    }
+                    std::unique_ptr<Annotation> annotation;
+                    if (!saved.hiddenNative) {
+                        QDomDocument xml;
+                        if (!xml.setContent(saved.xml)) {
+                            sidecarError = QStringLiteral("Invalid annotation XML in sidecar database");
+                            break;
+                        }
+                        annotation.reset(AnnotationUtils::createAnnotation(xml.documentElement()));
+                        if (!annotation || annotation->uniqueName() != saved.id || annotation->subType() != saved.subtype || (annotation->flags() & Annotation::External)) {
+                            sidecarError = QStringLiteral("Invalid annotation in sidecar database");
+                            break;
+                        }
+                    }
+                    restored.push_back({saved.page, saved.id, native, std::move(annotation)});
+                }
+                if (sidecarError.isEmpty()) {
+                    d->m_annotationSidecarHash = hash;
+                    d->m_annotationSidecarRevision = revision;
+                    d->m_sidecarHasAnnotations = !savedAnnotations.isEmpty();
+                    d->m_loadingAnnotationSidecar = true;
+                    for (auto &item : restored) {
+                        if (item.replacesNative) {
+                            d->performRemovePageAnnotation(item.page, d->m_pagesVector[item.page]->annotation(item.id));
+                        }
+                        if (item.annotation) {
+                            d->performAddPageAnnotation(item.page, item.annotation.release());
+                        }
+                    }
+                    d->m_loadingAnnotationSidecar = false;
+                }
+            }
+        }
+        if (!sidecarError.isEmpty()) {
+            qCWarning(OkularCoreDebug) << "Could not load annotation sidecar:" << sidecarError;
+            Q_EMIT error(i18n("Could not load saved annotations: %1", sidecarError), -1);
+        }
+    }
+
+    d->m_formChanges = false;
+    d->m_localAnnotationChanges = false;
+    d->m_externalAnnotationChanges = false;
 
     d->m_bookmarkManager->setUrl(d->m_url);
 
@@ -2709,6 +2831,14 @@ void Document::closeDocument()
 
     d->m_undoStack->clear();
     d->m_docdataMigrationNeeded = false;
+    d->m_annotationSidecarHash.clear();
+    d->m_annotationSidecarRevision = 0;
+    d->m_loadingAnnotationSidecar = false;
+    d->m_localAnnotationChanges = false;
+    d->m_externalAnnotationChanges = false;
+    d->m_formChanges = false;
+    d->m_nativeAnnotationBaseline.clear();
+    d->m_sidecarHasAnnotations = false;
 
 #if HAVE_MALLOC_TRIM
     // trim unused memory, glibc should do this but it seems it does not
@@ -3402,6 +3532,7 @@ void DocumentPrivate::notifyAnnotationChanges(int page)
 
 void DocumentPrivate::notifyFormChanges(int /*page*/)
 {
+    m_formChanges = true;
     recalculateForms();
 }
 
@@ -3910,18 +4041,21 @@ void Document::redo()
 
 void Document::editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos)
 {
+    d->m_formChanges = true;
     QUndoCommand *uc = new EditFormTextCommand(this->d, form, pageNumber, newContents, newCursorPos, form->text(), prevCursorPos, prevAnchorPos);
     d->m_undoStack->push(uc);
 }
 
 void Document::editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos, const QString &oldContents)
 {
+    d->m_formChanges = true;
     QUndoCommand *uc = new EditFormTextCommand(this->d, form, pageNumber, newContents, newCursorPos, oldContents, prevCursorPos, prevAnchorPos);
     d->m_undoStack->push(uc);
 }
 
 void Document::editFormList(int pageNumber, FormFieldChoice *form, const QList<int> &newChoices)
 {
+    d->m_formChanges = true;
     const QList<int> prevChoices = form->currentChoices();
     QUndoCommand *uc = new EditFormListCommand(this->d, form, pageNumber, newChoices, prevChoices);
     d->m_undoStack->push(uc);
@@ -3929,6 +4063,7 @@ void Document::editFormList(int pageNumber, FormFieldChoice *form, const QList<i
 
 void Document::editFormCombo(int pageNumber, FormFieldChoice *form, const QString &newText, int newCursorPos, int prevCursorPos, int prevAnchorPos)
 {
+    d->m_formChanges = true;
     QString prevText;
     if (form->currentChoices().isEmpty()) {
         prevText = form->editChoice();
@@ -3942,6 +4077,7 @@ void Document::editFormCombo(int pageNumber, FormFieldChoice *form, const QStrin
 
 void Document::editFormButtons(int pageNumber, const QList<FormFieldButton *> &formButtons, const QList<bool> &newButtonStates)
 {
+    d->m_formChanges = true;
     QUndoCommand *uc = new EditFormButtonsCommand(this->d, pageNumber, formButtons, newButtonStates);
     d->m_undoStack->push(uc);
 }
@@ -5004,6 +5140,28 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
         d->m_url = url;
         d->m_docFileName = newFileName;
         d->updateMetadataXmlNameAndDocSize();
+        d->m_annotationSidecarHash.clear();
+        d->m_annotationSidecarRevision = 0;
+        d->m_localAnnotationChanges = false;
+        d->m_externalAnnotationChanges = false;
+        d->m_formChanges = false;
+        d->m_nativeAnnotationBaseline.clear();
+        d->m_sidecarHasAnnotations = false;
+        for (const Page *page : std::as_const(d->m_pagesVector)) {
+            for (const Annotation *annotation : page->annotations()) {
+                if (annotation->flags() & Annotation::External) {
+                    d->m_nativeAnnotationBaseline.insert(sidecarAnnotationKey(page->number(), annotation->uniqueName()), sidecarRecord(page->number(), annotation));
+                }
+            }
+        }
+        const QMimeType newMime = QMimeDatabase().mimeTypeForUrl(url);
+        if (url.isLocalFile() && newMime.inherits(QStringLiteral("application/pdf"))) {
+            QString hashError;
+            d->m_annotationSidecarHash = AnnotationSidecar::pdfHash(newFileName, &hashError);
+            if (!hashError.isEmpty()) {
+                qCWarning(OkularCoreDebug) << "Could not hash PDF for annotations:" << hashError;
+            }
+        }
         d->m_bookmarkManager->setUrl(d->m_url);
         d->m_documentInfo = DocumentInfo();
         d->m_documentInfoAskedKeys.clear();
@@ -5132,6 +5290,75 @@ bool Document::saveChanges(const QString &fileName, QString *errorText)
         }
     }
     return success;
+}
+
+bool Document::canSaveAnnotationsToSidecar() const
+{
+    return !d->m_annotationSidecarHash.isEmpty() && (d->m_localAnnotationChanges || d->m_externalAnnotationChanges) && !d->m_formChanges && !d->m_docdataMigrationNeeded;
+}
+
+bool Document::hasSeparatePdfAnnotations() const
+{
+    return !d->m_annotationSidecarHash.isEmpty() && (d->m_sidecarHasAnnotations || d->m_localAnnotationChanges || d->m_externalAnnotationChanges);
+}
+
+bool Document::saveAnnotationsToSidecar(QString *errorText)
+{
+    if (!canSaveAnnotationsToSidecar()) {
+        *errorText = QStringLiteral("This document has changes that cannot be saved to the annotation sidecar");
+        return false;
+    }
+    const QString currentHash = AnnotationSidecar::pdfHash(d->m_docFileName, errorText);
+    if (currentHash.isEmpty() || currentHash != d->m_annotationSidecarHash) {
+        if (errorText->isEmpty()) {
+            *errorText = QStringLiteral("The source PDF changed since it was opened");
+        }
+        return false;
+    }
+
+    QList<SidecarAnnotation> annotations;
+    QSet<QString> visibleNative;
+    for (const Page *page : std::as_const(d->m_pagesVector)) {
+        for (const Annotation *annotation : page->annotations()) {
+            SidecarAnnotation record = sidecarRecord(page->number(), annotation);
+            const QString key = sidecarAnnotationKey(record.page, record.id);
+            const auto original = d->m_nativeAnnotationBaseline.constFind(key);
+            if (original != d->m_nativeAnnotationBaseline.cend()) {
+                visibleNative.insert(key);
+                if (record.xml == original->xml) {
+                    continue;
+                }
+            }
+            QDomDocument roundTripXml;
+            if (!roundTripXml.setContent(record.xml)) {
+                *errorText = QStringLiteral("Could not serialize an annotation");
+                return false;
+            }
+            std::unique_ptr<Annotation> roundTrip(AnnotationUtils::createAnnotation(roundTripXml.documentElement()));
+            if (!roundTrip || roundTrip->uniqueName() != record.id || roundTrip->subType() != record.subtype) {
+                *errorText = QStringLiteral("This annotation type cannot be saved to the sidecar");
+                return false;
+            }
+            annotations.append(std::move(record));
+        }
+    }
+    for (auto it = d->m_nativeAnnotationBaseline.cbegin(); it != d->m_nativeAnnotationBaseline.cend(); ++it) {
+        if (!visibleNative.contains(it.key())) {
+            SidecarAnnotation hidden = it.value();
+            hidden.xml.clear();
+            hidden.hiddenNative = true;
+            annotations.append(std::move(hidden));
+        }
+    }
+    qint64 revision = 0;
+    if (!AnnotationSidecar::save(currentHash, annotations, errorText, d->m_annotationSidecarRevision, &revision)) {
+        return false;
+    }
+    d->m_annotationSidecarRevision = revision;
+    d->m_sidecarHasAnnotations = !annotations.isEmpty();
+    d->m_localAnnotationChanges = false;
+    d->m_externalAnnotationChanges = false;
+    return true;
 }
 
 void Document::registerView(View *view)

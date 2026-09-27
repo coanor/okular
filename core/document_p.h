@@ -9,6 +9,7 @@
 #define _OKULAR_DOCUMENT_P_H_
 
 #include "document.h"
+#include "annotationsidecar_p.h"
 #include "script/event_p.h"
 
 #include "synctex/synctex_parser.h"
@@ -323,6 +324,16 @@ public:
     // shown in read-only mode. This flag is set if the docdata/ XML file
     // for the current document contains any annotation or form.
     bool m_docdataMigrationNeeded;
+
+    // A PDF's local annotations can be stored outside the source file.
+    QString m_annotationSidecarHash;
+    qint64 m_annotationSidecarRevision = 0;
+    bool m_loadingAnnotationSidecar = false;
+    bool m_localAnnotationChanges = false;
+    bool m_externalAnnotationChanges = false;
+    bool m_formChanges = false;
+    bool m_sidecarHasAnnotations = false;
+    QMap<QString, SidecarAnnotation> m_nativeAnnotationBaseline;
 
     synctex_scanner_p m_synctex_scanner;
 

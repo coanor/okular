@@ -1,0 +1,44 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+#pragma once
+
+#include <QList>
+#include <QString>
+#include <QUrl>
+#include <QtGui/qwindowdefs.h>
+
+struct AiProfile {
+    enum class Kind { OpenAiChat, OpenAiResponses, Anthropic, Codex };
+
+    QString id;
+    QString name;
+    Kind kind = Kind::OpenAiChat;
+    QString endpoint;
+    QString model;
+    bool vision = true;
+    QString apiKey; // Kept in memory and, when available, in KWallet.
+};
+
+struct AiMessage {
+    QString role;
+    QString content;
+    int page = -1;
+    QString pageText;
+    QString selectedText;
+    QString pageImage; // JPEG encoded as base64; only user messages use this.
+};
+
+struct AiConversation {
+    QString sessionId;
+    QList<AiMessage> messages;
+};
+
+class AiStore
+{
+public:
+    static QList<AiProfile> loadProfiles(WId windowId);
+    static bool saveProfiles(const QList<AiProfile> &profiles, WId windowId, QString *error);
+    static QString documentKey(const QUrl &url);
+    static AiConversation loadConversation(const QString &documentKey, const QString &profileId);
+    static bool saveConversation(const QString &documentKey, const QString &profileId, const AiConversation &conversation);
+    static bool clearConversation(const QString &documentKey, const QString &profileId);
+};

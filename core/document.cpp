@@ -28,6 +28,7 @@
 
 // qt/kde/system includes
 #include <QApplication>
+#include <QCryptographicHash>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -2508,7 +2509,7 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
     }
 
     d->m_nativeAnnotationBaseline.clear();
-    if (mime.inherits(QStringLiteral("application/pdf")) && d->m_url.isLocalFile() && !d->m_archiveData) {
+    if (mime.inherits(QStringLiteral("application/pdf")) && (d->m_url.isLocalFile() || fromFileDescriptor) && !d->m_archiveData) {
         for (const Page *page : std::as_const(d->m_pagesVector)) {
             for (const Annotation *annotation : page->annotations()) {
                 if (annotation->flags() & Annotation::External) {
@@ -2533,9 +2534,10 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
         d->loadDocumentInfo(LoadGeneralInfo);
     }
 
-    if (mime.inherits(QStringLiteral("application/pdf")) && d->m_url.isLocalFile() && !d->m_archiveData && !d->m_docdataMigrationNeeded) {
+    if (mime.inherits(QStringLiteral("application/pdf")) && (d->m_url.isLocalFile() || fromFileDescriptor) && !d->m_archiveData && !d->m_docdataMigrationNeeded) {
         QString sidecarError;
-        const QString hash = AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
+        const QString hash = fromFileDescriptor ? QString::fromLatin1(QCryptographicHash::hash(filedata, QCryptographicHash::Sha256).toHex())
+                                                : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
         if (!hash.isEmpty()) {
             QList<SidecarAnnotation> savedAnnotations;
             qint64 revision = 0;
@@ -5297,6 +5299,11 @@ bool Document::canSaveAnnotationsToSidecar() const
     return !d->m_annotationSidecarHash.isEmpty() && (d->m_localAnnotationChanges || d->m_externalAnnotationChanges) && !d->m_formChanges && !d->m_docdataMigrationNeeded;
 }
 
+bool Document::supportsAnnotationSidecar() const
+{
+    return !d->m_annotationSidecarHash.isEmpty();
+}
+
 bool Document::hasSeparatePdfAnnotations() const
 {
     return !d->m_annotationSidecarHash.isEmpty() && (d->m_sidecarHasAnnotations || d->m_localAnnotationChanges || d->m_externalAnnotationChanges);
@@ -5308,7 +5315,9 @@ bool Document::saveAnnotationsToSidecar(QString *errorText)
         *errorText = QStringLiteral("This document has changes that cannot be saved to the annotation sidecar");
         return false;
     }
-    const QString currentHash = AnnotationSidecar::pdfHash(d->m_docFileName, errorText);
+    // File descriptors are consumed when opening the document. Their PDF bytes were
+    // hashed at that point, and there is no local source path to check again.
+    const QString currentHash = d->m_docFileName.isEmpty() ? d->m_annotationSidecarHash : AnnotationSidecar::pdfHash(d->m_docFileName, errorText);
     if (currentHash.isEmpty() || currentHash != d->m_annotationSidecarHash) {
         if (errorText->isEmpty()) {
             *errorText = QStringLiteral("The source PDF changed since it was opened");

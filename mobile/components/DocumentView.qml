@@ -63,6 +63,7 @@ QQC2.ScrollView {
             property real initialHeight
 
             onPinchStarted: {
+                root.page.clearSelection()
                 initialWidth = mouseArea.currPageDelegate.implicitWidth * mouseArea.currPageDelegate.scaleFactor
                 initialHeight = mouseArea.currPageDelegate.implicitHeight * mouseArea.currPageDelegate.scaleFactor
             }
@@ -97,17 +98,29 @@ QQC2.ScrollView {
                 property real oldMouseY
                 property real startMouseX
                 property real startMouseY
+                property bool longPressSelecting: false
+                property bool suppressClick: false
                 property bool incrementing: true
                 property PageView currPageDelegate: page1
                 property PageView prevPageDelegate: page2
                 property PageView nextPageDelegate: page3
 
                 onPressed: (mouse) => {
+                    longPressSelecting = false;
+                    suppressClick = false;
                     var pos = mapToItem(flick, mouse.x, mouse.y);
                     startMouseX = oldMouseX = pos.x;
                     startMouseY = oldMouseY = pos.y;
                 }
                 onPositionChanged: (mouse) => {
+                    if (longPressSelecting) {
+                        var selectionPos = mapToItem(root.page, mouse.x, mouse.y);
+                        root.page.moveSelectionHandle(false, selectionPos.x, selectionPos.y);
+                        return;
+                    }
+                    if (root.page.hasSelection) {
+                        root.page.clearSelection();
+                    }
                     var pos = mapToItem(flick, mouse.x, mouse.y);
 
                     flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY - (pos.y - oldMouseY)));
@@ -124,6 +137,10 @@ QQC2.ScrollView {
                     oldMouseY = pos.y;
                 }
                 onReleased: {
+                    if (longPressSelecting) {
+                        longPressSelecting = false;
+                        return;
+                    }
                     if (root.document.currentPage > 0 &&
                         currPageDelegate.x > width/6) {
                         switchAnimation.running = true;
@@ -135,13 +152,28 @@ QQC2.ScrollView {
                     }
                 }
                 onCanceled: {
+                    longPressSelecting = false;
                     resetAnim.running = true;
                 }
+                onPressAndHold: (mouse) => {
+                    var pos = mapToItem(root.page, mouse.x, mouse.y);
+                    longPressSelecting = root.page.selectWordAt(pos.x, pos.y);
+                    suppressClick = longPressSelecting;
+                }
                 onDoubleClicked: {
+                    root.page.clearSelection();
                     flick.contentWidth = flick.width
                     flick.contentHeight = flick.width / mouseArea.currPageDelegate.pageRatio
                 }
                 onClicked: (mouse) => {
+                    if (suppressClick) {
+                        suppressClick = false;
+                        return;
+                    }
+                    if (root.page.hasSelection) {
+                        root.page.clearSelection();
+                        return;
+                    }
                     var pos = mapToItem(flick, mouse.x, mouse.y);
                     if (Math.abs(startMouseX - pos.x) < 20 &&
                         Math.abs(startMouseY - pos.y) < 20) {
@@ -149,6 +181,7 @@ QQC2.ScrollView {
                     }
                 }
                 onWheel: (wheel) => {
+                    root.page.clearSelection();
                     if (wheel.modifiers & Qt.ControlModifier) {
                         //generate factors between 0.8 and 1.2
                         var factor = (((wheel.angleDelta.y / 120)+1) / 5 )+ 0.8;
@@ -183,6 +216,82 @@ QQC2.ScrollView {
                     id: page3
                     document: root.document
                     z: 0
+                }
+
+                QQC2.ToolBar {
+                    id: selectionMenu
+                    z: 5
+                    visible: root.page.hasSelection
+                    x: Math.max(0, Math.min(mouseArea.width - width,
+                                            root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).x - width / 2))
+                    y: Math.max(0, root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).y - height - 12)
+
+                    contentItem: Row {
+                        QQC2.ToolButton {
+                            text: i18n("Copy")
+                            enabled: root.page.canCopySelection
+                            onClicked: root.page.copySelection()
+                        }
+                        QQC2.ToolButton {
+                            text: i18n("Highlight")
+                            enabled: root.page.canHighlightSelection
+                            onClicked: root.page.highlightSelection()
+                        }
+                    }
+                }
+
+                Item {
+                    id: startHandle
+                    z: 5
+                    visible: root.page.hasSelection
+                    width: 40
+                    height: 40
+                    x: root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).x - width / 2
+                    y: root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).y - height / 2
+
+                    Rectangle {
+                        width: 18
+                        height: 18
+                        radius: 9
+                        color: "#4a90e2"
+                        border.color: "white"
+                        border.width: 2
+                        anchors.centerIn: parent
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onPositionChanged: (mouse) => {
+                            var pos = mapToItem(root.page, mouse.x, mouse.y);
+                            root.page.moveSelectionHandle(true, pos.x, pos.y);
+                        }
+                    }
+                }
+
+                Item {
+                    id: endHandle
+                    z: 5
+                    visible: root.page.hasSelection
+                    width: 40
+                    height: 40
+                    x: root.page.mapToItem(mouseArea, root.page.selectionEnd.x, root.page.selectionEnd.y).x - width / 2
+                    y: root.page.mapToItem(mouseArea, root.page.selectionEnd.x, root.page.selectionEnd.y).y - height / 2
+
+                    Rectangle {
+                        width: 18
+                        height: 18
+                        radius: 9
+                        color: "#4a90e2"
+                        border.color: "white"
+                        border.width: 2
+                        anchors.centerIn: parent
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onPositionChanged: (mouse) => {
+                            var pos = mapToItem(root.page, mouse.x, mouse.y);
+                            root.page.moveSelectionHandle(false, pos.x, pos.y);
+                        }
+                    }
                 }
 
                     

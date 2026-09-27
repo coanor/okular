@@ -11,6 +11,11 @@
 #include <QTest>
 #include <QUuid>
 
+#ifdef Q_OS_UNIX
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 #include "../core/annotationsidecar_p.h"
 #include "../core/annotations.h"
 #include "../core/document.h"
@@ -166,6 +171,56 @@ private Q_SLOTS:
         QCOMPARE(Okular::AnnotationSidecar::pdfHash(pdfPath, &error), hash);
         document.closeDocument();
         QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
+    }
+
+    void fdPdfHighlightRoundTrip()
+    {
+#ifdef Q_OS_UNIX
+        Okular::SettingsCore::instance(QStringLiteral("annotationsidecartest"));
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString pdfPath = dir.filePath(QStringLiteral("android-open.pdf"));
+        QVERIFY(QFile::copy(QStringLiteral(KDESRCDIR "data/file1.pdf"), pdfPath));
+        QFile pdf(pdfPath);
+        QVERIFY(pdf.open(QIODevice::Append));
+        pdf.write("\n% fd-sidecar-test ");
+        pdf.write(QUuid::createUuid().toString().toLatin1());
+        pdf.write("\n");
+        pdf.close();
+
+        auto openThroughFd = [&pdfPath](Okular::Document &document) {
+            const int fd = ::open(QFile::encodeName(pdfPath).constData(), O_RDONLY);
+            if (fd < 0) {
+                return Okular::Document::OpenError;
+            }
+            return document.openDocument(QStringLiteral("-"), QUrl(QStringLiteral("fd:///%1").arg(fd)), QMimeType());
+        };
+
+        Okular::Document document(nullptr);
+        QCOMPARE(openThroughFd(document), Okular::Document::OpenSuccess);
+        QVERIFY(document.supportsAnnotationSidecar());
+        auto *highlight = new Okular::HighlightAnnotation();
+        const Okular::NormalizedRect rect(0.36, 0.16, 0.51, 0.17);
+        highlight->setBoundingRectangle(rect);
+        Okular::HighlightAnnotation::Quad quad;
+        quad.setPoint(Okular::NormalizedPoint(rect.left, rect.bottom), 0);
+        quad.setPoint(Okular::NormalizedPoint(rect.right, rect.bottom), 1);
+        quad.setPoint(Okular::NormalizedPoint(rect.right, rect.top), 2);
+        quad.setPoint(Okular::NormalizedPoint(rect.left, rect.top), 3);
+        highlight->highlightQuads().append(quad);
+        document.addPageAnnotation(0, highlight);
+        const QString id = highlight->uniqueName();
+        QString error;
+        QVERIFY2(document.saveAnnotationsToSidecar(&error), qPrintable(error));
+        const QString hash = Okular::AnnotationSidecar::pdfHash(pdfPath, &error);
+        document.closeDocument();
+
+        QCOMPARE(openThroughFd(document), Okular::Document::OpenSuccess);
+        QVERIFY(document.page(0)->annotation(id));
+        QCOMPARE(Okular::AnnotationSidecar::pdfHash(pdfPath, &error), hash);
+        document.closeDocument();
+        QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
+#endif
     }
 
     void embeddedAnnotationOverrideAndRemoval()

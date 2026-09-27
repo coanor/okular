@@ -428,3 +428,64 @@ AnnotationSyncResult AnnotationSync::synchronize(const BookObjectStore &store, c
     }
     return result;
 }
+
+AnnotationSyncResult AnnotationSync::resolveConflict(const BookObjectStore &store, const QString &libraryRoot, const QString &pdfHash, int page, const QString &annotationId, const QStringList &expectedHeads, const QString &chosenHead)
+{
+    AnnotationSyncResult result;
+    if (page < 0 || annotationId.isEmpty() || expectedHeads.size() < 2) {
+        result.error = QStringLiteral("Invalid annotation conflict selection");
+        return result;
+    }
+    // Publish local edits before choosing a version. A stale dialog must not
+    // silently resolve a branch that appeared after the reader made a choice.
+    result = synchronize(store, libraryRoot, pdfHash);
+    if (!result.successful()) {
+        return result;
+    }
+    QMap<QString, Event> events;
+    if (!listEvents(store, pdfHash, &events, &result.error)) {
+        return result;
+    }
+    const QString key = annotationKey(page, annotationId);
+    const QStringList heads = headsByKey(events).value(key);
+    QStringList sortedExpected = expectedHeads;
+    sortedExpected.sort();
+    if (heads.size() < 2 || heads != sortedExpected || !heads.contains(chosenHead)) {
+        result.error = QStringLiteral("Annotation versions changed; sync and choose again");
+        return result;
+    }
+    QList<Okular::SidecarAnnotation> annotations;
+    qint64 revision = 0;
+    if (!Okular::AnnotationSidecar::load(pdfHash, &annotations, &result.error, &revision)) {
+        return result;
+    }
+    annotations.removeIf([&](const Okular::SidecarAnnotation &annotation) { return annotation.page == page && annotation.id == annotationId; });
+    const Value selected = events.value(chosenHead).value;
+    if (selected) {
+        annotations.append(*selected);
+    }
+    if (!Okular::AnnotationSidecar::save(pdfHash, annotations, &result.error, revision)) {
+        return result;
+    }
+    QJsonObject body = encodeEntry(selected, key);
+    body.insert(QStringLiteral("schemaVersion"), 1);
+    QJsonArray parents;
+    for (const QString &head : heads) {
+        parents.append(head);
+    }
+    body.insert(QStringLiteral("parents"), parents);
+    const QByteArray bytes = QJsonDocument(body).toJson(QJsonDocument::Compact);
+    const QString id = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+    const S3Response uploaded = store.putObjectIfAbsent(QStringLiteral("books/%1/annotations/events/%2.json").arg(pdfHash, id), bytes);
+    if (uploaded.status == 412 && uploaded.error.isEmpty()) {
+        const S3Response existing = store.getObject(QStringLiteral("books/%1/annotations/events/%2.json").arg(pdfHash, id));
+        if (!existing.successful() || existing.body != bytes) {
+            result.error = QStringLiteral("A cloud annotation event does not match its hash");
+            return result;
+        }
+    } else if (!uploaded.successful()) {
+        result.error = uploaded.error.isEmpty() ? QStringLiteral("Resolve annotation failed (HTTP %1)").arg(uploaded.status) : uploaded.error;
+        return result;
+    }
+    return synchronize(store, libraryRoot, pdfHash);
+}

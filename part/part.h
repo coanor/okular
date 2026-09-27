@@ -316,6 +316,8 @@ private:
     void addCurrentBookToCloudLibrary();
     void openCloudBook();
     void syncCloudBookFiles();
+    void resolveCloudAnnotationConflict();
+    void resolveCloudModelSettingConflict();
 #endif
 
     void setupPrint(QPrinter &printer);
@@ -376,6 +378,8 @@ private:
     QAction *m_addToCloudLibrary = nullptr;
     QAction *m_openCloudBook = nullptr;
     QAction *m_syncCloudLibrary = nullptr;
+    QAction *m_resolveCloudAnnotations = nullptr;
+    QAction *m_resolveCloudModelSettings = nullptr;
 #endif
     QString m_aiAnnotationQuestion;
     QString m_aiAnnotationAnswer;

@@ -80,6 +80,66 @@ class AnnotationSyncTest : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void resolvesChosenHeadAndRejectsStaleSelection()
+    {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const QByteArray originalDataHome = qgetenv("XDG_DATA_HOME");
+        qputenv("XDG_DATA_HOME", temp.filePath(QStringLiteral("data")).toUtf8());
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash("resolve PDF bytes", QCryptographicHash::Sha256).toHex());
+        const QString root = temp.filePath(QStringLiteral("library"));
+        QVERIFY(QDir().mkpath(QDir(root).filePath(QStringLiteral("books/") + hash)));
+        MemoryAnnotationStore store;
+        QString error;
+        Okular::SidecarAnnotation note {QStringLiteral("note"), 0, 1, QStringLiteral("<original/>")};
+        QVERIFY2(Okular::AnnotationSidecar::save(hash, {note}, &error), qPrintable(error));
+        auto result = AnnotationSync::synchronize(store, root, hash);
+        QVERIFY2(result.successful(), qPrintable(result.error));
+        const QString originalHead = store.objects.firstKey().section(QLatin1Char('/'), -1).left(64);
+
+        note.xml = QStringLiteral("<first/>");
+        QVERIFY2(Okular::AnnotationSidecar::save(hash, {note}, &error), qPrintable(error));
+        result = AnnotationSync::synchronize(store, root, hash);
+        QVERIFY2(result.successful(), qPrintable(result.error));
+        QString firstHead;
+        for (auto it = store.objects.cbegin(); it != store.objects.cend(); ++it) {
+            if (it.key().contains(QStringLiteral("/events/")) && QJsonDocument::fromJson(it.value()).object().value(QStringLiteral("parents")).toArray().contains(originalHead)) {
+                firstHead = it.key().section(QLatin1Char('/'), -1).left(64);
+            }
+        }
+        QVERIFY(!firstHead.isEmpty());
+        note.xml = QStringLiteral("<second/>");
+        QJsonObject sibling {{QStringLiteral("schemaVersion"), 1},
+                             {QStringLiteral("page"), 0},
+                             {QStringLiteral("id"), QStringLiteral("note")},
+                             {QStringLiteral("parents"), QJsonArray {originalHead}},
+                             {QStringLiteral("value"),
+                              QJsonObject {{QStringLiteral("id"), QStringLiteral("note")},
+                                           {QStringLiteral("page"), 0},
+                                           {QStringLiteral("subtype"), 1},
+                                           {QStringLiteral("xml"), note.xml},
+                                           {QStringLiteral("contents"), QString()},
+                                           {QStringLiteral("author"), QString()},
+                                           {QStringLiteral("color"), QString()},
+                                           {QStringLiteral("hiddenNative"), false}}}};
+        const QByteArray bytes = QJsonDocument(sibling).toJson(QJsonDocument::Compact);
+        const QString secondHead = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+        store.objects.insert(QStringLiteral("books/%1/annotations/events/%2.json").arg(hash, secondHead), bytes);
+        result = AnnotationSync::synchronize(store, root, hash);
+        QVERIFY2(result.successful(), qPrintable(result.error));
+        QCOMPARE(result.conflicts, 1);
+        result = AnnotationSync::resolveConflict(store, root, hash, 0, QStringLiteral("note"), {originalHead, firstHead}, firstHead);
+        QVERIFY(!result.successful());
+        result = AnnotationSync::resolveConflict(store, root, hash, 0, QStringLiteral("note"), {firstHead, secondHead}, secondHead);
+        QVERIFY2(result.successful(), qPrintable(result.error));
+        QCOMPARE(result.conflicts, 0);
+        QList<Okular::SidecarAnnotation> loaded;
+        QVERIFY2(Okular::AnnotationSidecar::load(hash, &loaded, &error), qPrintable(error));
+        QCOMPARE(loaded.size(), 1);
+        QCOMPARE(loaded.first().xml, note.xml);
+        qputenv("XDG_DATA_HOME", originalDataHome);
+    }
+
     void retriesAfterUploadWithoutDuplicatingEvent()
     {
         QTemporaryDir temp;

@@ -535,6 +535,7 @@ if(BUILD_DESKTOP)
     part/booklibrary.cpp
     part/booklibrarysync.cpp
     part/annotationsync.cpp
+    part/modelsettingssync.cpp
     part/s3configuration.cpp
     part/aiprovider.cpp
     part/aireadingassistant.cpp

@@ -25,4 +25,5 @@ class AnnotationSync
 {
 public:
     static AnnotationSyncResult synchronize(const BookObjectStore &store, const QString &libraryRoot, const QString &pdfHash, bool deferRemoteApply = false);
+    static AnnotationSyncResult resolveConflict(const BookObjectStore &store, const QString &libraryRoot, const QString &pdfHash, int page, const QString &annotationId, const QStringList &expectedHeads, const QString &chosenHead);
 };

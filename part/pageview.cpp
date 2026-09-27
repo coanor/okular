@@ -26,6 +26,8 @@
 #include <QDesktopServices>
 #include <QElapsedTimer>
 #include <QEvent>
+#include <QFileInfo>
+#include <QFutureWatcher>
 #include <QGestureEvent>
 #include <QImage>
 #include <QInputDialog>
@@ -35,12 +37,16 @@
 #include <QMimeDatabase>
 #include <QNativeGestureEvent>
 #include <QPainter>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QScroller>
 #include <QScrollerProperties>
 #include <QSet>
 #include <QTimer>
 #include <QToolTip>
+#include <QTextDocument>
+#include <QUrl>
+#include <QtConcurrent>
 
 #include <KActionCollection>
 #include <KActionMenu>
@@ -98,6 +104,7 @@
 #include "core/tile.h"
 #include "kleopatraintegration.h"
 #include "magnifierview.h"
+#include "mdxdictionary.h"
 #include "settings.h"
 #include "settings_core.h"
 #include "signaturepartutils.h"
@@ -121,6 +128,41 @@ static const int searchTextPreviewLength = 21;
 
 // When following a link, only a preview of this length will be used to set the text of the action.
 static const int linkTextPreviewLength = 30;
+
+static QString dictionaryWord(QString text)
+{
+    text = text.trimmed();
+    while (!text.isEmpty() && !text.front().isLetterOrNumber()) {
+        text.remove(0, 1);
+    }
+    while (!text.isEmpty() && !text.back().isLetterOrNumber()) {
+        text.chop(1);
+    }
+
+    static const QRegularExpression wordPattern(QStringLiteral(R"(^[\p{L}\p{N}][\p{L}\p{N}\p{M}]*(?:['\x{2019}\x{2010}\x{2011}-][\p{L}\p{N}\p{M}]+)*$)"));
+    return text.size() <= 128 && wordPattern.match(text).hasMatch() ? text : QString();
+}
+
+static QString dictionarySummary(QString definition)
+{
+    definition.truncate(16384);
+    definition.replace(QRegularExpression(QStringLiteral("(?i)</?br\\s*/?>")), QStringLiteral("<br>"));
+    definition.remove(QRegularExpression(QStringLiteral("`[0-9]+`")));
+    QTextDocument document;
+    document.setHtml(definition);
+    const QStringList lines = document.toPlainText().split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    QStringList summary;
+    for (const QString &line : lines) {
+        const QString clean = line.simplified();
+        if (!clean.isEmpty()) {
+            summary.append(clean);
+        }
+        if (summary.size() == 5) {
+            break;
+        }
+    }
+    return summary.join(QLatin1Char('\n')).left(400);
+}
 
 static inline double normClamp(double value, double def)
 {
@@ -174,6 +216,9 @@ public:
     QColor mouseSelectionColor;
     bool mouseTextSelecting = false;
     QSet<int> pagesWithTextSelection;
+    QTimer dictionaryLookupTimer;
+    QString pendingDictionaryWord;
+    int dictionaryLookupRequest = 0;
     bool mouseOnRect = false;
     int mouseMode = 0;
     MouseAnnotation *mouseAnnotation = nullptr;
@@ -348,6 +393,12 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->mouseMode = Okular::Settings::mouseMode();
     d->mouseAnnotation = new MouseAnnotation(this, document);
     d->messageWindow = new PageViewMessage(this);
+    d->dictionaryLookupTimer.setSingleShot(true);
+    connect(&d->dictionaryLookupTimer, &QTimer::timeout, this, [this] {
+        if (dictionaryWord(d->selectedText()) == d->pendingDictionaryWord) {
+            lookupSelectedWord(d->pendingDictionaryWord);
+        }
+    });
     d->setting_viewCols = Okular::Settings::viewColumns();
     d->rtl_Mode = Okular::Settings::rtlReadingDirection();
 
@@ -1032,6 +1083,80 @@ QString PageViewPrivate::selectedText() const
         text.chop(1);
     }
     return text;
+}
+
+void PageView::lookupSelectedWord(const QString &text, bool waitForTripleClick)
+{
+    if (!Okular::Settings::autoLookupSelectedWords() || !d->document->isAllowed(Okular::AllowCopy)) {
+        return;
+    }
+
+    const QString word = dictionaryWord(text);
+    if (word.isEmpty()) {
+        return;
+    }
+
+    if (waitForTripleClick) {
+        d->pendingDictionaryWord = word;
+        d->dictionaryLookupTimer.start(QApplication::doubleClickInterval());
+        return;
+    }
+
+    const QString dictionaryFile = Okular::Settings::dictionaryFile().trimmed();
+    if (!dictionaryFile.isEmpty()) {
+        ++d->dictionaryLookupRequest;
+        static QString warnedDictionaryFile;
+        const QFileInfo dictionaryInfo(dictionaryFile);
+        if (!dictionaryInfo.isFile() || dictionaryInfo.suffix().compare(QLatin1String("mdx"), Qt::CaseInsensitive) != 0) {
+            if (warnedDictionaryFile != dictionaryFile) {
+                warnedDictionaryFile = dictionaryFile;
+                KMessageBox::information(this, i18n("Select a valid MDX dictionary file in Okular's General settings."), i18n("Dictionary Lookup"));
+            }
+            return;
+        }
+#if HAVE_MDICT
+        const int request = d->dictionaryLookupRequest;
+        const QPoint position = QCursor::pos();
+        auto *watcher = new QFutureWatcher<QString>(this);
+        connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, request, word, position] {
+            const QString definition = watcher->result();
+            watcher->deleteLater();
+            if (request != d->dictionaryLookupRequest || dictionaryWord(d->selectedText()) != word) {
+                return;
+            }
+            const QString summary = definition.isEmpty() ? i18n("No definition found in the selected MDX dictionary.") : dictionarySummary(definition);
+            const QString tooltip = QStringLiteral("<b>%1</b><br>%2").arg(word.toHtmlEscaped(), summary.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br>")));
+            QToolTip::showText(position, tooltip, viewport());
+        });
+        watcher->setFuture(QtConcurrent::run([dictionaryFile, word] {
+            return MdxDictionary::lookup(dictionaryFile, word);
+        }));
+#else
+        if (warnedDictionaryFile != dictionaryFile) {
+            warnedDictionaryFile = dictionaryFile;
+            KMessageBox::information(this, i18n("This Okular build does not include MDX support. Install mdict-cpp and rebuild Okular."), i18n("Dictionary Lookup"));
+        }
+#endif
+        return;
+    }
+
+    static bool eudicUnavailable = false;
+    if (eudicUnavailable) {
+        return;
+    }
+
+    QUrl url;
+    url.setScheme(QStringLiteral("eudic"));
+    url.setHost(QStringLiteral("dict"));
+    url.setPath(QLatin1Char('/') + word);
+    if (!QDesktopServices::openUrl(url)) {
+        eudicUnavailable = true;
+        KMessageBox::information(this,
+                                 i18n("Could not open Eudic. <a href=\"https://www.eudic.net/v4/en/app/download\">Download Eudic</a> to use automatic word lookup."),
+                                 i18n("Dictionary Lookup"),
+                                 QString(),
+                                 KMessageBox::Notify | KMessageBox::AllowLink);
+    }
 }
 
 QMimeData *PageView::getTableContents() const
@@ -2411,6 +2536,8 @@ void PageView::mousePressEvent(QMouseEvent *e)
         return;
     }
 
+    d->dictionaryLookupTimer.stop();
+
     // if performing a selection or dyn zooming, disable mouse press
     if (d->mouseSelecting || (e->button() != Qt::MiddleButton && (e->buttons() & Qt::MiddleButton))) {
         return;
@@ -3128,6 +3255,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                     if (cb->supportsSelection()) {
                         cb->setText(text, QClipboard::Selection);
                     }
+                    lookupSelectedWord(text);
                 }
             }
         } else if (!d->mousePressPos.isNull() && rightButton) {
@@ -3351,6 +3479,7 @@ void PageView::mouseDoubleClickEvent(QMouseEvent *e)
                             if (cb->supportsSelection()) {
                                 cb->setText(text, QClipboard::Selection);
                             }
+                            lookupSelectedWord(text, true);
                         }
                     }
 
@@ -3820,6 +3949,7 @@ PageViewItem *PageView::pickItemOnPoint(int x, int y)
 
 void PageView::textSelectionClear()
 {
+    d->dictionaryLookupTimer.stop();
     // something to clear
     if (!d->pagesWithTextSelection.isEmpty()) {
         for (const int page : std::as_const(d->pagesWithTextSelection)) {

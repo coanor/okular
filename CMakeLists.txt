@@ -100,7 +100,7 @@ ecm_setup_version(${PROJECT_VERSION}
                   VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/core/version.h"
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
-find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql)
+find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql Concurrent)
 if(BUILD_DESKTOP)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
 endif()
@@ -555,6 +555,7 @@ if(BUILD_DESKTOP)
     part/pageviewannotator.cpp
     part/pageviewmouseannotation.cpp
     part/pageview.cpp
+    part/mdxdictionary.cpp
     part/magnifierview.cpp
     part/pageviewutils.cpp
     part/presentationsearchbar.cpp
@@ -592,11 +593,26 @@ kconfig_add_kcfg_files(okularpart_SRCS GENERATE_MOC conf/settings.kcfgc)
 add_library(okularpart SHARED ${okularpart_SRCS})
 generate_export_header(okularpart BASE_NAME okularpart)
 
+find_path(MDICT_INCLUDE_DIR mdict_extern.h PATH_SUFFIXES mdict)
+find_library(MDICT_LIBRARY mdict)
+find_library(MDICT_MINIZ_LIBRARY mdictminiz)
+find_library(MDICT_BASE64_LIBRARY mdictbase64)
+if(MDICT_INCLUDE_DIR AND MDICT_LIBRARY AND MDICT_MINIZ_LIBRARY AND MDICT_BASE64_LIBRARY)
+    message(STATUS "MDX dictionary lookup enabled")
+    target_include_directories(okularpart PRIVATE ${MDICT_INCLUDE_DIR})
+    target_link_libraries(okularpart ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
+    target_compile_definitions(okularpart PRIVATE HAVE_MDICT=1)
+else()
+    message(STATUS "MDX dictionary lookup disabled (mdict-cpp not found)")
+    target_compile_definitions(okularpart PRIVATE HAVE_MDICT=0)
+endif()
+
 target_link_libraries(okularpart okularcore
     ${MATH_LIB}
     Qt6::Network
     Qt6::WebEngineWidgets
     Qt6::Svg
+    Qt6::Concurrent
     KF6::Archive
     KF6::Bookmarks
     KF6::I18n

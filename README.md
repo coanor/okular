@@ -79,6 +79,16 @@ cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/install/dir -DOKULAR_UI=desktop ..
 ```
 Available options are `desktop`, `mobile`, and `both`.
 
+### Android APK
+
+With Docker, an initialized Android Craft root next to the main checkout (`craft-kde-android`), Android SDK build tools 36.0.0, and an Android debug keystore, build and sign the arm64 APK with:
+
+```bash
+make android-apk
+```
+
+The APK is written to `build-android/okular-mobile-arm64-selection-debug.apk`. Set `CRAFT_ROOT`, `ANDROID_SDK_ROOT`, `ANDROID_BUILD_TOOLS_DIR`, or `ANDROID_KEYSTORE` if they are in other locations. See [KDE's Android Craft setup guide](https://develop.kde.org/docs/packaging/android/building_applications/) for the initial Craft setup.
+
 ### clang-format
 
 The Okular project uses clang-format to enforce source code formatting.

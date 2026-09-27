@@ -101,6 +101,12 @@ ecm_setup_version(${PROJECT_VERSION}
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
 find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql)
+find_package(SQLite3 REQUIRED)
+if(TARGET SQLite3::SQLite3)
+    set(OKULAR_SQLITE_TARGET SQLite3::SQLite3)
+else()
+    set(OKULAR_SQLITE_TARGET SQLite::SQLite3)
+endif()
 if(BUILD_DESKTOP)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
     find_package(Qt6Concurrent ${QT_REQUIRED_VERSION} CONFIG QUIET)
@@ -447,6 +453,7 @@ endif(WIN32)
 target_link_libraries(okularcore
 PRIVATE
     Qt6::Sql
+    ${OKULAR_SQLITE_TARGET}
     ${OKULAR_IOKIT}
     ${SHLWAPI}
     KF6::Archive

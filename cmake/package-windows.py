@@ -32,6 +32,13 @@ def system_dll(name):
     return lower.startswith(("api-ms-", "ext-ms-")) or Path(lower).stem in SYSTEM_DLLS
 
 
+def copy_dependency(source, destination):
+    # The installed application takes precedence over any cached SDK copy.
+    if not Path(destination).exists():
+        shutil.copy2(source, destination)
+    return str(destination)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dependencies", type=Path, required=True)
@@ -50,27 +57,27 @@ def main():
                      "share/ghostscript", "share/fonts", "share/color", "share/locale", "share/gnupg", "certs", "licenses"):
         directory = source / relative
         if directory.exists():
-            shutil.copytree(directory, stage / relative, dirs_exist_ok=True)
+            shutil.copytree(directory, stage / relative, dirs_exist_ok=True, copy_function=copy_dependency)
     for name in ("kf6", "knotifications6", "kstyle", "mime", "color-schemes", "icons",
                  "locale", "dbus-1", "iso-codes", "qlogging-categories6", "poppler", "ghostscript"):
         directory = source / "bin/data" / name
         if directory.exists():
-            shutil.copytree(directory, stage / "bin/data" / name, dirs_exist_ok=True)
+            shutil.copytree(directory, stage / "bin/data" / name, dirs_exist_ok=True, copy_function=copy_dependency)
     for relative in ("lib/plugins", "plugins"):
         for directory in (source / relative).glob("*"):
             if directory.is_dir() and directory.name not in ("designer", "qmllint", "qmlls", "qmltooling"):
-                shutil.copytree(directory, stage / "lib/plugins" / directory.name, dirs_exist_ok=True)
+                shutil.copytree(directory, stage / "lib/plugins" / directory.name, dirs_exist_ok=True, copy_function=copy_dependency)
     for pattern in ("QtWebEngineProcess.exe", "kioworker.exe", "kioexec.exe", "kconf_update.exe",
                     "dbus-daemon.exe", "knewstuff-dialog.exe", "gswin64c.exe", "gpg*.exe", "dirmngr*.exe", "icudtl.dat",
                     "qtwebengine*.pak", "v8_context_snapshot.bin", "libcrypto*.dll", "libssl*.dll",
                     "libEGL.dll", "libGLESv2.dll", "d3dcompiler_47.dll", "dxcompiler.dll", "dxil.dll",
                     "vk_swiftshader*", "vulkan-1.dll", "opengl32sw.dll"):
         for file in (source / "bin").glob(pattern):
-            shutil.copy2(file, stage / "bin" / file.name)
+            copy_dependency(file, stage / "bin" / file.name)
     for pattern in ("*.ps", "Fontmap*", "*.icc"):
         for file in (source / "lib").glob(pattern):
             if file.is_file():
-                shutil.copy2(file, stage / "lib" / file.name)
+                copy_dependency(file, stage / "lib" / file.name)
 
     available = {file.name.casefold(): file for file in (source / "bin").glob("*.dll")}
     for file in args.redist.rglob("*.dll"):

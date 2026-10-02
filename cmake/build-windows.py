@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -79,7 +80,8 @@ def extract(archive, destination, kind, sevenzip):
         listing = subprocess.check_output([sevenzip, "l", "-slt", "-ba", str(archive)], text=True)
         safe_names(line.removeprefix("Path = ") for line in listing.splitlines() if line.startswith("Path = "))
         # Craft packages are regular files/directories, not Unix symlinks.
-        if "Symbolic Link = " in listing or "Hard Link = " in listing:
+        if ("Symbolic Link = " in listing or "Hard Link = " in listing
+                or re.search(r"^Attributes = .*\bl[rwxstST-]{9}(?:\s|$)", listing, re.MULTILINE)):
             raise ValueError(f"Unexpected link in Craft package: {archive}")
         subprocess.run([sevenzip, "x", "-y", "-aoa", "-bso0", "-bsp0", f"-o{destination}", str(archive)], check=True)
 
@@ -93,6 +95,30 @@ def native_tool(*names):
                     raise RuntimeError(f"Expected a Linux ELF host tool: {path}")
             return path
     raise RuntimeError(f"Install Linux tool: {' / '.join(names)}")
+
+
+def validate_build(build, root, lock_hash, tools):
+    stamp = build / "dependency-lock.sha256"
+    if stamp.exists() and stamp.read_text().strip() != lock_hash:
+        raise RuntimeError("Dependency lock changed; use a new --build-dir or remove the old build directory.")
+    cmake_cache = build / "CMakeCache.txt"
+    if not cmake_cache.exists():
+        return
+    if not stamp.exists():
+        raise RuntimeError("Use a new --build-dir; the existing CMake cache has no dependency lock.")
+    values = {}
+    for line in cmake_cache.read_text().splitlines():
+        if line and not line.startswith(("#", "//")) and "=" in line:
+            key, value = line.split("=", 1)
+            values[key.split(":", 1)[0]] = value
+    expected = {"OKULAR_WINDOWS_SDK": str(root / "sdk"),
+                "OKULAR_WINDOWS_PREFIX": str(root / "target"), "QT_HOST_PATH": str(root / "host"),
+                "CMAKE_HOME_DIRECTORY": str(SOURCE), **tools}
+    # CMake initializes compiler/linker flags and package locations only once.
+    # Reconfiguring a tree with another cache or toolchain mixes old/new paths.
+    for key, value in expected.items():
+        if key in values and values[key] != value:
+            raise RuntimeError(f"Build context changed ({key}); use a new --build-dir or remove the old build directory.")
 
 
 def normalize_headers(include):
@@ -223,31 +249,33 @@ def main():
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     # Reject Windows compilers even if WSL imported them into PATH.
-    clang = native_tool("clang-20", "clang")
-    clangxx = native_tool("clang++-20", "clang++")
-    for names in (("lld-link-20", "lld-link"), ("llvm-rc-20", "llvm-rc"),
-                  ("llvm-ar-20", "llvm-ar"), ("llvm-ranlib-20", "llvm-ranlib"),
-                  ("llvm-readobj-20", "llvm-readobj")):
-        native_tool(*names)
+    tools = {key: native_tool(*names) for key, names in {
+        "CMAKE_C_COMPILER": ("clang-20", "clang"), "CMAKE_CXX_COMPILER": ("clang++-20", "clang++"),
+        "CMAKE_LINKER": ("lld-link-20", "lld-link"), "CMAKE_RC_COMPILER": ("llvm-rc-20", "llvm-rc"),
+        "CMAKE_AR": ("llvm-ar-20", "llvm-ar"), "CMAKE_RANLIB": ("llvm-ranlib-20", "llvm-ranlib")}.items()}
+    native_tool("llvm-readobj-20", "llvm-readobj")
+    clang, clangxx = tools["CMAKE_C_COMPILER"], tools["CMAKE_CXX_COMPILER"]
     version = subprocess.check_output([clang, "-dumpversion"], text=True).strip()
     if int(version.split(".")[0]) < 19:
         parser.error("The pinned MSVC STL requires Clang >= 19; Clang 20 is recommended.")
     lock = json.loads(LOCK.read_text())
+    lock_hash = digest(LOCK)
     build = args.build_dir.resolve()
     stamp = build / "dependency-lock.sha256"
-    if not args.prepare_only:
-        if stamp.exists() and stamp.read_text().strip() != digest(LOCK):
-            parser.error("Dependency lock changed; use a new --build-dir or remove the old build directory.")
-        if (build / "CMakeCache.txt").exists() and not stamp.exists():
-            parser.error("Use a new --build-dir for this bootstrap; the existing CMake cache has no dependency lock.")
     cache = args.cache.resolve()
+    root = cache / lock_hash[:16]
+    if not args.prepare_only:
+        build.mkdir(parents=True, exist_ok=True)
+        # Different dependency caches can still share the same output tree.
+        build_lock = (build / ".cross-build.lock").open("w")
+        fcntl.flock(build_lock, fcntl.LOCK_EX)
+        validate_build(build, root, lock_hash, tools)
     cache.mkdir(parents=True, exist_ok=True)
     cache_lock = (cache / ".lock").open("w")
     fcntl.flock(cache_lock, fcntl.LOCK_EX)
     downloads = cache / "downloads"
     downloads.mkdir(parents=True, exist_ok=True)
     # Changing a dependency lock never mixes packages or stale host-tool exports.
-    root = cache / digest(LOCK)[:16]
     root.mkdir(parents=True, exist_ok=True)
     target, sdk = prepare(args, lock, root, downloads)
     host = build_host(lock, root, downloads, target, args.jobs)
@@ -255,7 +283,7 @@ def main():
         print("Prepared Linux cache:", root)
         return
     build.mkdir(parents=True, exist_ok=True)
-    stamp.write_text(digest(LOCK) + "\n")
+    stamp.write_text(lock_hash + "\n")
     install = build / "install"
     run("cmake", "-S", SOURCE, "-B", build, "-G", "Ninja",
         "--toolchain", SOURCE / "cmake/toolchains/linux-clang-windows.cmake",

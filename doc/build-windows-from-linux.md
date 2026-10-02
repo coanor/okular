@@ -56,8 +56,11 @@ python3 cmake/build-windows.py --mirror https://your-mirror.example/craft-cache/
 The default cache is `${XDG_CACHE_HOME:-~/.cache}/okular-windows`. Keep it on a
 Linux filesystem for efficient builds. The dependency lock's fingerprint selects
 a separate SDK/library/host-tool cache. After updating the lock, use a new build
-directory, or remove the old build directory before rebuilding. Failed downloads
-are not marked complete; a failed bootstrap can be rerun.
+directory, or remove the old build directory before rebuilding. Changing the
+cache location or compiler also requires a new build directory: CMake retains
+SDK flags and package paths from its first configuration. Concurrent invocations
+sharing a build directory are serialized, including installation and packaging.
+Failed downloads are not marked complete; a failed bootstrap can be rerun.
 
 ## Dependency updates and scope
 
@@ -118,6 +121,14 @@ recompilation; two translation-generation targets ran before installation and
 packaging. Five Linux bootstrap regression checks passed. The independently
 downloaded runtime package has not been executed on Windows. The GitLab job's
 YAML was checked locally; a remote scheduled pipeline has not been run.
+
+Review verification on 2026-10-03 reran the complete build/install/package using
+the Linux cache and passed ten bootstrap regression checks. These include cache
+and compiler changes, Unix links in 7z packages, and preserving built plugins
+when staging dependency files. A CLI check verified serialization of concurrent
+builds and rejection of a changed SDK before bootstrap. ZIP CRC checks passed;
+all 14 generator DLLs and the SQLite driver were present, and packaged application
+binaries matched the installed build.
 
 ## Earlier manual runtime verification (2026-10-02)
 

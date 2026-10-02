@@ -16,9 +16,10 @@
 #include <unistd.h>
 #endif
 
-#include "../core/annotationsidecar_p.h"
 #include "../core/annotations.h"
+#include "../core/annotationsidecar_p.h"
 #include "../core/document.h"
+#include "../core/form.h"
 #include "../core/page.h"
 #include "../settings_core.h"
 
@@ -171,6 +172,49 @@ private Q_SLOTS:
         QCOMPARE(Okular::AnnotationSidecar::pdfHash(pdfPath, &error), hash);
         document.closeDocument();
         QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
+    }
+
+    void formEditsPreventSidecarSave()
+    {
+        Okular::SettingsCore::instance(QStringLiteral("annotationsidecartest"));
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString pdfPath = dir.filePath(QStringLiteral("forms.pdf"));
+        QVERIFY(QFile::copy(QStringLiteral(KDESRCDIR "data/formSamples.pdf"), pdfPath));
+        QFile pdf(pdfPath);
+        QVERIFY(pdf.open(QIODevice::Append));
+        pdf.write("\n% form-sidecar-test ");
+        pdf.write(QUuid::createUuid().toString().toLatin1());
+        pdf.write("\n");
+        pdf.close();
+
+        const QMimeType mime = QMimeDatabase().mimeTypeForFile(pdfPath);
+        Okular::Document document(nullptr);
+        QCOMPARE(document.openDocument(pdfPath, QUrl::fromLocalFile(pdfPath), mime), Okular::Document::OpenSuccess);
+        Okular::FormFieldText *form = nullptr;
+        for (Okular::FormField *field : document.page(0)->formFields()) {
+            if (field->type() == Okular::FormField::FormText) {
+                auto *textField = static_cast<Okular::FormFieldText *>(field);
+                if (textField->textType() == Okular::FormFieldText::Normal) {
+                    form = textField;
+                    break;
+                }
+            }
+        }
+        QVERIFY(form);
+
+        auto *note = new Okular::TextAnnotation();
+        note->setBoundingRectangle(Okular::NormalizedRect(0.1, 0.1, 0.15, 0.15));
+        document.addPageAnnotation(0, note);
+        QVERIFY(document.canSaveAnnotationsToSidecar());
+
+        document.editFormText(0, form, QStringLiteral("Hello"), 5, 0, 0, form->text());
+        QCOMPARE(form->text(), QStringLiteral("Hello"));
+        QVERIFY(!document.canSaveAnnotationsToSidecar());
+        QString error;
+        QVERIFY(!document.saveAnnotationsToSidecar(&error));
+        QVERIFY(!error.isEmpty());
+        document.closeDocument();
     }
 
     void fdPdfHighlightRoundTrip()

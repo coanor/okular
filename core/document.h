@@ -669,27 +669,11 @@ public:
     void processAction(const Action *action);
 
     /**
-     * Processes the given format @p action on @p fft.
-     *
-     * @since 1.9
-     * @deprecated use processFormatAction(const Action *, Okular::FormField *).
-     */
-    OKULARCORE_DEPRECATED void processFormatAction(const Action *action, Okular::FormFieldText *fft);
-
-    /**
      * Processes the given format @p action on a Form Field @p ff.
      *
      * @since 24.08
      */
     void processFormatAction(const Action *action, Okular::FormField *ff);
-
-    /**
-     * Processes the given keystroke @p action on @p fft.
-     *
-     * @since 1.9
-     * @deprecated use processKeystrokeAction(const Action *, Okular::FormField *, const QVariant &, int, int)
-     */
-    OKULARCORE_DEPRECATED void processKeystrokeAction(const Action *action, Okular::FormFieldText *fft, const QVariant &newValue);
 
     /**
      * Processes the given keystroke @p action on @p ff between the two positions @p prevCursorPos and @p prevAnchorPos
@@ -698,15 +682,6 @@ public:
      * @since 24.08
      */
     void processKeystrokeAction(const Action *action, Okular::FormField *ff, const QVariant &newValue, int prevCursorPos, int prevAnchorPos);
-
-    /**
-     * Processes the given keystroke @p action on @p fft.
-     * This will set event.willCommit=true
-     *
-     * @since 22.04
-     * @deprecated use processKeystrokeCommitAction(const Action *, Okular::FormField *, bool &).
-     */
-    OKULARCORE_DEPRECATED void processKeystrokeCommitAction(const Action *action, Okular::FormFieldText *fft);
 
     /**
      * Processes the given keystroke @p action on FormField @p ff.
@@ -725,14 +700,6 @@ public:
     void processFocusAction(const Action *action, Okular::FormField *field);
 
     /**
-     * Processes the given keystroke @p action on @p fft.
-     *
-     * @since 1.9
-     * @deprecated use processValidateAction(const Action *, Okular::FormField *, bool &).
-     */
-    OKULARCORE_DEPRECATED void processValidateAction(const Action *action, Okular::FormFieldText *fft, bool &returnCode);
-
-    /**
      * Validates the input value in the FormField @p ff and sets the @p returnCode for a given validate @p action.
      *
      * @since 24.08
@@ -745,14 +712,6 @@ public:
      * @since 24.08
      */
     void processKVCFActions(Okular::FormField *ff);
-
-    /**
-     * Processes the mouse up @p action on @p ff.
-     *
-     * @deprecated use @ref processFormMouseScriptAction
-     * @since 23.12
-     */
-    OKULARCORE_DEPRECATED void processFormMouseUpScripAction(const Action *action, Okular::FormField *ff);
 
     enum MouseEventType {
         FieldMouseDown,  /// < This event is the result of a mouse down on a field.
@@ -810,13 +769,6 @@ public:
      * Returns the range of the bookmarked.pages
      */
     QString bookmarkedPageRange() const;
-
-    /**
-     * Processes/Executes the given source @p reference.
-     *
-     * @deprecated since 25.12 use void processSourceReference(const SourceReference &reference)
-     */
-    OKULARCORE_DEPRECATED void processSourceReference(const SourceReference *reference);
 
     /**
      * Processes/Executes the given source @p reference.
@@ -889,11 +841,6 @@ public:
      * generators.
      */
     void fillConfigDialog(KConfigDialog *dialog);
-
-    /**
-     * Returns the number of generators that have a configuration widget.
-     */
-    OKULARCORE_DEPRECATED int configurableGenerators() const;
 
     /**
      * Returns the list with the supported MIME types.
@@ -984,14 +931,6 @@ public:
      * @since 0.7 (KDE 4.1)
      */
     bool canSaveChanges() const;
-
-    /**
-     * Save the document and the optional changes to it to the specified
-     * @p fileName.
-     *
-     * @since 0.7 (KDE 4.1)
-     */
-    OKULARCORE_DEPRECATED bool saveChanges(const QString &fileName);
 
     /**
      * Save the document and the optional changes to it to the specified
@@ -1180,17 +1119,6 @@ public Q_SLOTS:
      * @since 0.17 (KDE 4.11)
      */
     void redo();
-
-    /**
-     * Edit the text contents of the specified @p form on page @p page to be @p newContents.
-     * The new text cursor position (@p newCursorPos), previous text cursor position (@p prevCursorPos),
-     * and previous cursor anchor position will be restored by the undo / redo commands.
-     * @since 0.17 (KDE 4.11)
-     *
-     * @deprecated use editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents,
-     *                          int newCursorPos, int prevCursorPos, int prevAnchorPos, const QString &oldContents)
-     */
-    OKULARCORE_DEPRECATED void editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos);
 
     /**
      * Edit the text contents of the specified @p form on page @p page to be @p newContents where
@@ -1534,36 +1462,71 @@ public:
 };
 
 /**
- * @short A DOM tree that describes the Table of Contents.
+ * @short Document synopsis or Table of contents.
  *
  * The Synopsis (TOC or Table Of Contents for friends) is represented via
- * a dom tree where each node has an internal name (displayed in the TOC)
- * and one or more attributes.
+ * a tree of objects.
  *
- * In the tree the tag name is the 'screen' name of the entry. A tag can have
- * attributes. Here follows the list of tag attributes with meaning:
- * - Destination: A string description of the referred viewport
- * - DestinationName: A 'named reference' to the viewport that must be converted
- *      using metaData( "NamedViewport", viewport_name )
- * - ExternalFileName: A document to be opened, whose destination is specified
- *      with Destination or DestinationName
- * - Open: a boolean saying whether its TOC branch is open or not (default: false)
- * - URL: a URL to be open as destination; if set, no other Destination* or
- *      ExternalFileName entry is used
+ * \since 26.12
+ *
  */
-class OKULARCORE_EXPORT DocumentSynopsis : public QDomDocument
+class OKULARCORE_EXPORT DocumentSynopsis
 {
 public:
-    /**
-     * Creates a new document synopsis object.
-     */
-    DocumentSynopsis();
+    class OKULARCORE_NO_EXPORT ElementPrivate;
+    class ElementBuilder;
+    class OKULARCORE_EXPORT Element
+    {
+    public:
+        explicit Element(const ElementBuilder &builder);
+        ~Element();
+        /* A named reference that must be converted by the generator using
+         *      using metaData( "NamedViewport", viewport_name )
+         */
+        std::optional<QString> viewPortName() const;
+        /* The viewport (if available where this element is located) */
+        std::optional<DocumentViewport> viewPort() const;
+        /*If this branch is open or not*/
+        bool isOpen() const;
+        /* - URL: a URL to be open as destination; if set, no other Destination* or
+       ExternalFileName entry is used*/
+        QString url() const;
+        /* The title or header
+         */
+        QString title() const;
+        QString externalFileName() const;
+        QVector<Element> children() const;
 
-    /**
-     * Creates a new document synopsis object with the given
-     * @p document as parent node.
-     */
-    explicit DocumentSynopsis(const QDomDocument &document);
+    private:
+        std::shared_ptr<ElementPrivate> d;
+    };
+    class OKULARCORE_EXPORT ElementBuilder
+    {
+    public:
+        friend class Element;
+        explicit ElementBuilder(const QString &title);
+        ~ElementBuilder();
+        void addChild(const Element &element);
+        /* A The viewport is a 'cheap' location that can be directly derived*/
+        void setViewPort(const DocumentViewport &viewPort);
+        /* A The viewportname is an 'expensive' location that can be calculated if needed*/
+        void setViewPortName(const QString &viewPortName);
+        void setOpen(bool open);
+        void setExternalFileName(const QString &externalFileName);
+        void setUrl(const QString &url);
+
+    private:
+        std::shared_ptr<ElementPrivate> d;
+    };
+    explicit DocumentSynopsis();
+    ~DocumentSynopsis();
+
+    void addChild(const Element &element);
+    QVector<Element> children() const;
+    class OKULARCORE_NO_EXPORT DocumentSynopsisPrivate;
+
+private:
+    std::shared_ptr<DocumentSynopsisPrivate> d;
 };
 
 /**

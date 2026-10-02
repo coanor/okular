@@ -78,3 +78,33 @@ clang_format:
  script:
   - find . \( -name "*.cpp" -or -name "*.h"  -or -name "*.c"  -or -name "*.cc" \) -exec clang-format-19 -i {} \;
   - git diff --exit-code
+
+# Opt in on a scheduled pipeline with OKULAR_WINDOWS_CROSS=1. This exercises
+# the Linux-only bootstrap; the existing Windows jobs cover native execution.
+build_windows_from_linux:
+ stage: build
+ image: ubuntu:24.04
+ tags:
+  - Linux
+ rules:
+  - if: '$CI_PIPELINE_SOURCE == "schedule" && $OKULAR_WINDOWS_CROSS == "1"'
+  - if: '$CI_PIPELINE_SOURCE == "web" && $OKULAR_WINDOWS_CROSS == "1"'
+ variables:
+  XDG_CACHE_HOME: "$CI_PROJECT_DIR/.cache"
+ cache:
+  key:
+   files:
+    - cmake/windows-dependencies.lock.json
+   prefix: windows-cross-linux-x64
+  paths:
+   - .cache/okular-windows/
+ before_script:
+  - apt-get update
+  - apt-get install --yes --no-install-recommends ca-certificates curl python3 make g++ clang-20 lld-20 llvm-20 7zip gettext icoutils pkg-config zlib1g-dev libzstd-dev
+ script:
+  - python3 autotests/windowscrossbuildtest.py
+  - make windows-cross
+ artifacts:
+  paths:
+   - build-windows-cross/okular-windows-x64.zip
+  expire_in: 7 days

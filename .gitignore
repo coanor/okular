@@ -3,6 +3,7 @@ CMakeLists.txt.user*
 *.swp
 /build*/
 .cmake/
+/cmake/__pycache__/
 
 # LSP & IDE
 /.clang-format

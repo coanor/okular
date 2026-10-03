@@ -12,6 +12,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SOURCE = Path(__file__).resolve().parent.parent
@@ -35,6 +36,41 @@ def archive(entries):
 
 
 class UnixBootstrapTest(unittest.TestCase):
+    def test_missing_host_tools_report_complete_install_command(self):
+        with patch.dict(os.environ, {"PATH": ""}):
+            with self.assertRaises(RuntimeError) as result:
+                bootstrap["host_tools"]("macos")
+        message = str(result.exception)
+        for name in ("clang-20", "clang++-20", "ld64.lld-20", "llvm-ar-20",
+                     "llvm-ranlib-20", "llvm-nm-20", "llvm-install-name-tool-20",
+                     "7zz", "msgfmt", "gcc", "g++", "make", "pkg-config"):
+            self.assertIn(name, message)
+        self.assertIn("sudo apt-get install", message)
+        self.assertIn("clang-20 lld-20 llvm-20 7zip gettext", message)
+
+    def test_old_compilers_and_linker_are_reported_together(self):
+        with patch.object(shutil, "which", return_value=sys.executable), \
+                patch.object(subprocess, "check_output", return_value="clang version 18.1.3\nLLD 18.1.3\n"):
+            with self.assertRaises(RuntimeError) as result:
+                bootstrap["host_tools"]("macos")
+        message = str(result.exception)
+        self.assertIn("clang-20 / clang: version 20 or newer required", message)
+        self.assertIn("clang++-20 / clang++: version 20 or newer required", message)
+        self.assertIn("ld64.lld-20 / ld64.lld: version 20 or newer required", message)
+
+    def test_host_utility_launchers_are_allowed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            launcher = Path(directory) / "launcher"
+            launcher.write_text("#!/bin/sh\nexit 0\n")
+            launcher.chmod(0o755)
+            utilities = {"7zz", "make", "pkg-config", "cmake", "ninja", "dpkg-deb"}
+            with patch.object(shutil, "which", side_effect=lambda name: str(launcher) if name in utilities else sys.executable), \
+                    patch.object(subprocess, "check_output", return_value="clang version 20.1.2\nLLD 20.1.2\n"):
+                tools, sevenzip, version = bootstrap["host_tools"]("linux")
+            self.assertEqual(tools["cmake"], str(launcher))
+            self.assertEqual(sevenzip, str(launcher))
+            self.assertIn("20.1.2", version)
+
     def test_program_search_ignores_explicit_target_prefix(self):
         if not shutil.which("cmake"):
             self.skipTest("CMake is needed")

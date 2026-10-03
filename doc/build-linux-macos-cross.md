@@ -27,6 +27,13 @@ Automatic preparation requires Python >= 3.12 and Linux Clang/LLVM >= 20.
 The Linux path also uses `dpkg-deb`, supplied by Ubuntu's `dpkg` package.
 The macOS path downloads pinned Linux CMake 4.1.4 and Ninja 1.13.2.
 
+Install these host prerequisites before running `make`. Target SDK provisioning
+does not install system packages or change your shell's `PATH`. For example,
+`Install Linux tool: ld64.lld-20 / ld64.lld` means the Linux LLD macOS linker is
+missing from `PATH`, not that a macOS installation is required. The entry points
+check missing tools and compiler/linker versions together before downloading an
+SDK and print the Ubuntu installation command when setup is incomplete.
+
 The default outputs are `build-linux-cross-arm64/install/bin/okular` and
 `build-macos-cross-arm64/install/bin/okular.app/Contents/MacOS/okular`.
 Installed binaries are checked for ELF/Mach-O format and the requested CPU.

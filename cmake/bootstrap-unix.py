@@ -200,6 +200,59 @@ def macos(lock, root, downloads, sevenzip, jobs):
     return target, host_cmake, [f"-DCMAKE_PREFIX_PATH={target}", f"-DQT_HOST_PATH={host}"]
 
 
+def host_tools(target):
+    """Check all host prerequisites before downloading or preparing an SDK."""
+    names = {
+        "cc": ("clang-20", "clang"), "cxx": ("clang++-20", "clang++"),
+        "linker": (("ld.lld-20", "ld.lld") if target == "linux" else ("ld64.lld-20", "ld64.lld")),
+        "ar": ("llvm-ar-20", "llvm-ar"), "ranlib": ("llvm-ranlib-20", "llvm-ranlib"),
+        "sevenzip": ("7zz", "7z"),
+        "make": ("make",), "pkg-config": ("pkg-config",)}
+    if target == "macos":
+        names.update(nm=("llvm-nm-20", "llvm-nm"),
+                     install_name_tool=("llvm-install-name-tool-20", "llvm-install-name-tool"),
+                     gcc=("gcc",), gxx=("g++",), msgfmt=("msgfmt",))
+    else:
+        names.update(cmake=("cmake",), ninja=("ninja",), dpkg=("dpkg-deb",))
+    tools, problems = {}, []
+    elf_tools = {"cc", "cxx", "linker", "ar", "ranlib", "nm", "install_name_tool", "gcc", "gxx"}
+    for name, candidates in names.items():
+        try:
+            if name in elf_tools:
+                tools[name] = native_tool(*candidates)
+            else:
+                path = next((path for candidate in candidates if (path := shutil.which(candidate))), None)
+                if not path:
+                    raise RuntimeError(f"Install Linux tool: {' / '.join(candidates)}")
+                tools[name] = path
+        except (RuntimeError, OSError) as error:
+            problems.append(str(error))
+    version = ""
+    for name, pattern in (("cc", r"clang version (\d+)"), ("cxx", r"clang version (\d+)"),
+                          ("linker", r"LLD (\d+)")):
+        if name not in tools:
+            continue
+        try:
+            output = subprocess.check_output([tools[name], "--version"], text=True, stderr=subprocess.STDOUT)
+            match = re.search(pattern, output)
+            if not match or int(match[1]) < 20:
+                problems.append(f"{' / '.join(names[name])}: version 20 or newer required")
+            if name == "cc":
+                version = output.splitlines()[0] if output else ""
+        except (OSError, subprocess.CalledProcessError) as error:
+            problems.append(f"Cannot run {tools[name]}: {error}")
+    if problems:
+        raise RuntimeError("Missing or incompatible Linux host tools:\n  " + "\n  ".join(problems)
+                           + "\nOn Ubuntu 24.04, install the host prerequisites:\n"
+                           "  sudo apt-get update\n"
+                           "  sudo apt-get install --no-install-recommends ca-certificates curl python3 make cmake "
+                           "ninja-build g++ clang-20 lld-20 llvm-20 7zip gettext pkg-config zlib1g-dev libzstd-dev\n"
+                           "See doc/build-linux-macos-cross.md for setup instructions.")
+    # 7z locates its shared objects relative to the real executable.
+    sevenzip = str(Path(tools.pop("sevenzip")).resolve())
+    return tools, sevenzip, version
+
+
 def prepare(target, arch, cache, jobs):
     if sys.version_info < (3, 12) or platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("Automatic SDK preparation requires Linux x86_64 and Python 3.12+.")
@@ -209,24 +262,10 @@ def prepare(target, arch, cache, jobs):
         raise RuntimeError(f"The pinned {target} SDK currently supports {lock['target_arch']}; supply --toolchain for {arch}.")
     if target == "macos" and any(character.isspace() for character in str(cache.resolve())):
         raise RuntimeError("LibSpectre's Autoconf build requires a --cache path without whitespace.")
-    tools = {name: native_tool(*names) for name, names in {
-        "cc": ("clang-20", "clang"), "cxx": ("clang++-20", "clang++"),
-        "linker": (("ld.lld-20", "ld.lld") if target == "linux" else ("ld64.lld-20", "ld64.lld")),
-        "ar": ("llvm-ar-20", "llvm-ar"), "ranlib": ("llvm-ranlib-20", "llvm-ranlib")}.items()}
-    version = subprocess.check_output([tools["cc"], "--version"], text=True).splitlines()[0]
-    match = re.search(r"clang version (\d+)", version)
-    if not match or int(match[1]) < 20:
-        raise RuntimeError("Install Linux Clang/LLVM 20 or newer.")
-    for name, pattern in (("cxx", r"clang version (\d+)"), ("linker", r"LLD (\d+)")):
-        text = subprocess.check_output([tools[name], "--version"], text=True)
-        match = re.search(pattern, text)
-        if not match or int(match[1]) < 20:
-            raise RuntimeError(f"Install Linux Clang/LLVM 20 or newer: {tools[name]}")
-    sevenzip = shutil.which("7zz") or shutil.which("7z")
-    if not sevenzip:
-        raise RuntimeError("Install Linux 7zip (7zz or 7z).")
-    sevenzip = str(Path(sevenzip).resolve())
-    identity = lock_path.read_bytes() + json.dumps(tools, sort_keys=True).encode() + version.encode()
+    tools, sevenzip, version = host_tools(target)
+    # Keep SDK identity tied to target compilation tools, as before preflight.
+    compilers = {name: tools[name] for name in ("cc", "cxx", "linker", "ar", "ranlib")}
+    identity = lock_path.read_bytes() + json.dumps(compilers, sort_keys=True).encode() + version.encode()
     root = cache.resolve() / hashlib.sha256(identity).hexdigest()[:16] / f"{target}-{arch}"
     root.mkdir(parents=True, exist_ok=True)
     downloads = cache.resolve() / "downloads"
@@ -279,7 +318,7 @@ def write_toolchain(target, root, prefix, tools, lock):
     else:
         sdk = root / "sdk" / lock["sdk"]["directory"]
         contents += f'set(CMAKE_OSX_SYSROOT "{sdk}" CACHE PATH "")\nset(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "")\nset(CMAKE_OSX_DEPLOYMENT_TARGET 13.3 CACHE STRING "")\n'
-        contents += f'set(CMAKE_INSTALL_NAME_TOOL "{native_tool("llvm-install-name-tool-20", "llvm-install-name-tool")}")\n'
+        contents += f'set(CMAKE_INSTALL_NAME_TOOL "{tools["install_name_tool"]}")\n'
         pkgconfig = f"{prefix}/lib/pkgconfig:{prefix}/share/pkgconfig"
         contents += 'set(ENV{PKG_CONFIG_SYSROOT_DIR} "")\n'
         roots = f"{prefix};{sdk}"
@@ -307,7 +346,7 @@ def build_spectre(root, prefix, tools, lock, downloads, sevenzip, jobs):
     sdk = root / "sdk" / lock["sdk"]["directory"]
     environment = dict(os.environ, CC=shlex.join([tools["cc"], "--target=arm64-apple-macos13.3", "-isysroot", str(sdk),
                        "-mlinker-version=520", f"--ld-path={root / 'ld64.lld'}"]),
-                       LD=tools["linker"], NM=native_tool("llvm-nm-20", "llvm-nm"),
+                       LD=tools["linker"], NM=tools["nm"],
                        AR=tools["ar"], RANLIB=tools["ranlib"], lt_cv_prog_gnu_ld="no",
                        CFLAGS=f"-O2 -I{prefix}/include", CPPFLAGS=f"-I{source}",
                        LDFLAGS=f"-L{prefix}/lib", PKG_CONFIG_PATH="", PKG_CONFIG_LIBDIR=f"{prefix}/lib/pkgconfig")

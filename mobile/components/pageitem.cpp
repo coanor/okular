@@ -567,9 +567,11 @@ void PageItem::requestPixmap()
 
 void PageItem::paint()
 {
+    // ListView can detach a delegate while a shared observer's pixmap request is pending.
     if (!m_documentItem || !m_page || !window() || width() <= 0 || height() <= 0) {
         return;
     }
+
     Observer *observer = m_isThumbnail ? m_documentItem.data()->thumbnailObserver() : m_documentItem.data()->pageviewObserver();
     const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::TextSelection | PagePainter::Annotations;
 

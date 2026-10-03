@@ -25,6 +25,15 @@ include(GenerateExportHeader)
 include(FeatureSummary)
 include(ECMAddAppIcon)
 include(KDECompilerSettings NO_POLICY_SCOPE)
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"
+        AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
+    # ECM adds GNU linker options for Clang, but this target uses lld-link.
+    # PE linking already rejects unresolved symbols; /WX makes warnings fatal.
+    foreach(_flags CMAKE_SHARED_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS)
+        string(REPLACE "-Wl,--no-undefined" "" ${_flags} "${${_flags}}")
+        string(REPLACE "-Wl,--fatal-warnings" "-Wl,/WX" ${_flags} "${${_flags}}")
+    endforeach()
+endif()
 include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(ECMAddTests)

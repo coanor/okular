@@ -1,4 +1,6 @@
-add_definitions( -DKDESRCDIR="${CMAKE_CURRENT_SOURCE_DIR}/" )
+set(OKULAR_TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE STRING
+    "Autotest source directory as seen by the test runtime")
+add_definitions( -DKDESRCDIR="${OKULAR_TEST_DATA_DIR}/" )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/..)
 
@@ -58,6 +60,19 @@ ecm_add_test(shelltest.cpp ../shell/shellutils.cpp
 )
 
 if(Poppler_Qt6_FOUND)
+    if(BUILD_MOBILE AND NOT ANDROID)
+        find_package(Qt6 ${QT_REQUIRED_VERSION} REQUIRED COMPONENTS QuickTest)
+        ecm_add_test(mobiledocumentviewtest.cpp
+            TEST_NAME "mobiledocumentviewtest"
+            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets KF6::I18n
+        )
+        target_compile_definitions(mobiledocumentviewtest PRIVATE
+            QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
+            OKULAR_QML_IMPORT_PATH="${CMAKE_BINARY_DIR}/bin"
+        )
+        add_dependencies(mobiledocumentviewtest okularplugin okularGenerator_poppler)
+    endif()
+
     if (BUILD_DESKTOP)
         ecm_add_test(parttest.cpp closedialoghelper.cpp
             TEST_NAME "parttest"

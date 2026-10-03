@@ -1,0 +1,1010 @@
+{
+  "schema": 1,
+  "craft_base": "https://files.kde.org/craft/Qt6/26.05/windows/cl/msvc2022/x86_64/RelWithDebInfo/",
+  "craft_mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/Qt6/26.05/windows/cl/msvc2022/x86_64/RelWithDebInfo/",
+  "craft_prefix": "C:/Craft/windows-msvc2022_64-cl",
+  "packages": [
+    {
+      "name": "libs/libb2",
+      "version": "0.98.1",
+      "file": "libs/libb2/libb2-0.98.1-88-20260524T100303-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "f83ea3944ee50af4dc12e382f9547c9a49df03649f1ba1f03f905265ee34d554"
+    },
+    {
+      "name": "libs/libbzip2",
+      "version": "1.0.8-1",
+      "file": "libs/libbzip2/libbzip2-1.0.8-1-88-20260524T100311-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "6bcca1d8c666dae60927dbf1c9e89526b3914919eb2af443257cef3a6d874be7"
+    },
+    {
+      "name": "libs/expat",
+      "version": "2.7.3",
+      "file": "libs/expat/expat-2.7.3-88-20260524T100327-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "f1871aa81bd2f6c9f051dd533e302a447025b7732e49cb4c29449f745a65bcba"
+    },
+    {
+      "name": "libs/zlib",
+      "version": "1.3.1",
+      "file": "libs/zlib/zlib-1.3.1-88-20260524T100336-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0c2876b3ac271edc33ee83887f2acc2cd4219bb5c9d580c262146cce07fce49b"
+    },
+    {
+      "name": "libs/openssl",
+      "version": "3.6.3",
+      "file": "libs/openssl/openssl-3.6.3-97-20260613T001236-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "b48138bab21a3d63b4bb8d88657baa7257683bdb07da9d81db6f0aa9e7b12d47"
+    },
+    {
+      "name": "libs/iconv",
+      "version": "0.0.10",
+      "file": "libs/iconv/iconv-0.0.10-88-20260524T102110-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "114ae4ebdda988c8d803434bc967ebf8a4361e21aabdd1a60df3a7bdb20eb047"
+    },
+    {
+      "name": "libs/liblzma",
+      "version": "5.2.3-1",
+      "file": "libs/liblzma/liblzma-5.2.3-1-119-20260812T185330-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "20356ec49060aa6a9742d9fc9d3f701f251f547d9d45b058b5ec3c3b706f3955"
+    },
+    {
+      "name": "libs/icu",
+      "version": "78.1",
+      "file": "libs/icu/icu-78.1-88-20260525T004109-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e68b2a02163f081c79c7ef32dc69982625e331a7c152a067e4ab206ba017f0e9"
+    },
+    {
+      "name": "libs/libxml2",
+      "version": "2.14.5",
+      "file": "libs/libxml2/libxml2-2.14.5-88-20260525T004133-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "073dad2ace779e1b9eaa40a04e0c80ac3bc2c7ce044ef361fb3a69fcb389b0e9"
+    },
+    {
+      "name": "libs/libunistring",
+      "version": "1.4.1",
+      "file": "libs/libunistring/libunistring-1.4.1-88-20260525T005121-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "87d8fa75becf41091beef5f82e4d57dde91d18098ae14e3acb125b9ed3d2c271"
+    },
+    {
+      "name": "libs/gettext",
+      "version": "0.22.3-3",
+      "file": "libs/gettext/gettext-0.22.3-3-88-20260525T011930-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "45d0f5361384138c0a73af7c897051c1d29dc3060de52f4fce1548273af5ba61"
+    },
+    {
+      "name": "libs/sqlite",
+      "version": "3.50.4",
+      "file": "libs/sqlite/sqlite-3.50.4-88-20260525T011941-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "a16c9cdc821232e3b148d1886a6dbdaa1b67ec8a6271e8e2b4efe40269f3d7a2"
+    },
+    {
+      "name": "libs/libffi",
+      "version": "3.5.2",
+      "file": "libs/libffi/libffi-3.5.2-88-20260525T012038-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "aba8edada80611cb2a197145e5ee98136228b7b981a453111c609519a804b10a"
+    },
+    {
+      "name": "libs/dbus",
+      "version": "1.14.10",
+      "file": "libs/dbus/dbus-1.14.10-88-20260525T012142-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "3902450fabbedf6c02181ef50c03f4cdb60290792edc3f39e9d1fba9aa233c1a"
+    },
+    {
+      "name": "libs/pcre2",
+      "version": "10.44",
+      "file": "libs/pcre2/pcre2-10.44-88-20260525T012155-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0b920666ca29bcadb27d1b0f0142a4b5787ea7ba05456c3e2e69a892f0c3d289"
+    },
+    {
+      "name": "libs/glib",
+      "version": "2.86.0-1",
+      "file": "libs/glib/glib-2.86.0-1-116-20260720T121619-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "ba9072768d9c99b7099921df08a03693efabd08d653cf6c0d581d920a6acd707"
+    },
+    {
+      "name": "libs/shared-mime-info",
+      "version": "2.4",
+      "file": "libs/shared-mime-info/shared-mime-info-2.4-88-20260525T012314-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "9ff1b9f878daf12d18944ed9680f0ff8ba328a10898ebfcf03703221ad67d94c"
+    },
+    {
+      "name": "libs/brotli",
+      "version": "1.1.0",
+      "file": "libs/brotli/brotli-1.1.0-88-20260525T012318-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "3157f7f98d5e312da4220a8be4118f0de69f599f977c50f5aa971b33f17acce5"
+    },
+    {
+      "name": "libs/libzstd",
+      "version": "1.5.7",
+      "file": "libs/libzstd/libzstd-1.5.7-88-20260525T012326-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "98282bf1617fcd4f9285439171fd36aeebda71bc8dbff89865ecb1798551d2c5"
+    },
+    {
+      "name": "libs/libpng",
+      "version": "1.6.45",
+      "file": "libs/libpng/libpng-1.6.45-88-20260525T012331-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "837bb8105b7ff75627455dbc863958bad8e706ca129e9a58c5d0f2e30b08fce4"
+    },
+    {
+      "name": "libs/libjpeg-turbo",
+      "version": "3.0.3",
+      "file": "libs/libjpeg-turbo/libjpeg-turbo-3.0.3-88-20260525T012347-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "8ef12313a12da5d41898ae539dba9af8312aaa5119d2a338e285aab4e914ec34"
+    },
+    {
+      "name": "libs/freetype",
+      "version": "2.14.1-1",
+      "file": "libs/freetype/freetype-2.14.1-1-88-20260525T012359-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "9bafe47d9a0efed2d4e23f60f68e82ab2224360795c85e0a080318c44933dbd4"
+    },
+    {
+      "name": "libs/pixman",
+      "version": "0.46.4",
+      "file": "libs/pixman/pixman-0.46.4-88-20260525T012412-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "6b1df121ffc757efe213260d0f2dd88ac7beca2881dbdc012a97312669f2343e"
+    },
+    {
+      "name": "libs/cairo",
+      "version": "1.18.4-2",
+      "file": "libs/cairo/cairo-1.18.4-2-88-20260525T012431-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "dc9dcb4f94aafc04a98c223a6394a64103733904d18491d77710f3201ebfe54f"
+    },
+    {
+      "name": "libs/harfbuzz",
+      "version": "11.2.0-2",
+      "file": "libs/harfbuzz/harfbuzz-11.2.0-2-88-20260525T012513-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "a54183717dddf9508055bec294cf3bdc7c0aad988cba334cac73df71715223e4"
+    },
+    {
+      "name": "libs/qt6/qtbase",
+      "version": "6.11.1-4",
+      "file": "libs/qt6/qtbase/qtbase-6.11.1-4-147-20261001T135200-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "f350afa9572b90d08a7b366f7c129d48cb18fca2386998a8825dc4c6971594de"
+    },
+    {
+      "name": "libs/qt6/qtshadertools",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtshadertools/qtshadertools-6.11.1-88-20260525T013434-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "74a20b030df03111b43995842aec5bb44f9f227d11ddf2173f36c6e4919cdf06"
+    },
+    {
+      "name": "libs/qt6/qtsvg",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtsvg/qtsvg-6.11.1-88-20260525T013514-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d47e133f50082e7977b6e663b86b1baf8899463c2a6b309b9d8c18d077fad0c8"
+    },
+    {
+      "name": "libs/qt6/qtlanguageserver",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtlanguageserver/qtlanguageserver-6.11.1-88-20260525T013552-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "c366f83955148260e384674a7b0e081b030f0228489ce10c43c1f20ea46c0ba1"
+    },
+    {
+      "name": "libs/qt6/qtdeclarative",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtdeclarative/qtdeclarative-6.11.1-88-20260525T022413-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "733527e0eade0eafa87ea779f08645b1c72de955bbd9ba721168d00261d533fe"
+    },
+    {
+      "name": "libs/qt6/qttranslations",
+      "version": "6.11.1",
+      "file": "libs/qt6/qttranslations/qttranslations-6.11.1-89-20260525T140043-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "a59b421baba1fd026326f3aa5ab22f96f7223910b1cbaec1fae7c153ac43cee5"
+    },
+    {
+      "name": "kde/frameworks/extra-cmake-modules",
+      "version": "6.30.0",
+      "file": "kde/frameworks/extra-cmake-modules/extra-cmake-modules-6.30.0-136-20260912T110455-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "9bed685bb162cb8e92224e0fec538cfb65f7240ca58009bde15f870535534333"
+    },
+    {
+      "name": "kde/frameworks/tier1/attica",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/attica/attica-6.30.0-136-20260912T110518-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "debc309b7db2a47f80c46a007cde7bb8750e526c91083ea35676a4f9e9eaf1c5"
+    },
+    {
+      "name": "kde/frameworks/tier1/breeze-icons",
+      "version": "6.30.0-1",
+      "file": "kde/frameworks/tier1/breeze-icons/breeze-icons-6.30.0-1-136-20260912T110615-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "73cc9b227e30678774330c3995a4890861ddb03b0b8da4c64b228582e355fe02"
+    },
+    {
+      "name": "libs/libarchive",
+      "version": "3.8.1",
+      "file": "libs/libarchive/libarchive-3.8.1-89-20260525T140610-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "450926b6305f2ad820cd89fc849fdc34eb9490be587dc580106d838a6b6a4f49"
+    },
+    {
+      "name": "kde/frameworks/tier1/karchive",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/karchive/karchive-6.30.0-136-20260912T110631-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d01201b7a31eb5c19856d4cceff441b86799879f159c7e95c3138cdc5d834530"
+    },
+    {
+      "name": "libs/libical",
+      "version": "3.0.20",
+      "file": "libs/libical/libical-3.0.20-89-20260525T140645-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "de2d2d2bfb6271a54c5098c0f9ccc0f95920031e067e9a44a8c67a6aed6d30d7"
+    },
+    {
+      "name": "kde/frameworks/tier1/kcodecs",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kcodecs/kcodecs-6.30.0-136-20260912T110757-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "ee06b12aaaab868c350a55bae4a99aa6879233f267712cfb117838c894abde8b"
+    },
+    {
+      "name": "kde/frameworks/tier1/kconfig",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kconfig/kconfig-6.30.0-136-20260912T110900-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "267e4ad9af856926b994d1979266f8a67e4b3e5ec000f25bc1f824f62ee19103"
+    },
+    {
+      "name": "kde/frameworks/tier1/kcoreaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kcoreaddons/kcoreaddons-6.30.0-136-20260912T110944-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "1e856a7abfb6101987d7af55e1285bef44d6260c645fda1fb8bd50868f623798"
+    },
+    {
+      "name": "kde/frameworks/tier1/kdbusaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kdbusaddons/kdbusaddons-6.30.0-136-20260912T111009-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e74658533217993b413753b9731b786103eddc742723dd5c1bfc10bb859630ac"
+    },
+    {
+      "name": "kde/frameworks/tier1/kguiaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kguiaddons/kguiaddons-6.30.0-136-20260912T111041-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "de41865103067b5d481a917cd119bc29d4ab1bca52fe2375ec5c19efb26a398a"
+    },
+    {
+      "name": "data/iso-codes",
+      "version": "4.20.1",
+      "file": "data/iso-codes/iso-codes-4.20.1-116-20260720T050633-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "14e8a1de9f28e04af71e0cb688a7faa3056fd8f039d1beec8c5b3ced61c133e6"
+    },
+    {
+      "name": "kde/frameworks/tier1/ki18n",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/ki18n/ki18n-6.30.0-136-20260912T111156-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "62f4ddb8b8f12f19d3136a42bde40208b6db7ebccc64b589f92d3785ce588df3"
+    },
+    {
+      "name": "kde/frameworks/tier1/kidletime",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kidletime/kidletime-6.30.0-136-20260912T111228-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "1599f3fb3a652ddf8dd25b75632a5b4753057206b096cc72bd2e35008cf5b38e"
+    },
+    {
+      "name": "libs/aom",
+      "version": "3.13.3",
+      "file": "libs/aom/aom-3.13.3-89-20260525T141616-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e1b5669b99949459ee96435fa716e13388559e2b2e1ebf01254c4d4ff40353a7"
+    },
+    {
+      "name": "libs/dav1d",
+      "version": "1.5.3",
+      "file": "libs/dav1d/dav1d-1.5.3-89-20260525T141713-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0479bd798b034d92b65e53a6cd3d83c8e2da773dc8e6ccad6ed5983b39a3c44f"
+    },
+    {
+      "name": "libs/libavif",
+      "version": "1.4.1",
+      "file": "libs/libavif/libavif-1.4.1-89-20260525T141722-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d46ea653ee81ee8b16947864cf7b039374f10be701ef18c848c96376b6a89aae"
+    },
+    {
+      "name": "libs/liblame",
+      "version": "3.100",
+      "file": "libs/liblame/liblame-3.100-89-20260525T141740-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "aaa7af633a2b88da7fdb6c2b3324d3267ce529ca8162d79c85a23ba653a0e3ef"
+    },
+    {
+      "name": "libs/libopus",
+      "version": "1.5.2",
+      "file": "libs/libopus/libopus-1.5.2-89-20260525T141800-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0a587ccbc11f56e5760b8fbefc7ffeb465c59f2d696355b6c7adff62746ec62d"
+    },
+    {
+      "name": "libs/x265",
+      "version": "8f18e3a-2",
+      "file": "libs/x265/x265-8f18e3a-2-89-20260525T141958-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "fec841dcce98a01dfc3a8121d1671b42257d84aea3d2a3b9262d9e63f3efe1ff"
+    },
+    {
+      "name": "libs/libvorbis",
+      "version": "1.3.7-2",
+      "file": "libs/libvorbis/libvorbis-1.3.7-2-89-20260525T142013-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "94fc0970b9459a3227b2c2354c01d4974354cf717f57533bb53156ba7517c828"
+    },
+    {
+      "name": "libs/libsamplerate",
+      "version": "0.2.2",
+      "file": "libs/libsamplerate/libsamplerate-0.2.2-89-20260525T142021-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0164c02ee6c2f77428842523d7ccd0e6abef5f2c40359f7cfb7579a3e7553f8d"
+    },
+    {
+      "name": "libs/libsdl2",
+      "version": "2.30.10",
+      "file": "libs/libsdl2/libsdl2-2.30.10-89-20260525T142112-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d6146352d24a6633528b20e6a8f37163efee5c3b99f24280c0157adba935848a"
+    },
+    {
+      "name": "libs/onevpl",
+      "version": "2.14.0",
+      "file": "libs/onevpl/onevpl-2.14.0-89-20260525T142129-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "a24e986a7f0d64094fbc782415e67ee03e9621a76050b412210c48668448bcfb"
+    },
+    {
+      "name": "libs/svtav1",
+      "version": "3.1.2",
+      "file": "libs/svtav1/svtav1-3.1.2-89-20260525T142316-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "abd0d301f2199dce275b70b9dff279a7217d9e773f15d0cd0233efcf1a7ca89e"
+    },
+    {
+      "name": "libs/amf",
+      "version": "1.5.2",
+      "file": "libs/amf/amf-1.5.2-92-20260608T223606-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "07c74a6b5f7e08ce764ec36cbe1027de2682e2008ad0f3b31e3574e5e7a6b791"
+    },
+    {
+      "name": "libs/nvidia-codecs",
+      "version": "12.1.14.0",
+      "file": "libs/nvidia-codecs/nvidia-codecs-12.1.14.0-89-20260525T142402-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "488cfc3c99cb0f6591e62c63cb7cbba7a68dd160ad792dc73cc971ed058d6762"
+    },
+    {
+      "name": "libs/ffmpeg",
+      "version": "8.1.1-6",
+      "file": "libs/ffmpeg/ffmpeg-8.1.1-6-145-20260917T182245-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "425827c4d2fac7f9f918501152d3777fb0c2f6f465c44fc15338bc8a3e347d9f"
+    },
+    {
+      "name": "libs/giflib",
+      "version": "5.2.1",
+      "file": "libs/giflib/giflib-5.2.1-89-20260525T143554-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "be37bec2c6e34017c7f57007273a922ddf376df667553feb1282cc462ea07e20"
+    },
+    {
+      "name": "libs/webp",
+      "version": "1.6.0",
+      "file": "libs/webp/webp-1.6.0-89-20260525T143619-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "cd8ba8c919e794bf386f94afe7bd7dd3672a06fb8fcfcf23f6551165185291a6"
+    },
+    {
+      "name": "libs/tiff",
+      "version": "4.7.1",
+      "file": "libs/tiff/tiff-4.7.1-89-20260525T143659-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "7df58ddc861d1bcd0a2252378bd777016281a169ee3e8d536721f917e5b57e3f"
+    },
+    {
+      "name": "libs/lcms2",
+      "version": "2.17",
+      "file": "libs/lcms2/lcms2-2.17-89-20260525T143711-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "ab3b73174b1d65e1a2846128e543f24646eb164b87aa55679899f386c0b8447d"
+    },
+    {
+      "name": "libs/openjpeg",
+      "version": "2.5.3-1",
+      "file": "libs/openjpeg/openjpeg-2.5.3-1-89-20260525T143736-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "b5397a12043d3ef683670f7c43624e9157888881b3b8305bc4683c9d247cdf1f"
+    },
+    {
+      "name": "libs/libheif",
+      "version": "1.23.0",
+      "file": "libs/libheif/libheif-1.23.0-103-20260618T000450-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "95ab3e89b8f04b3251fd2e3fd23da1198fbf7a96530fa233c4c3cafa9ea2fe0b"
+    },
+    {
+      "name": "libs/libhwy",
+      "version": "1.4.0",
+      "file": "libs/libhwy/libhwy-1.4.0-89-20260525T143815-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e3b73964721be74475f92114e73841d8f41ee9e0b68db1bb35c7703be9d6006a"
+    },
+    {
+      "name": "libs/libjxl",
+      "version": "0.11.2",
+      "file": "libs/libjxl/libjxl-0.11.2-89-20260525T143919-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e193b26ada0abd8ef7284f0cde66900bf4ab4d469a8fe1cbee8c6656c9e79072"
+    },
+    {
+      "name": "kde/frameworks/tier1/kimageformats",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kimageformats/kimageformats-6.30.0-136-20260912T111332-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "6f6bcb7bca6c6196b1c60e03e6711cd6591fcc9c1470be7168516fd3ed09977e"
+    },
+    {
+      "name": "kde/frameworks/tier1/kirigami",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kirigami/kirigami-6.30.0-136-20260912T111818-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "c1ee3232baf4d0d1ad095f9155990c6727f05df1c1751780ee6e426f82084993"
+    },
+    {
+      "name": "kde/frameworks/tier1/kitemmodels",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kitemmodels/kitemmodels-6.30.0-136-20260912T111941-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "5aee2408ca16a1c708c7ded3135094bf22940e8f5af70d44b6017cb8072785ac"
+    },
+    {
+      "name": "kde/frameworks/tier1/kitemviews",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kitemviews/kitemviews-6.30.0-136-20260912T112016-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d55e66f0832fefb734a51d92b2a42c19ae9eed78c1bd3f77bff8b75573c23161"
+    },
+    {
+      "name": "kde/frameworks/tier1/kwidgetsaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kwidgetsaddons/kwidgetsaddons-6.30.0-136-20260912T112740-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "4c265c858442cfab87c31732b27c2408e63243b036a374b96bc9fff199f5c152"
+    },
+    {
+      "name": "kde/frameworks/tier1/kwindowsystem",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kwindowsystem/kwindowsystem-6.30.0-136-20260912T112825-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0163134e44ceab37c88827bc50d775b5bf3711a6d1d4ad56830d63a47ef2e614"
+    },
+    {
+      "name": "libs/qt6/qtmultimedia",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtmultimedia/qtmultimedia-6.11.1-89-20260525T144631-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e2a3ab6fc46afa773d37ac9311d6f2316a0e8eb2aab36731af2c3e1c9fa13064"
+    },
+    {
+      "name": "libs/qrencode",
+      "version": "4.1.1-1",
+      "file": "libs/qrencode/qrencode-4.1.1-1-89-20260525T144659-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "2ace6538610047b728edfdd6db88390262091ba73f2a1f2cb6977b08d55b1c34"
+    },
+    {
+      "name": "libs/zxing-cpp",
+      "version": "2.3.0",
+      "file": "libs/zxing-cpp/zxing-cpp-2.3.0-89-20260525T144710-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "97438b36a1a44cf79a2c271153b8b75bafb79486d1c23b6e0ee4369f24fa3fa8"
+    },
+    {
+      "name": "kde/frameworks/tier1/solid",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/solid/solid-6.30.0-136-20260912T113119-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "383902938bc4a0abc26db53408601fce05e9071a55b8436ff638879f1ba5055a"
+    },
+    {
+      "name": "kde/frameworks/tier1/sonnet",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/sonnet/sonnet-6.30.0-136-20260912T113235-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "32ebe34b3e7fd1a89330ecf3c194fb671d8c0d08f7ca0798a7f66bd47da16e9c"
+    },
+    {
+      "name": "kde/frameworks/tier1/syntax-highlighting",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/syntax-highlighting/syntax-highlighting-6.30.0-136-20260912T113410-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "9a85e4ef857f038bac4c038cdc1949152443a9a6204b118f74b2bb9c5da35f87"
+    },
+    {
+      "name": "kde/frameworks/tier1/threadweaver",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/threadweaver/threadweaver-6.30.0-136-20260912T113516-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "ca50bd12e48a982f0e30e2dadc99eea752b914fb0b15c85394edd0ee14736726"
+    },
+    {
+      "name": "kde/frameworks/tier2/kcolorscheme",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kcolorscheme/kcolorscheme-6.30.0-136-20260912T113540-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "5610083be7a192dfacff1be7395f90a6760491edf6babe1662144fa80a752d40"
+    },
+    {
+      "name": "kde/frameworks/tier2/kcompletion",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kcompletion/kcompletion-6.30.0-136-20260912T113620-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "dff9246e646e10ecc732b8d3accf1cfcacee91058987ab6366be963399c6cc84"
+    },
+    {
+      "name": "kde/frameworks/tier2/kcrash",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kcrash/kcrash-6.30.0-136-20260912T113758-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "8e3d384db769b720df9494f4b0c2dcefddebd27e0e0a821f8633d67d04cd0526"
+    },
+    {
+      "name": "libs/libxslt",
+      "version": "1.1.43",
+      "file": "libs/libxslt/libxslt-1.1.43-89-20260525T145014-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "6387d2613b2b25cac1c1a5114a6a8ab54ec149f287c4e3c8ecbcacd548d243b5"
+    },
+    {
+      "name": "data/poppler-data",
+      "version": "0.4.12",
+      "file": "data/poppler-data/poppler-data-0.4.12-89-20260525T145057-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "89727f303d162bc8684c34fae7947887c6d244c734b3ca7f8224788a4d8e90e5"
+    },
+    {
+      "name": "libs/libssh2",
+      "version": "1.11.1-1",
+      "file": "libs/libssh2/libssh2-1.11.1-1-89-20260525T145101-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "20077268e857518f14e4d5deea4ea0d73a26ed3bede5215aac8b21e41726f0ba"
+    },
+    {
+      "name": "libs/libpsl",
+      "version": "0.21.5",
+      "file": "libs/libpsl/libpsl-0.21.5-89-20260525T145108-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0d4ecc218476f0eb1e644a18936bfed9da11a587d632ab94db3e0c0fcb0e0480"
+    },
+    {
+      "name": "libs/libcurl",
+      "version": "8.14.1",
+      "file": "libs/libcurl/libcurl-8.14.1-89-20260525T145117-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "4512bd526abf8e8f71493c43ef8cc0f126fc863c6bfaa7ba0a30ec9ad92fa1e1"
+    },
+    {
+      "name": "data/urw-base35-fonts",
+      "version": "20200910",
+      "file": "data/urw-base35-fonts/urw-base35-fonts-20200910-89-20260525T145120-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "128f19b43c0036850ec8dc9ef0d4ed56448d362e2c12d65282b5e16433eeefca"
+    },
+    {
+      "name": "libs/nss",
+      "version": "3.109-2",
+      "file": "libs/nss/nss-3.109-2-89-20260525T145225-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "377582dd7cf9c565cb24cd22035bc1f5484030fd29002e58be3c0dd24a14454e"
+    },
+    {
+      "name": "libs/gpgme/gpgmepp",
+      "version": "2.0.0",
+      "file": "libs/gpgme/gpgmepp/gpgmepp-2.0.0-89-20260525T145236-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "32dac631ae39796f26f1d9a9dcbe4a6809d80fabfba6be722b04cc26725bedf6"
+    },
+    {
+      "name": "libs/gpgme/qgpgme",
+      "version": "2.0.0-1",
+      "file": "libs/gpgme/qgpgme/qgpgme-2.0.0-1-89-20260525T145256-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "915553ed4fb3b1bb252c3c4f76eff8f96fb2a8479696be4d9586893e5c38b23b"
+    },
+    {
+      "name": "qt-libs/poppler",
+      "version": "26.07.0",
+      "file": "qt-libs/poppler/poppler-26.07.0-116-20260720T050751-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "a1df8c88a351401869b715fdf779a3d5c8fa568d68c90f0cadb9e208db9cfc27"
+    },
+    {
+      "name": "libs/taglib",
+      "version": "2.1.1",
+      "file": "libs/taglib/taglib-2.1.1-89-20260525T145521-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "85a92c39d0b67358dfbe9e2299435f2d446cec310594798c0413c7a063256d3f"
+    },
+    {
+      "name": "libs/inih",
+      "version": "56",
+      "file": "libs/inih/inih-56-89-20260525T145526-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "f2b9c87ed7cae956a80f37e0d108d6091a09438cd273289162c836791179293c"
+    },
+    {
+      "name": "libs/exiv2",
+      "version": "0.28.5",
+      "file": "libs/exiv2/exiv2-0.28.5-89-20260525T145556-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e62d8d283cceb16bf7303781630cd02d5825a14e5ebd873268894cb0bf625791"
+    },
+    {
+      "name": "libs/libgmp",
+      "version": "6.3.0",
+      "file": "libs/libgmp/libgmp-6.3.0-89-20260525T150118-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "75bfd8c5998c22e7ff845af44a6a8f018c1e9315edcb5202a2a53b1890b9aa83"
+    },
+    {
+      "name": "libs/libzip",
+      "version": "1.11.3",
+      "file": "libs/libzip/libzip-1.11.3-89-20260525T150138-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "96b7547db1bf90e446ac514f19ed3c2a92e2a292209f24829618d7b106026436"
+    },
+    {
+      "name": "libs/ebook-tools",
+      "version": "0.2.2",
+      "file": "libs/ebook-tools/ebook-tools-0.2.2-89-20260525T150142-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "0173fa3514ea7e536ee3b959fabe2395d81424106f36a6d77c63ca82a2905363"
+    },
+    {
+      "name": "kde/frameworks/tier3/kconfigwidgets",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kconfigwidgets/kconfigwidgets-6.30.0-136-20260912T114029-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "c1a71b30d5f87842cb94092f7262b9afc1808103ef1a245f3c6d36c2e3b91716"
+    },
+    {
+      "name": "kde/frameworks/tier3/kiconthemes",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kiconthemes/kiconthemes-6.30.0-136-20260912T114049-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "1388b0a899a8debfbadcbe8a0ff0f351f66c33d68c4d5d649b9c1808462292b3"
+    },
+    {
+      "name": "kde/frameworks/tier3/kxmlgui",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kxmlgui/kxmlgui-6.30.0-136-20260912T114122-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "560438b3223918f1ce4d9eebf29d8f7631c13164ac925f55849b71f22e62e450"
+    },
+    {
+      "name": "kde/frameworks/tier3/kbookmarks",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kbookmarks/kbookmarks-6.30.0-136-20260912T114213-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "4b6362269121c13d929a6446b95a22585f187e67e879b1598637ffc34f7906d1"
+    },
+    {
+      "name": "libs/qt6/qtspeech",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtspeech/qtspeech-6.11.1-89-20260525T150314-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "4851bb04cfef067a986cc80a3f5d426f4a921c00c1c6b60974215fad7e35e161"
+    },
+    {
+      "name": "kde/frameworks/tier3/knotifications",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/knotifications/knotifications-6.30.0-136-20260912T114247-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "6f6a3ef77cd77e6794a65cde080e158f560f2153aedffbbf0aa4bd0f73732d42"
+    },
+    {
+      "name": "kde/frameworks/tier2/kjobwidgets",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kjobwidgets/kjobwidgets-6.30.0-136-20260912T114308-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "e58cf1cbae0296dca1ecbeba8c258052a6f8c15dc0403dd186e7afee2b05eee2"
+    },
+    {
+      "name": "kde/frameworks/tier3/kservice",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kservice/kservice-6.30.0-136-20260912T114329-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "2cceaeaef4a0cd6985ee9533f1e06d5fcb90c50e11abd9d015b0b0ffbbadf360"
+    },
+    {
+      "name": "kde/frameworks/tier3/ktextwidgets",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/ktextwidgets/ktextwidgets-6.30.0-136-20260912T114342-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "48d2db0d35f24d4eb3dc872fdcd254249d24f984fe198831929ea7261269af37"
+    },
+    {
+      "name": "kde/frameworks/tier3/kio",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kio/kio-6.30.0-136-20260912T114528-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "72b99fbc8857c55587ed53fb9efdfe38d2da8df7acc8e4bc2218f63d0684a335"
+    },
+    {
+      "name": "kde/kdegraphics/kdegraphics-mobipocket",
+      "version": "26.08.1",
+      "file": "kde/kdegraphics/kdegraphics-mobipocket/kdegraphics-mobipocket-26.08.1-136-20260912T114558-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "f0abf869ef1265536abf9a1a0945ba8155c548b844be709934238dd5cfcc803a"
+    },
+    {
+      "name": "kde/frameworks/tier2/kpackage",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kpackage/kpackage-6.30.0-136-20260912T114657-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "ed747a43379aefb31c3bbb7f30c1361f27dd6194883970995bbf15de1bf355df"
+    },
+    {
+      "name": "kde/frameworks/tier2/kstatusnotifieritem",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kstatusnotifieritem/kstatusnotifieritem-6.30.0-136-20260912T114706-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "f8fc4e8dcc0ad89ddc9c5b12fd21784e348f487228f170dbe1a7e0a5324361b6"
+    },
+    {
+      "name": "kde/frameworks/tier3/kcmutils",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kcmutils/kcmutils-6.30.0-136-20260912T114808-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "805e8932ed8d566f3bed1d3d6db697bbf7bd6e7bb2d97fcb600289ea3b26e40f"
+    },
+    {
+      "name": "kde/frameworks/tier3/kdeclarative",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kdeclarative/kdeclarative-6.30.0-136-20260912T114843-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "c31e0e1d7db8189f08a89078aad1b114a7a852aba114d7041bb940125bb9cf2d"
+    },
+    {
+      "name": "kde/frameworks/tier3/qqc2-desktop-style",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/qqc2-desktop-style/qqc2-desktop-style-6.30.0-136-20260912T114921-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "24001b3ae3c371281e36fdb26b39b9301e7e2be992cd3dacb0b77c581f686079"
+    },
+    {
+      "name": "kde/frameworks/tier3/knewstuff",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/knewstuff/knewstuff-6.30.0-136-20260912T115019-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "5ce980f945157beda73c6dbf90bad98de1239187cf2801f301e5d25418a24b1a"
+    },
+    {
+      "name": "kde/frameworks/tier3/knotifyconfig",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/knotifyconfig/knotifyconfig-6.30.0-136-20260912T115047-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "c0b80e620a0871cbae5283cd15870fa858261eba3083f30060e07f231c6a4b4e"
+    },
+    {
+      "name": "kde/frameworks/tier3/kparts",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kparts/kparts-6.30.0-136-20260912T115102-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "bdc147d2bd2e895b4c22b3c2ab98846362089a1b6c26e4d99d028a27c206dbf4"
+    },
+    {
+      "name": "kde/frameworks/tier3/ksvg",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/ksvg/ksvg-6.30.0-136-20260912T115145-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "acd20016335490a399dbdbf37e457b2ec00a2e2abe1b148150f8e10f66b102f6"
+    },
+    {
+      "name": "libs/editorconfig",
+      "version": "0.12.5",
+      "file": "libs/editorconfig/editorconfig-0.12.5-89-20260525T151148-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "9fb5ff5c2a003758c92041a46b32fcc3799a4b22ceacc4a3f85684ffdfcd7bb7"
+    },
+    {
+      "name": "libs/libgit2",
+      "version": "1.7.1",
+      "file": "libs/libgit2/libgit2-1.7.1-89-20260525T151238-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "209d4acf20384a01b12f1d9298ab60dedf1e8155f1f8b2e7b91bdcfc958d0cec"
+    },
+    {
+      "name": "libs/qt6/qt5compat",
+      "version": "6.11.1",
+      "file": "libs/qt6/qt5compat/qt5compat-6.11.1-89-20260525T151527-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "429702d1dea90f3d910f6435af2abf9fc09b2fef53c19bfe0debf39be99f3653"
+    },
+    {
+      "name": "libs/lmdb",
+      "version": "0.9.33-1",
+      "file": "libs/lmdb/lmdb-0.9.33-1-89-20260525T151539-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d55e339fb1f63f9a4d9b97b3f35f8ff505f0eb967d8343a69aec5ef52c6b6010"
+    },
+    {
+      "name": "libs/cyrus-sasl",
+      "version": "2.1.28-3",
+      "file": "libs/cyrus-sasl/cyrus-sasl-2.1.28-3-89-20260525T151559-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "02e0d31024d333dd35ae47ac8b851f5244c0c5b497d3192434e213ea3378b2e1"
+    },
+    {
+      "name": "kdesupport/qca",
+      "version": "2.3.10",
+      "file": "kdesupport/qca/qca-2.3.10-89-20260525T151744-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "30c05e07b5cc6a1c32c7800fa77471b285218a58cdc37bd621f81e99b8acea82"
+    },
+    {
+      "name": "kde/frameworks/tier3/kwallet",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kwallet/kwallet-6.30.0-136-20260912T115430-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "4f86c09209c8524caf004cc0a06354c00beac26531d13c2dd73ff7f59b694789"
+    },
+    {
+      "name": "kde/frameworks/tier3/purpose",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/purpose/purpose-6.30.0-136-20260912T115557-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "4006cf298c4d0b2f9d9f6fedec16803fb0d8c97eeaad8ad4b5689c60737a5655"
+    },
+    {
+      "name": "kde/frameworks/tier4/frameworkintegration",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier4/frameworkintegration/frameworkintegration-6.30.0-136-20260912T115630-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "5433c1ba75d7c2c7a60e0d9d8bee3913144883a43a1ccb3e490ed4ce8e943366"
+    },
+    {
+      "name": "qt-libs/qtkeychain",
+      "version": "0.16.0",
+      "file": "qt-libs/qtkeychain/qtkeychain-0.16.0-116-20260720T050821-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "6b2fa11b82720cbe7ff3285b2c7c558d04f7d884ac5bbc2ed9d5816031f6ee79"
+    },
+    {
+      "name": "libs/qt6/qtpositioning",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtpositioning/qtpositioning-6.11.1-89-20260525T185852-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "65c3cccfc267a43cf234099aaae3d36fa43741ee3e75599ee68589029e762e84"
+    },
+    {
+      "name": "libs/qt6/qtwebchannel",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtwebchannel/qtwebchannel-6.11.1-89-20260525T185933-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "08bf3db0b34fe938436fef3ba2a455fde5cc156af66108da9bd06ef277dab0f3"
+    },
+    {
+      "name": "libs/fribidi",
+      "version": "1.0.10-1",
+      "file": "libs/fribidi/fribidi-1.0.10-1-92-20260608T223440-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "9075e1378c25c18353cebd2cd1852dcf70e100141b42dc3da889ca5003938401"
+    },
+    {
+      "name": "libs/libass",
+      "version": "0.17.4",
+      "file": "libs/libass/libass-0.17.4-92-20260608T223456-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "d380620d2754f2e75735bee9403bd9a532043f9f81ae3f0d20ad6d74d5362e43"
+    },
+    {
+      "name": "libs/qt6/qtwebengine",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtwebengine/qtwebengine-6.11.1-92-20260609T013049-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "983e8fc9fe208b6534765ba17dfb4680e76601e118bd5696c2a8d06a68c3410b"
+    },
+    {
+      "name": "qt-libs/phonon",
+      "version": "4.12.0-1",
+      "file": "qt-libs/phonon/phonon-4.12.0-1-119-20260812T185949-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "877773267f0c18bdaeba3951425464d0f5bc466d2ad6755ce29b3520f1ee1898"
+    },
+    {
+      "name": "libs/libraw",
+      "version": "0.21.4",
+      "file": "libs/libraw/libraw-0.21.4-92-20260609T020316-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "89a24a418fd6a58fb94e0d64391edc6164c7735d95419568f6b2c549465718ff"
+    },
+    {
+      "name": "libs/ghostscript",
+      "version": "10.05.1",
+      "file": "libs/ghostscript/ghostscript-10.05.1-92-20260609T020938-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "fa1d0a9b22bee3ff572c59511d2e9ff58784bbded1c7bf8b1dcea560fe053ed0"
+    },
+    {
+      "name": "libs/chm",
+      "version": "0.40-1",
+      "file": "libs/chm/chm-0.40-1-92-20260609T082615-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "3fda4024a68bb2ead98efdb8736113001797b589fd84c44c70da15bea4af0d7b"
+    },
+    {
+      "name": "libs/discount",
+      "version": "3.0.1.2",
+      "file": "libs/discount/discount-3.0.1.2-92-20260609T082620-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "2eaca94a2d2178690e273701c8de22a290e86f700711650acc44a65ac25ad1ca"
+    },
+    {
+      "name": "libs/djvu",
+      "version": "3.5.27",
+      "file": "libs/djvu/djvu-3.5.27-92-20260609T082634-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "46da512f26bcd8a32c345cb6b454681704a48da53ccf7736563b886f072346e3"
+    },
+    {
+      "name": "libs/libspectre",
+      "version": "0.2.8",
+      "file": "libs/libspectre/libspectre-0.2.8-92-20260609T082641-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "20c9db8e34bc710517bf3f449915506ac679fa6b0e2c54dc795807a14c1225f1"
+    },
+    {
+      "name": "libs/hunspell",
+      "version": "1.7.2",
+      "file": "libs/hunspell/hunspell-1.7.2-92-20260609T082718-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "eaad732a84dd866b83ac872ad3d785ab4926d6cf07a81e2a9fc67d1bbceb80fc"
+    },
+    {
+      "name": "libs/imath",
+      "version": "3.1.11",
+      "file": "libs/imath/imath-3.1.11-92-20260609T085441-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "c112efa050c90547c2e863452c156b4fdac7d42cf6770499eccd9ae5ee43c3a0"
+    },
+    {
+      "name": "libs/openexr",
+      "version": "3.2.4-1",
+      "file": "libs/openexr/openexr-3.2.4-1-92-20260609T085535-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "8cc658e9706ba18f7bde186e960066b67c5bfc3442054e9fd3424216f92d5aeb"
+    },
+    {
+      "name": "kde/applications/libkexiv2",
+      "version": "26.04.2",
+      "file": "kde/applications/libkexiv2/libkexiv2-26.04.2-97-20260613T004520-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "b2cbc4f7cf288db0dcb55cdea201f4b9bb74aa58bda6eb4d9a4ea1b066fbee7d"
+    },
+    {
+      "name": "libs/qt6/qtimageformats",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtimageformats/qtimageformats-6.11.1-100-20260614T144656-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "28e195eb81839d9f840dccbf07c4b571845a808a1fd86e64cf78f2dc385482e8"
+    },
+    {
+      "name": "kde/frameworks/tier2/kdoctools",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kdoctools/kdoctools-6.30.0-136-20260912T113938-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "54b6ddc9e783db7421a872b2aec6168140add0f82044e16db96866f86e5761f2"
+    },
+    {
+      "name": "libs/x264",
+      "version": "b35605a",
+      "file": "libs/x264/x264-b35605a-103-20260617T235658-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "8dad44a08aaa6e40109da0cffdba7e2776fe8a55da297d15dd1d9f2166239f7f"
+    },
+    {
+      "name": "libs/runtime",
+      "version": "14.2.0-2",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/runtime/runtime-14.2.0-2-1228-20251023T164820-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/runtime/runtime-14.2.0-2-1228-20251023T164820-windows-gcc-x86_64.7z",
+      "sha256": "41dd8b642881af9f6b8274ce431f43afc9d9f67e3d628b2aa034d59c21edd11b"
+    },
+    {
+      "name": "libs/gpg-error",
+      "version": "1.56",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gpg-error/gpg-error-1.56-1228-20251023T173830-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gpg-error/gpg-error-1.56-1228-20251023T173830-windows-gcc-x86_64.7z",
+      "sha256": "e394a68399dd74942f2cb3acd5ca535d6f8da5b482f1435ff63df65361fae7ff"
+    },
+    {
+      "name": "libs/assuan2",
+      "version": "3.0.1",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/assuan2/assuan2-3.0.1-1228-20251023T174124-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/assuan2/assuan2-3.0.1-1228-20251023T174124-windows-gcc-x86_64.7z",
+      "sha256": "87dc5fd4ae7023e20e2c5c8cc55356333aa291a705ef7691cb54b458d27dbbfc"
+    },
+    {
+      "name": "libs/gcrypt",
+      "version": "1.11.2",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gcrypt/gcrypt-1.11.2-1228-20251023T174523-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gcrypt/gcrypt-1.11.2-1228-20251023T174523-windows-gcc-x86_64.7z",
+      "sha256": "262a6418c4575cdadb023f94eeb4b0ca89ded99c983fab8241d3053add06bb68"
+    },
+    {
+      "name": "libs/npth",
+      "version": "1.8",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/npth/npth-1.8-1228-20251023T174609-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/npth/npth-1.8-1228-20251023T174609-windows-gcc-x86_64.7z",
+      "sha256": "6ec5174932739c2bea3ee136638c27209e45bca5bcd1c5f8cd7bb35bbef66293"
+    },
+    {
+      "name": "libs/libksba",
+      "version": "1.6.7",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/libksba/libksba-1.6.7-1228-20251023T174817-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/libksba/libksba-1.6.7-1228-20251023T174817-windows-gcc-x86_64.7z",
+      "sha256": "b4fa5f824ffe668a6a72bf6b117e6c8061774cd41313b880cf9d6e66ae1c7bac"
+    },
+    {
+      "name": "libs/ntbtls",
+      "version": "0.3.2",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/ntbtls/ntbtls-0.3.2-1228-20251023T175522-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/ntbtls/ntbtls-0.3.2-1228-20251023T175522-windows-gcc-x86_64.7z",
+      "sha256": "fa5080efcab4ce7637ac8f087ec442fba6b1d26b58d0a1dbb0fd29f1b3b28dc0"
+    },
+    {
+      "name": "libs/gnupg",
+      "version": "2.4.8",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gnupg/gnupg-2.4.8-1228-20251023T181030-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gnupg/gnupg-2.4.8-1228-20251023T181030-windows-gcc-x86_64.7z",
+      "sha256": "a726f35a2f748d02f10239169cc0ff01b1a528270286a026fa45445c96692c28"
+    },
+    {
+      "name": "libs/gpgme/gpgme",
+      "version": "2.0.1",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gpgme/gpgme/gpgme-2.0.1-1228-20251023T181511-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/gpgme/gpgme/gpgme-2.0.1-1228-20251023T181511-windows-gcc-x86_64.7z",
+      "sha256": "f2e3f97a0a4ab4e2c100ddb40b468caa918dc7598ce2ed2386abd0214cd752f8"
+    },
+    {
+      "name": "libs/libogg",
+      "version": "1.3.3",
+      "url": "https://files.kde.org/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/libogg/libogg-1.3.3-1228-20251023T181622-windows-gcc-x86_64.7z",
+      "mirror": "https://mirrors.bfsu.edu.cn/kde-application/craft/prebuilt/25.10/windows/gcc/x86_64/RelWithDebInfo/libs/libogg/libogg-1.3.3-1228-20251023T181622-windows-gcc-x86_64.7z",
+      "sha256": "dfe44873c13993de998324cabc8395e6eb0409b40c5c72fa6891673c2ce34b5c"
+    },
+    {
+      "name": "kde/frameworks/tier2/syndication",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/syndication/syndication-6.30.0-136-20260912T114742-windows-cl-msvc2022-x86_64.7z",
+      "sha256": "66f1d2fbf62a9d530a4c886608bd7cc803058b66b15586a71a5d2fd5449b7f60"
+    }
+  ],
+  "tools": {
+    "cmake": {
+      "url": "https://github.com/Kitware/CMake/releases/download/v4.1.4/cmake-4.1.4-linux-x86_64.tar.gz",
+      "sha256": "af5c72ce7ce61607d70ff80445130f6278204aa46c45127edc0dc36e26a687b2",
+      "directory": "cmake-4.1.4-linux-x86_64"
+    },
+    "ninja": {
+      "url": "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip",
+      "sha256": "5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6"
+    },
+    "xwin": {
+      "url": "https://github.com/Jake-Shadle/xwin/releases/download/0.10.0/xwin-0.10.0-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "d870eb4b2f390878af6da1ccd3cf321d22fcb72720984853b4be732ae597fc88",
+      "directory": "xwin-0.10.0-x86_64-unknown-linux-musl"
+    }
+  },
+  "host_sources": {
+    "qtbase": {
+      "url": "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtbase-everywhere-src-6.11.1.tar.xz",
+      "sha256": "d9594a31228aa23ad6b531719a29b45f0f3989fe6c136d45767ea179f233c1ac",
+      "directory": "qtbase-everywhere-src-6.11.1"
+    },
+    "kconfig": {
+      "url": "https://download.kde.org/stable/frameworks/6.30/kconfig-6.30.0.tar.xz",
+      "sha256": "0e98bac324cd716849202d4b246a948e363d6792a8eb09c78417cdde9559f56e",
+      "directory": "kconfig-6.30.0"
+    }
+  },
+  "sdk_manifest": {
+    "url": "https://download.visualstudio.microsoft.com/download/pr/bc92e2cb-33de-4a0c-995d-efa817f16b16/6e470016e4324c84c255ffd0beb3767d17ec89cc8561e9409ee3e1f6d29400f5/VisualStudio.vsman",
+    "sha256": "f0a50ea157222c29abd5ea6ff01bfc3c33b04e011c5e45ee2ca38ef0778e5643",
+    "crt": "14.44.35226",
+    "sdk": "10.0.26100.15"
+  },
+  "crt_redist": {
+    "url": "https://download.visualstudio.microsoft.com/download/pr/45d3b8dd-bced-4b37-9974-142f748d710c/2076c0dc32095338841011431766d532479b50e1c37f17638325c792f37f9fdb/Microsoft.VC.14.44.17.14.CRT.Redist.x64.OneCore.Desktop.base.vsix",
+    "sha256": "2076c0dc32095338841011431766d532479b50e1c37f17638325c792f37f9fdb"
+  }
+}

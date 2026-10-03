@@ -13,6 +13,8 @@ network=${ANDROID_DOCKER_NETWORK:-bridge}
 output_dir="$project_dir/build-android"
 output_apk="$output_dir/okular-mobile-arm64-selection-debug.apk"
 unsigned_apk="$craft_root/tmp/okularkirigami-arm64-v8a.apk"
+craft_work_key=$(printf '%s' "$project_dir" | git -C "$project_dir" hash-object --stdin)
+craft_work_dir="$craft_root/build/okular-worktrees/${craft_work_key:0:16}/work"
 
 if [[ ! -f "$craft_root/craft/craftenv.sh" ]]; then
     echo "Craft is not initialized at $craft_root (set CRAFT_ROOT to its location)." >&2
@@ -29,7 +31,8 @@ if [[ ! -f "$keystore" ]]; then
     exit 1
 fi
 
-docker_mounts=(-v "$craft_root:/home/user/CraftRoot" -v "$source_repo:/home/user/okular-repo" -v "$source_repo:$source_repo")
+mkdir -p "$craft_work_dir"
+docker_mounts=(-v "$craft_root:/home/user/CraftRoot" -v "$craft_work_dir:/home/user/CraftRoot/build/kde/applications/okular/work" -v "$source_repo:/home/user/okular-repo" -v "$source_repo:$source_repo")
 case "$project_dir" in
     "$source_repo") container_source=/home/user/okular-repo ;;
     "$source_repo"/*) container_source="/home/user/okular-repo${project_dir#"$source_repo"}" ;;
@@ -47,15 +50,17 @@ docker run --rm --network "$network" "${docker_mounts[@]}" \
         set +u
         source /home/user/CraftRoot/craft/craftenv.sh
         set -u
-        build_dir=/home/user/CraftRoot/build/kde/applications/okular/work/build
-        if [[ -f "$build_dir/CMakeCache.txt" ]]; then
-            cached_source=$(sed -n "s/^CMAKE_HOME_DIRECTORY:INTERNAL=//p" "$build_dir/CMakeCache.txt")
-            if [[ -n "$cached_source" && "$cached_source" != "$OKULAR_SOURCE_DIR" ]]; then
-                rm -rf "$build_dir"
-            fi
+        # Fastlane requires a tracking remote for unpublished topic branches.
+        if ! git -C "$OKULAR_SOURCE_DIR" rev-parse --verify "@{upstream}" >/dev/null 2>&1; then
+            build_branch=$(git -C "$OKULAR_SOURCE_DIR" symbolic-ref --short HEAD)
+            export GIT_CONFIG_COUNT=2
+            export GIT_CONFIG_KEY_0="branch.$build_branch.remote" GIT_CONFIG_VALUE_0=origin
+            export GIT_CONFIG_KEY_1="branch.$build_branch.merge" GIT_CONFIG_VALUE_1=refs/heads/master
         fi
-        craft -i --options "okular.srcDir=$OKULAR_SOURCE_DIR" okular
+        craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" okular
+        craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --configure okular
 
+        build_dir=/home/user/CraftRoot/build/kde/applications/okular/work/build
         ninja -C "$build_dir" install
         craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --package okular
 
@@ -67,8 +72,11 @@ docker run --rm --network "$network" "${docker_mounts[@]}" \
         if [[ -n "$strip_tool" ]]; then
             "$strip_tool" "$archive/$plugin"
         fi
-        touch "$build_dir/bin/okularkirigami"
-        ninja -C "$build_dir" create-apk
+        apk_dir="$build_dir/okularkirigami_build_apk"
+        cp "$archive/$plugin" "$apk_dir/libs/arm64-v8a/$plugin"
+        (cd "$apk_dir" && ./gradlew --offline assembleRelease)
+        cp "$apk_dir/build/outputs/apk/release/okularkirigami_build_apk-release-unsigned.apk" \
+            /home/user/CraftRoot/tmp/okularkirigami-arm64-v8a.apk
     '
 
 if [[ ! -f "$unsigned_apk" ]]; then

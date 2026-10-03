@@ -13,7 +13,10 @@
 #include "dviFile.h"
 #include "pageNumber.h"
 #include "psgs.h"
+// The generated header's __STDC__ check is not valid for MSVC ABI builds.
+#define _Xconst const
 #include "psheader.cpp"
+#undef _Xconst
 
 #include <KLocalizedString>
 #include <KProcess>

@@ -79,6 +79,12 @@ cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/install/dir -DOKULAR_UI=desktop ..
 ```
 Available options are `desktop`, `mobile`, and `both`.
 
+For Windows x64 builds using Linux Clang and LLVM tools, run `make windows-cross`; see
+[Building Windows from Linux](doc/build-windows-from-linux.md).
+
+For Linux ARM64 or macOS ARM64 builds from Linux, with automatic SDK preparation, use
+`make linux-cross` or `make macos-cross`; see [Linux and macOS cross-builds](doc/build-linux-macos-cross.md).
+
 ### Dictionary lookup
 
 Word lookup uses Eudic by default. Enable automatic word lookup in settings to

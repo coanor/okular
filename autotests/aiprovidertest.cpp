@@ -1,14 +1,19 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../part/aiprovider.h"
 
+#include <QDir>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QFile>
+#include <QScopeGuard>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
+
+#include <cstdio>
 
 class FakeAiServer : public QTcpServer
 {
@@ -46,12 +51,12 @@ public:
                 if (path.endsWith("/conversations")) {
                     response.insert(QStringLiteral("id"), QStringLiteral("conv-123"));
                 } else if (path.endsWith("/responses")) {
-                    response.insert(QStringLiteral("output"), QJsonArray{QJsonObject{{QStringLiteral("content"), QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("output_text")},
-                                                                                                                                         {QStringLiteral("text"), QStringLiteral("response answer")}}}}}});
+                    response.insert(QStringLiteral("output"),
+                                    QJsonArray {QJsonObject {{QStringLiteral("content"), QJsonArray {QJsonObject {{QStringLiteral("type"), QStringLiteral("output_text")}, {QStringLiteral("text"), QStringLiteral("response answer")}}}}}});
                 } else if (path.endsWith("/chat/completions")) {
-                    response.insert(QStringLiteral("choices"), QJsonArray{QJsonObject{{QStringLiteral("message"), QJsonObject{{QStringLiteral("content"), QStringLiteral("chat answer")}}}}});
+                    response.insert(QStringLiteral("choices"), QJsonArray {QJsonObject {{QStringLiteral("message"), QJsonObject {{QStringLiteral("content"), QStringLiteral("chat answer")}}}}});
                 } else {
-                    response.insert(QStringLiteral("content"), QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), QStringLiteral("anthropic answer")}}});
+                    response.insert(QStringLiteral("content"), QJsonArray {QJsonObject {{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), QStringLiteral("anthropic answer")}}});
                 }
                 const QByteArray body = QJsonDocument(response).toJson(QJsonDocument::Compact);
                 socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body);
@@ -75,9 +80,9 @@ private Q_SLOTS:
 
         AiConversation history;
         history.instructions = QStringLiteral("Answer in Chinese with a patient tone.");
-        history.messages.append(AiMessage{QStringLiteral("user"), QStringLiteral("earlier question"), 0, QStringLiteral("earlier page text"), {}, {}});
-        history.messages.append(AiMessage{QStringLiteral("assistant"), QStringLiteral("earlier answer"), -1, {}, {}, {}});
-        AiMessage current{QStringLiteral("user"), QStringLiteral("explain equation 1.2"), 1, QStringLiteral("equation 1.2"), {}, QStringLiteral("Zm9v")};
+        history.messages.append(AiMessage {QStringLiteral("user"), QStringLiteral("earlier question"), 0, QStringLiteral("earlier page text"), {}, {}});
+        history.messages.append(AiMessage {QStringLiteral("assistant"), QStringLiteral("earlier answer"), -1, {}, {}, {}});
+        AiMessage current {QStringLiteral("user"), QStringLiteral("explain equation 1.2"), 1, QStringLiteral("equation 1.2"), {}, QStringLiteral("Zm9v")};
         history.messages.append(current);
 
         AiProfile profile;
@@ -138,25 +143,34 @@ private Q_SLOTS:
     {
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
-        QFile script(directory.filePath(QStringLiteral("codex")));
-        QVERIFY(script.open(QIODevice::WriteOnly));
-        script.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$OKULAR_AI_TEST_ARGS\"\ncat > \"$OKULAR_AI_TEST_STDIN\"\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}'\n");
-        script.close();
+#ifdef Q_OS_WIN
+        const QString executableName = QStringLiteral("codex.exe");
+#else
+        const QString executableName = QStringLiteral("codex");
+#endif
+        QFile script(directory.filePath(executableName));
+        QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), script.fileName()));
         QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
         const QByteArray previousPath = qgetenv("PATH");
+        const auto restoreEnvironment = qScopeGuard([previousPath] {
+            qputenv("PATH", previousPath);
+            qunsetenv("OKULAR_AI_TEST_ARGS");
+            qunsetenv("OKULAR_AI_TEST_STDIN");
+        });
         QByteArray testPath = QFile::encodeName(directory.path());
-        testPath += ':';
+        testPath += QDir::listSeparator().toLatin1();
         testPath += previousPath;
         qputenv("PATH", testPath);
         qputenv("OKULAR_AI_TEST_ARGS", QFile::encodeName(directory.filePath(QStringLiteral("args.txt"))));
         qputenv("OKULAR_AI_TEST_STDIN", QFile::encodeName(directory.filePath(QStringLiteral("stdin.txt"))));
+        QCOMPARE(QStandardPaths::findExecutable(QStringLiteral("codex")), script.fileName());
 
         AiProvider provider;
         QSignalSpy completed(&provider, &AiProvider::completed);
         QSignalSpy failed(&provider, &AiProvider::failed);
         AiProfile profile;
         profile.kind = AiProfile::Kind::Codex;
-        AiMessage question{QStringLiteral("user"), QStringLiteral("Why?"), 0, QStringLiteral("page text"), {}, {}};
+        AiMessage question {QStringLiteral("user"), QStringLiteral("Why?"), 0, QStringLiteral("page text"), {}, {}};
         AiConversation conversation;
         conversation.instructions = QStringLiteral("Answer in Chinese with a patient tone.");
         provider.send(profile, conversation, question);
@@ -198,11 +212,30 @@ private Q_SLOTS:
         const QByteArray overriddenArgs = args.readAll();
         QVERIFY(overriddenArgs.contains("model_reasoning_effort=medium"));
         QVERIFY(!overriddenArgs.contains("model_reasoning_effort=low"));
-        qputenv("PATH", previousPath);
-        qunsetenv("OKULAR_AI_TEST_ARGS");
-        qunsetenv("OKULAR_AI_TEST_STDIN");
     }
 };
 
-QTEST_GUILESS_MAIN(AiProviderTest)
+// Run the copied test executable as a fake CLI, without a platform shell.
+int main(int argc, char **argv)
+{
+    QCoreApplication application(argc, argv);
+    if (application.applicationName() == QLatin1String("codex")) {
+        QFile args(qEnvironmentVariable("OKULAR_AI_TEST_ARGS"));
+        QFile input(qEnvironmentVariable("OKULAR_AI_TEST_STDIN"));
+        QFile standardInput;
+        QFile standardOutput;
+        if (!args.open(QIODevice::WriteOnly) || !input.open(QIODevice::WriteOnly) || !standardInput.open(stdin, QIODevice::ReadOnly) || !standardOutput.open(stdout, QIODevice::WriteOnly)) {
+            return 1;
+        }
+        args.write(application.arguments().mid(1).join(QLatin1Char('\n')).toUtf8());
+        input.write(standardInput.readAll());
+        standardOutput.write(
+            "{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}\n"
+            "{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}\n");
+        return 0;
+    }
+    AiProviderTest test;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&test, argc, argv);
+}
 #include "aiprovidertest.moc"

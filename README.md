@@ -85,6 +85,16 @@ For Windows x64 builds using Linux Clang and LLVM tools, run `make windows-cross
 For Linux ARM64 or macOS ARM64 builds from Linux, with automatic SDK preparation, use
 `make linux-cross` or `make macos-cross`; see [Linux and macOS cross-builds](doc/build-linux-macos-cross.md).
 
+### Dictionary lookup
+
+Word lookup uses Eudic by default. Enable automatic word lookup in settings to
+look up a selected word. Android uses Eudic's popup lookup.
+
+The package includes the MDX parser, and you can import your own MDX file for
+offline lookup. Leave the dictionary path empty, or choose **Use Eudic** on
+mobile, to use Eudic. Dictionary data is not downloaded or embedded during the
+build. Set `-DOKULAR_USE_BUNDLED_MDICT=OFF` to use a system mdict-cpp installation.
+
 ### Android APK
 
 With Docker, an initialized Android Craft root next to the main checkout (`craft-kde-android`), Android SDK build tools 36.0.0, and an Android debug keystore, build and sign the arm64 APK with:
@@ -93,7 +103,16 @@ With Docker, an initialized Android Craft root next to the main checkout (`craft
 make android-apk
 ```
 
+The target loads `~/.local/share/okular-android/environment.sh` when it exists
+and uses `sg docker` if the current shell lacks access to the Docker socket.
+Set `ANDROID_ENV_FILE=/path/to/environment.sh` to use another environment file.
+
 The APK is written to `build-android/okular-mobile-arm64-selection-debug.apk`. Set `CRAFT_ROOT`, `ANDROID_SDK_ROOT`, `ANDROID_BUILD_TOOLS_DIR`, or `ANDROID_KEYSTORE` if they are in other locations. See [KDE's Android Craft setup guide](https://develop.kde.org/docs/packaging/android/building_applications/) for the initial Craft setup.
+
+The build forwards HTTP proxy environment variables to the container. Set
+`ANDROID_DOCKER_NETWORK=host` when the proxy listens on the WSL host's loopback
+address. Gradle uses Java proxy settings from
+`$CRAFT_ROOT/gradle-home/gradle.properties`.
 
 ### clang-format
 

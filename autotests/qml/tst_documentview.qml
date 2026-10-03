@@ -167,6 +167,51 @@ TestCase {
         compare(clickedSpy.count, count, "Dismissing a selection should not toggle controls");
     }
 
+    function test_selectionOnAdjacentPageUsesItsWord() {
+        const delegate = visiblePages().find(item => item.pageNumber === 1);
+        verify(delegate !== undefined);
+        const page = delegate.pageItem;
+        const word = page.mapToItem(view, page.width * 0.22, page.height * 0.162);
+        const currentPage = view.document.currentPage;
+        const touch = touchEvent(view);
+        touch.press(0, view, word.x, word.y).commit();
+        wait(1000);
+        verify(view.hasSelection);
+        compare(view.selectionPage, page);
+        compare(view.document.currentPage, currentPage, "Selection must not reposition continuous scrolling");
+        verify(view.selectionPage.selectedWord.length > 0);
+        verify(view.selectingText, "The magnifier should follow the finger on the selected page");
+        touch.release(0, view, word.x, word.y).commit();
+        tryCompare(view, "selectingText", false);
+    }
+
+    function test_dictionaryWaitsForSelectionRelease() {
+        const enabled = Okular.DictionaryLookup.autoLookupEnabled;
+        const file = Okular.DictionaryLookup.dictionaryFile;
+        // Exercise the real lookup scheduling without launching an external app.
+        Okular.DictionaryLookup.dictionaryFile = "/nonexistent/test-dictionary.mdx";
+        Okular.DictionaryLookup.autoLookupEnabled = true;
+        Okular.DictionaryLookup.clear();
+        try {
+            const page = view.page;
+            const word = page.mapToItem(view, page.width * 0.22, page.height * 0.162);
+            const touch = touchEvent(view);
+            touch.press(0, view, word.x, word.y).commit();
+            wait(1000);
+            verify(view.hasSelection);
+            compare(Okular.DictionaryLookup.word, "", "Lookup must wait even if the finger pauses");
+            const selectedWord = view.selectionPage.selectedWord;
+            touch.release(0, view, word.x, word.y).commit();
+            tryCompare(Okular.DictionaryLookup, "word", selectedWord);
+            view.clearSelection();
+            compare(Okular.DictionaryLookup.word, "");
+        } finally {
+            Okular.DictionaryLookup.autoLookupEnabled = enabled;
+            Okular.DictionaryLookup.dictionaryFile = file;
+            Okular.DictionaryLookup.clear();
+        }
+    }
+
     function test_resetZoomUpdatesCurrentPage() {
         view.document.currentPage = 10;
         view.zoomAt(3, Qt.point(180, 450));

@@ -9,6 +9,7 @@ sdk_root=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-"$HOME/.local/android-sdk"}}
 build_tools=${ANDROID_BUILD_TOOLS_DIR:-"$sdk_root/build-tools/36.0.0"}
 keystore=${ANDROID_KEYSTORE:-"$HOME/.android/debug.keystore"}
 image=${ANDROID_CRAFT_IMAGE:-invent-registry.kde.org/sysadmin/ci-images/android-qt611}
+network=${ANDROID_DOCKER_NETWORK:-bridge}
 output_dir="$project_dir/build-android"
 output_apk="$output_dir/okular-mobile-arm64-selection-debug.apk"
 unsigned_apk="$craft_root/tmp/okularkirigami-arm64-v8a.apk"
@@ -41,7 +42,8 @@ case "$project_dir" in
         ;;
 esac
 
-docker run --rm "${docker_mounts[@]}" \
+docker run --rm --network "$network" "${docker_mounts[@]}" \
+    -e http_proxy -e https_proxy -e HTTP_PROXY -e HTTPS_PROXY -e no_proxy -e NO_PROXY \
     -e GRADLE_USER_HOME=/home/user/CraftRoot/gradle-home \
     -e "OKULAR_SOURCE_DIR=$container_source" \
     "$image" bash -euo pipefail -c '

@@ -1685,67 +1685,71 @@ TextEntity::List TextPage::words(const RegularAreaRect *area, TextAreaInclusionB
 
 std::unique_ptr<RegularAreaRect> TextPage::wordAt(const NormalizedPoint &p) const
 {
-    TextEntity::List::ConstIterator itBegin = d->m_words.constBegin(), itEnd = d->m_words.constEnd();
-    TextEntity::List::ConstIterator it = itBegin;
-    TextEntity::List::ConstIterator posIt = itEnd;
-    for (; it != itEnd; ++it) {
-        if (it->area().contains(p.x, p.y)) {
-            posIt = it;
+    const auto &words = d->m_words;
+    qsizetype position = -1;
+    for (qsizetype i = 0; i < words.size(); ++i) {
+        if (words[i].area().contains(p.x, p.y)) {
+            position = i;
             break;
         }
     }
-    if (posIt != itEnd) {
-        if (posIt->text().simplified().isEmpty()) {
-            auto ret = std::make_unique<RegularAreaRect>();
-            ret->appendShape(posIt->area());
-            return ret;
-        }
-        // Find the first TinyTextEntity of the word
-        while (posIt != itBegin) {
-            --posIt;
-            const QString itText = posIt->text();
-            if (itText.right(1).at(0).isSpace()) {
-                if (itText.endsWith(QLatin1String("-\n"))) {
-                    // Is an hyphenated word
-                    // continue searching the start of the word back
-                    continue;
-                }
-
-                if (itText == QLatin1String("\n") && posIt != itBegin) {
-                    --posIt;
-                    if (posIt->text().endsWith(QLatin1String("-"))) {
-                        // Is an hyphenated word
-                        // continue searching the start of the word back
-                        continue;
-                    }
-                    ++posIt;
-                }
-
-                ++posIt;
-                break;
-            }
-        }
-        auto ret = std::make_unique<RegularAreaRect>();
-        QString foundWord;
-        for (; posIt != itEnd; ++posIt) {
-            const QString itText = posIt->text();
-            if (itText.simplified().isEmpty()) {
-                break;
-            }
-
-            ret->appendShape(posIt->area());
-            foundWord += posIt->text();
-            if (itText.right(1).at(0).isSpace()) {
-                if (!foundWord.endsWith(QLatin1String("-\n"))) {
-                    break;
-                }
-            }
-        }
-
-        return ret;
-    } else {
+    if (position < 0) {
         return nullptr;
     }
+    auto ret = std::make_unique<RegularAreaRect>();
+    if (words[position].text().trimmed().isEmpty()) {
+        ret->appendShape(words[position].area());
+        return ret;
+    }
+
+    // PDF text often has no newline entity. Use the character geometry as well
+    // as explicit whitespace to recognize the boundary between two lines.
+    const auto joinsWord = [&words](qsizetype left, qsizetype right) {
+        const QString leftText = words[left].text();
+        const QString rightText = words[right].text();
+        const auto leftArea = words[left].area();
+        const auto rightArea = words[right].area();
+        bool lineBreak = !doesConsumeY(leftArea, rightArea, 70);
+        bool space = right > left + 1 || leftText.back().isSpace() || rightText.front().isSpace();
+        for (qsizetype i = left; i < right; ++i) {
+            const QString text = words[i].text();
+            lineBreak |= text.contains(QLatin1Char('\n')) || text.contains(QLatin1Char('\r'));
+        }
+        if (!lineBreak) {
+            return !space;
+        }
+        const QString trimmed = leftText.trimmed();
+        const QChar last = trimmed.back();
+        const double lineHeight = qMax(leftArea.bottom - leftArea.top, rightArea.bottom - rightArea.top);
+        return (last == QLatin1Char('-') || last == QChar(0x00ad)) && rightText.trimmed().front().isLetterOrNumber() && rightArea.top - leftArea.bottom <= 1.5 * lineHeight;
+    };
+
+    qsizetype first = position;
+    while (first > 0) {
+        qsizetype previous = first - 1;
+        while (previous > 0 && words[previous].text().trimmed().isEmpty()) {
+            --previous;
+        }
+        if (words[previous].text().trimmed().isEmpty() || !joinsWord(previous, first)) {
+            break;
+        }
+        first = previous;
+    }
+    qsizetype last = position;
+    while (last + 1 < words.size()) {
+        qsizetype next = last + 1;
+        while (next < words.size() && words[next].text().trimmed().isEmpty()) {
+            ++next;
+        }
+        if (next == words.size() || !joinsWord(last, next)) {
+            break;
+        }
+        last = next;
+    }
+    for (qsizetype i = first; i <= last; ++i) {
+        ret->appendShape(words[i].area());
+    }
+    return ret;
 }
 
 std::unique_ptr<RegularAreaRect> TextPage::lineAt(const NormalizedPoint &p) const

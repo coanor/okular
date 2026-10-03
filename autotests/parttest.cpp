@@ -36,21 +36,27 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QFutureWatcher>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QScopeGuard>
+#include <QSemaphore>
 #include <QTabletEvent>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTextEdit>
+#include <QThreadPool>
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
+#include <QToolTip>
 #include <QTreeView>
 #include <QUrl>
 #include <QUuid>
+#include <QtConcurrent>
 
 namespace Okular
 {
@@ -74,6 +80,8 @@ private Q_SLOTS:
     void testForwardPDF_data();
     void testGeneratorPreferences();
     void testSelectText();
+    void testAutomaticDictionaryLookup();
+    void testLocalMdxDictionaryLookup();
     void testSelectTextMultiline();
     void testCopyTextSelectionModes();
     void testCopyTextWithoutLineBreaksMultiline();
@@ -310,6 +318,120 @@ void PartTest::testSelectText()
     QVERIFY(QMetaObject::invokeMethod(part.m_pageView, "copyTextSelection", Q_ARG(PageView::TextCopyMode, PageView::TextCopyMode::AsProvided)));
 
     QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("Hola que tal"));
+}
+
+void PartTest::testAutomaticDictionaryLookup()
+{
+    const bool previousSetting = Okular::Settings::autoLookupSelectedWords();
+    const QString previousDictionaryFile = Okular::Settings::dictionaryFile();
+    Okular::Settings::setAutoLookupSelectedWords(true);
+    Okular::Settings::setDictionaryFile(QString());
+    QDesktopServices::setUrlHandler(QStringLiteral("eudic"), this, "urlHandler");
+    const auto restoreSettings = qScopeGuard([previousSetting, previousDictionaryFile] {
+        QDesktopServices::unsetUrlHandler(QStringLiteral("eudic"));
+        Okular::Settings::setAutoLookupSelectedWords(previousSetting);
+        Okular::Settings::setDictionaryFile(previousDictionaryFile);
+    });
+    QSignalSpy lookupSpy(this, &PartTest::urlHandler);
+
+    QVariantList dummyArgs;
+    Okular::Part part(nullptr, dummyArgs);
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file2.pdf")));
+    part.widget()->show();
+    if (qgetenv("KDECI_CANNOT_CREATE_WINDOWS") == "1") {
+        QSKIP("KDE CI can't create a window on this platform, skipping some gui tests");
+    }
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
+    QTRY_VERIFY(part.m_document->page(0)->hasPixmap(part.m_pageView));
+    QVERIFY(QMetaObject::invokeMethod(part.m_pageView, "slotSetMouseTextSelect"));
+
+    const int width = part.m_pageView->horizontalScrollBar()->maximum() + part.m_pageView->viewport()->width();
+    const int height = part.m_pageView->verticalScrollBar()->maximum() + part.m_pageView->viewport()->height();
+    const QPoint wordPosition(width * 0.14, height * 0.052);
+
+    QTest::mouseMove(part.m_pageView->viewport(), wordPosition);
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, wordPosition);
+    QTRY_COMPARE_WITH_TIMEOUT(lookupSpy.count(), 1, QApplication::doubleClickInterval() + 1000);
+    QCOMPARE(lookupSpy.takeFirst().at(0).value<QUrl>(), QUrl(QStringLiteral("eudic://dict/Hola")));
+
+    simulateMouseSelection(width * 0.12, wordPosition.y(), width * 0.16, wordPosition.y(), part.m_pageView->viewport());
+    QTRY_COMPARE(lookupSpy.count(), 1);
+    QCOMPARE(lookupSpy.takeFirst().at(0).value<QUrl>(), QUrl(QStringLiteral("eudic://dict/Hola")));
+
+    Okular::Settings::setAutoLookupSelectedWords(false);
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, wordPosition);
+    QTest::qWait(QApplication::doubleClickInterval() + 100);
+    QCOMPARE(lookupSpy.count(), 0);
+
+    Okular::Settings::setAutoLookupSelectedWords(true);
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, wordPosition);
+    QTest::mouseClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, wordPosition);
+    QTest::qWait(QApplication::doubleClickInterval() + 100);
+    QCOMPARE(lookupSpy.count(), 0);
+
+    simulateMouseSelection(width * 0.12, wordPosition.y(), width * 0.7, wordPosition.y(), part.m_pageView->viewport());
+    QCOMPARE(lookupSpy.count(), 0);
+}
+
+void PartTest::testLocalMdxDictionaryLookup()
+{
+    const QString dictionaryFile = QString::fromLocal8Bit(qgetenv("OKULAR_TEST_MDX"));
+    if (dictionaryFile.isEmpty()) {
+        QSKIP("Set OKULAR_TEST_MDX to an English-Chinese MDX file to test local dictionary lookup");
+    }
+    const bool previousSetting = Okular::Settings::autoLookupSelectedWords();
+    const QString previousDictionaryFile = Okular::Settings::dictionaryFile();
+    Okular::Settings::setAutoLookupSelectedWords(true);
+    Okular::Settings::setDictionaryFile(dictionaryFile);
+    const auto restoreSettings = qScopeGuard([previousSetting, previousDictionaryFile] {
+        QToolTip::hideText();
+        Okular::Settings::setAutoLookupSelectedWords(previousSetting);
+        Okular::Settings::setDictionaryFile(previousDictionaryFile);
+    });
+
+    QVariantList dummyArgs;
+    Okular::Part part(nullptr, dummyArgs);
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file2.pdf")));
+    part.widget()->show();
+    if (qgetenv("KDECI_CANNOT_CREATE_WINDOWS") == "1") {
+        QSKIP("KDE CI can't create a window on this platform, skipping some gui tests");
+    }
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
+    QTRY_VERIFY(part.m_document->page(0)->hasPixmap(part.m_pageView));
+    QVERIFY(QMetaObject::invokeMethod(part.m_pageView, "slotSetMouseTextSelect"));
+
+    const int width = part.m_pageView->horizontalScrollBar()->maximum() + part.m_pageView->viewport()->width();
+    const int height = part.m_pageView->verticalScrollBar()->maximum() + part.m_pageView->viewport()->height();
+    const QPoint wordPosition(width * 0.14, height * 0.052);
+    QTest::mouseMove(part.m_pageView->viewport(), wordPosition);
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, wordPosition);
+    QTRY_VERIFY_WITH_TIMEOUT(QToolTip::text().contains(QStringLiteral("你好")), 5000);
+
+    // Hold the lookup worker so disabling automatic lookup races with a real
+    // pending result, rather than merely stopping the double-click timer.
+    QTRY_VERIFY(part.m_pageView->findChildren<QFutureWatcherBase *>().isEmpty());
+    QToolTip::hideText();
+    QTRY_VERIFY(QToolTip::text().isEmpty());
+    QThreadPool *pool = QThreadPool::globalInstance();
+    const int previousThreadCount = pool->maxThreadCount();
+    pool->setMaxThreadCount(1);
+    QSemaphore entered, unblock;
+    auto blocker = QtConcurrent::run([&] {
+        entered.release();
+        unblock.acquire();
+    });
+    const auto restorePool = qScopeGuard([&] {
+        unblock.release();
+        blocker.waitForFinished();
+        pool->setMaxThreadCount(previousThreadCount);
+    });
+    QVERIFY(entered.tryAcquire(1, 5000));
+    simulateMouseSelection(width * 0.12, wordPosition.y(), width * 0.16, wordPosition.y(), part.m_pageView->viewport());
+    QTRY_VERIFY(!part.m_pageView->findChildren<QFutureWatcherBase *>().isEmpty());
+    Okular::Settings::setAutoLookupSelectedWords(false);
+    unblock.release();
+    QTRY_VERIFY(part.m_pageView->findChildren<QFutureWatcherBase *>().isEmpty());
+    QVERIFY(QToolTip::text().isEmpty());
 }
 
 void PartTest::testSelectTextMultiline()

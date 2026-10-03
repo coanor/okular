@@ -6,5 +6,5 @@ Mutators=true
 Singleton=true
 Visibility=
 IncludeFiles=settings_core.h
-SourceIncludeFiles=qdom.h,QStandardPaths
+SourceIncludeFiles=qdom.h,QStandardPaths,QFile
 MemberVariables=dpointer

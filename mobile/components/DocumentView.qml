@@ -21,6 +21,11 @@ QQC2.ScrollView {
     property PageItem selectionPage: null
     readonly property bool hasSelection: selectionPage !== null && selectionPage.hasSelection
     property bool positioning: false
+    property Item selectionInput: null
+    property point selectionFocus
+    readonly property bool selectingText: (selectionInput !== null && selectionInput.longPressSelecting) ||
+                                          (selectionOverlayLoader.item !== null && selectionOverlayLoader.item.handlePressed)
+    onSelectionPageChanged: DictionaryLookup.clear()
 
     signal clicked
     signal urlOpened
@@ -28,7 +33,30 @@ QQC2.ScrollView {
     clip: true
     padding: 0
 
+    SelectionLookupTimer {
+        id: dictionaryTimer
+        word: root.selectionPage ? root.selectionPage.selectedWord : ""
+        enabled: DictionaryLookup.autoLookupEnabled
+        selecting: root.selectingText || (root.selectionInput !== null && root.selectionInput.pressed)
+        onLookupRequested: word => DictionaryLookup.lookup(word)
+    }
+    Connections {
+        target: root.selectionPage
+        function onSelectionChanged() {
+            DictionaryLookup.clear()
+        }
+    }
+    Connections {
+        target: DictionaryLookup
+        function onDictionaryFileChanged() {
+            dictionaryTimer.restartWhenReady()
+        }
+    }
+
     function clearSelection() {
+        dictionaryTimer.stop();
+        DictionaryLookup.clear();
+        selectionInput = null;
         if (selectionPage) {
             selectionPage.clearSelection();
             selectionPage = null;
@@ -110,6 +138,14 @@ QQC2.ScrollView {
         }
     }
 
+    SelectionMagnifier {
+        parent: root
+        z: 10
+        sourceItem: root.selectionPage
+        focusPoint: root.selectionFocus
+        visible: root.hasSelection && root.selectingText
+    }
+
     contentItem: ListView {
         id: flick
         model: root.document ? root.document.pageCount : 0
@@ -139,17 +175,26 @@ QQC2.ScrollView {
                 anchors.fill: parent
                 property bool longPressSelecting: false
                 property bool suppressClick: false
+                property bool longPressExtended: false
+                property bool dragStartHandle: false
+                property point longPressOrigin
+                pressAndHoldInterval: 450
                 preventStealing: longPressSelecting
 
                 onPressed: {
                     longPressSelecting = false;
+                    longPressExtended = false;
                     suppressClick = root.hasSelection;
                     root.clearSelection();
+                    root.selectionInput = mouseArea;
                 }
                 onPressAndHold: mouse => {
                     root.clearSelection();
                     const pos = mapToItem(pageDelegate.pageItem, mouse.x, mouse.y);
                     longPressSelecting = pageDelegate.pageItem.selectWordAt(pos.x, pos.y);
+                    longPressOrigin = pos;
+                    root.selectionFocus = pos;
+                    root.selectionInput = mouseArea;
                     if (longPressSelecting) {
                         root.selectionPage = pageDelegate.pageItem;
                         suppressClick = true;
@@ -158,7 +203,18 @@ QQC2.ScrollView {
                 onPositionChanged: mouse => {
                     if (longPressSelecting) {
                         const pos = mapToItem(pageDelegate.pageItem, mouse.x, mouse.y);
-                        pageDelegate.pageItem.moveSelectionHandle(false, pos.x, pos.y);
+                        const dx = pos.x - longPressOrigin.x;
+                        const dy = pos.y - longPressOrigin.y;
+                        // Finger jitter must not shrink the initially selected word.
+                        if (!longPressExtended) {
+                            if (dx * dx + dy * dy < 12 * 12) {
+                                return;
+                            }
+                            dragStartHandle = dy < -8 || (Math.abs(dy) <= 8 && dx < 0);
+                            longPressExtended = true;
+                        }
+                        pageDelegate.pageItem.moveSelectionHandle(dragStartHandle, pos.x, pos.y);
+                        root.selectionFocus = dragStartHandle ? pageDelegate.pageItem.selectionStart : pageDelegate.pageItem.selectionEnd;
                     }
                 }
                 onReleased: longPressSelecting = false
@@ -216,6 +272,7 @@ QQC2.ScrollView {
         }
 
         Loader {
+            id: selectionOverlayLoader
             parent: flick
             anchors.fill: parent
             z: 5
@@ -223,23 +280,45 @@ QQC2.ScrollView {
             sourceComponent: Item {
                 id: selectionOverlay
                 anchors.fill: parent
+                readonly property bool handlePressed: startHandleMouse.pressed || endHandleMouse.pressed
                 QQC2.ToolBar {
                     id: selectionMenu
                     z: 5
-                    visible: root.selectionPage.hasSelection
+                    visible: root.hasSelection && !root.selectingText
+                    width: Math.min(selectionOverlay.width - 16, Math.max(280, selectionActions.implicitWidth))
                     x: Math.max(0, Math.min(selectionOverlay.width - width, root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).x - width / 2))
                     y: Math.max(0, root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).y - height - 12)
 
-                    contentItem: Row {
-                        QQC2.ToolButton {
-                            text: i18n("Copy")
-                            enabled: root.selectionPage.canCopySelection
-                            onClicked: root.selectionPage.copySelection()
+                    contentItem: Column {
+                        spacing: 4
+                        Row {
+                            id: selectionActions
+                            QQC2.ToolButton {
+                                text: i18n("Copy")
+                                enabled: root.selectionPage.canCopySelection
+                                onClicked: root.selectionPage.copySelection()
+                            }
+                            QQC2.ToolButton {
+                                text: i18n("Highlight")
+                                enabled: root.selectionPage.canHighlightSelection
+                                onClicked: root.selectionPage.highlightSelection()
+                            }
+                            QQC2.ToolButton {
+                                text: i18n("Look up")
+                                enabled: !!root.selectionPage.selectedWord
+                                onClicked: DictionaryLookup.retry(root.selectionPage.selectedWord)
+                            }
                         }
-                        QQC2.ToolButton {
-                            text: i18n("Highlight")
-                            enabled: root.selectionPage.canHighlightSelection
-                            onClicked: root.selectionPage.highlightSelection()
+                        QQC2.Label {
+                            width: parent.width
+                            visible: !!DictionaryLookup.word && DictionaryLookup.word === root.selectionPage.selectedWord &&
+                                     (DictionaryLookup.loading || !!DictionaryLookup.definition || !!DictionaryLookup.error)
+                            text: DictionaryLookup.loading ? i18n("Looking up %1…", DictionaryLookup.word) :
+                                  DictionaryLookup.word + "\n" + (DictionaryLookup.definition || DictionaryLookup.error)
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 8
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
                         }
                     }
                 }
@@ -263,10 +342,22 @@ QQC2.ScrollView {
                         anchors.centerIn: parent
                     }
                     MouseArea {
+                        id: startHandleMouse
                         anchors.fill: parent
+                        preventStealing: true
+                        property point grabOffset
+                        onPressed: mouse => {
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            grabOffset = Qt.point(pos.x - root.selectionPage.selectionStart.x, pos.y - root.selectionPage.selectionStart.y);
+                            root.selectionFocus = root.selectionPage.selectionStart;
+                        }
                         onPositionChanged: mouse => {
-                            var pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
-                            root.selectionPage.moveSelectionHandle(true, pos.x, pos.y);
+                            if (!pressed) {
+                                return;
+                            }
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            root.selectionPage.moveSelectionHandle(true, pos.x - grabOffset.x, pos.y - grabOffset.y);
+                            root.selectionFocus = root.selectionPage.selectionStart;
                         }
                     }
                 }
@@ -290,10 +381,22 @@ QQC2.ScrollView {
                         anchors.centerIn: parent
                     }
                     MouseArea {
+                        id: endHandleMouse
                         anchors.fill: parent
+                        preventStealing: true
+                        property point grabOffset
+                        onPressed: mouse => {
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            grabOffset = Qt.point(pos.x - root.selectionPage.selectionEnd.x, pos.y - root.selectionPage.selectionEnd.y);
+                            root.selectionFocus = root.selectionPage.selectionEnd;
+                        }
                         onPositionChanged: mouse => {
-                            var pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
-                            root.selectionPage.moveSelectionHandle(false, pos.x, pos.y);
+                            if (!pressed) {
+                                return;
+                            }
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            root.selectionPage.moveSelectionHandle(false, pos.x - grabOffset.x, pos.y - grabOffset.y);
+                            root.selectionFocus = root.selectionPage.selectionEnd;
                         }
                     }
                 }

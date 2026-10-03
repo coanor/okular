@@ -26,6 +26,8 @@
 #include <QDesktopServices>
 #include <QElapsedTimer>
 #include <QEvent>
+#include <QFileInfo>
+#include <QFutureWatcher>
 #include <QGestureEvent>
 #include <QImage>
 #include <QInputDialog>
@@ -41,6 +43,8 @@
 #include <QSet>
 #include <QTimer>
 #include <QToolTip>
+#include <QUrl>
+#include <QtConcurrent>
 
 #include <KActionCollection>
 #include <KActionMenu>
@@ -77,6 +81,7 @@
 #include "gui/guiutils.h"
 #include "gui/pagepainter.h"
 #include "gui/priorities.h"
+#include "gui/textselectionutils.h"
 #include "okmenutitle.h"
 #include "pageviewannotator.h"
 #include "pageviewmouseannotation.h"
@@ -98,6 +103,7 @@
 #include "core/tile.h"
 #include "kleopatraintegration.h"
 #include "magnifierview.h"
+#include "mdxdictionary.h"
 #include "settings.h"
 #include "settings_core.h"
 #include "signaturepartutils.h"
@@ -153,6 +159,7 @@ public:
     OkularTTS *tts();
 #endif
     QString selectedText() const;
+    QString selectedDictionaryWord() const;
 
     // the document, pageviewItems and the 'visible cache'
     PageView *q;
@@ -174,6 +181,9 @@ public:
     QColor mouseSelectionColor;
     bool mouseTextSelecting = false;
     QSet<int> pagesWithTextSelection;
+    QTimer dictionaryLookupTimer;
+    QString pendingDictionaryWord;
+    int dictionaryLookupRequest = 0;
     bool mouseOnRect = false;
     int mouseMode = 0;
     MouseAnnotation *mouseAnnotation = nullptr;
@@ -348,6 +358,12 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->mouseMode = Okular::Settings::mouseMode();
     d->mouseAnnotation = new MouseAnnotation(this, document);
     d->messageWindow = new PageViewMessage(this);
+    d->dictionaryLookupTimer.setSingleShot(true);
+    connect(&d->dictionaryLookupTimer, &QTimer::timeout, this, [this] {
+        if (d->selectedDictionaryWord() == d->pendingDictionaryWord) {
+            lookupSelectedWord();
+        }
+    });
     d->setting_viewCols = Okular::Settings::viewColumns();
     d->rtl_Mode = Okular::Settings::rtlReadingDirection();
 
@@ -1034,6 +1050,96 @@ QString PageViewPrivate::selectedText() const
     return text;
 }
 
+QString PageViewPrivate::selectedDictionaryWord() const
+{
+    if (pagesWithTextSelection.size() != 1) {
+        return {};
+    }
+    const Okular::Page *page = document->page(*pagesWithTextSelection.constBegin());
+    if (!page) {
+        return {};
+    }
+    const auto entities = page->words(page->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    QTransform unrotate;
+    unrotate.translate(0.5, 0.5);
+    unrotate.rotate(-90 * int(page->rotation()));
+    unrotate.translate(-0.5, -0.5);
+    return MdxDictionary::word(TextSelectionUtils::selectionText(entities, unrotate));
+}
+
+void PageView::lookupSelectedWord(bool waitForTripleClick)
+{
+    if (!Okular::Settings::autoLookupSelectedWords() || !d->document->isAllowed(Okular::AllowCopy)) {
+        return;
+    }
+
+    const QString word = d->selectedDictionaryWord();
+    if (word.isEmpty()) {
+        return;
+    }
+
+    if (waitForTripleClick) {
+        d->pendingDictionaryWord = word;
+        d->dictionaryLookupTimer.start(QApplication::doubleClickInterval());
+        return;
+    }
+
+    const QString dictionaryFile = Okular::Settings::dictionaryFile().trimmed();
+    if (!dictionaryFile.isEmpty()) {
+        ++d->dictionaryLookupRequest;
+        static QString warnedDictionaryFile;
+        const QFileInfo dictionaryInfo(dictionaryFile);
+        if (!dictionaryInfo.isFile() || dictionaryInfo.suffix().compare(QLatin1String("mdx"), Qt::CaseInsensitive) != 0) {
+            if (warnedDictionaryFile != dictionaryFile) {
+                warnedDictionaryFile = dictionaryFile;
+                KMessageBox::information(this, i18n("Select a valid MDX dictionary file in Okular's General settings."), i18n("Dictionary Lookup"));
+            }
+            return;
+        }
+#if HAVE_MDICT
+        const int request = d->dictionaryLookupRequest;
+        const QPoint position = QCursor::pos();
+        auto *watcher = new QFutureWatcher<QString>(this);
+        connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, request, word, position, dictionaryFile] {
+            const QString definition = watcher->result();
+            watcher->deleteLater();
+            if (request != d->dictionaryLookupRequest || !Okular::Settings::autoLookupSelectedWords() || !d->document->isAllowed(Okular::AllowCopy) || Okular::Settings::dictionaryFile().trimmed() != dictionaryFile ||
+                d->selectedDictionaryWord() != word) {
+                return;
+            }
+            const QString summary = definition.isEmpty() ? i18n("No definition found in the selected MDX dictionary.") : MdxDictionary::summary(definition);
+            const QString tooltip = QStringLiteral("<b>%1</b><br>%2").arg(word.toHtmlEscaped(), summary.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br>")));
+            QToolTip::showText(position, tooltip, viewport());
+        });
+        watcher->setFuture(QtConcurrent::run([dictionaryFile, word] { return MdxDictionary::lookup(dictionaryFile, word); }));
+#else
+        if (warnedDictionaryFile != dictionaryFile) {
+            warnedDictionaryFile = dictionaryFile;
+            KMessageBox::information(this, i18n("This Okular build does not include MDX support. Install mdict-cpp and rebuild Okular."), i18n("Dictionary Lookup"));
+        }
+#endif
+        return;
+    }
+
+    static bool eudicUnavailable = false;
+    if (eudicUnavailable) {
+        return;
+    }
+
+    QUrl url;
+    url.setScheme(QStringLiteral("eudic"));
+    url.setHost(QStringLiteral("dict"));
+    url.setPath(QLatin1Char('/') + word);
+    if (!QDesktopServices::openUrl(url)) {
+        eudicUnavailable = true;
+        KMessageBox::information(this,
+                                 i18n("Could not open Eudic. <a href=\"https://www.eudic.net/v4/en/app/download\">Download Eudic</a> to use automatic word lookup."),
+                                 i18n("Dictionary Lookup"),
+                                 QString(),
+                                 KMessageBox::Notify | KMessageBox::AllowLink);
+    }
+}
+
 QMimeData *PageView::getTableContents() const
 {
     QString selText;
@@ -1253,6 +1359,8 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
 
     // mouseAnnotation must not access our PageViewItem widgets any longer
     d->mouseAnnotation->reset();
+    d->dictionaryLookupTimer.stop();
+    ++d->dictionaryLookupRequest;
 
     // delete all widgets (one for each page in pageSet)
     qDeleteAll(d->items);
@@ -2411,6 +2519,8 @@ void PageView::mousePressEvent(QMouseEvent *e)
         return;
     }
 
+    d->dictionaryLookupTimer.stop();
+
     // if performing a selection or dyn zooming, disable mouse press
     if (d->mouseSelecting || (e->button() != Qt::MiddleButton && (e->buttons() & Qt::MiddleButton))) {
         return;
@@ -3128,6 +3238,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                     if (cb->supportsSelection()) {
                         cb->setText(text, QClipboard::Selection);
                     }
+                    lookupSelectedWord();
                 }
             }
         } else if (!d->mousePressPos.isNull() && rightButton) {
@@ -3351,6 +3462,7 @@ void PageView::mouseDoubleClickEvent(QMouseEvent *e)
                             if (cb->supportsSelection()) {
                                 cb->setText(text, QClipboard::Selection);
                             }
+                            lookupSelectedWord(true);
                         }
                     }
 
@@ -3820,6 +3932,8 @@ PageViewItem *PageView::pickItemOnPoint(int x, int y)
 
 void PageView::textSelectionClear()
 {
+    d->dictionaryLookupTimer.stop();
+    ++d->dictionaryLookupRequest;
     // something to clear
     if (!d->pagesWithTextSelection.isEmpty()) {
         for (const int page : std::as_const(d->pagesWithTextSelection)) {

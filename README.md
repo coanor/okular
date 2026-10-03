@@ -79,6 +79,25 @@ cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/install/dir -DOKULAR_UI=desktop ..
 ```
 Available options are `desktop`, `mobile`, and `both`.
 
+### Built-in dictionary
+
+Desktop and mobile builds include the bundled MDX parser and the
+[ECDICT 1.0.28 English-Chinese dictionary](https://github.com/skywind3000/ECDICT/releases/tag/1.0.28)
+by default. CMake downloads the pinned archive (about 93 MiB) and verifies its
+SHA-256 checksum. The dictionary and its MIT license are embedded in the package;
+word lookup works offline after installation. Enable automatic word lookup in
+settings to show definitions when selecting a word.
+
+The built-in dictionary is selected for new configurations. Existing custom MDX
+paths and explicit Eudic selections are preserved. On mobile, use **Use built-in**
+to restore ECDICT or **Use Eudic** to switch to Eudic. On desktop, restore the
+General settings defaults to select ECDICT again.
+
+For an offline build, pass `-DOKULAR_DICTIONARY_FILE=/path/to/ecdict.mdx`.
+Set `-DOKULAR_BUNDLE_DICTIONARY=OFF` to omit the dictionary, or
+`-DOKULAR_USE_BUNDLED_MDICT=OFF` to use a system mdict-cpp installation.
+See [thirdparty/ecdict/README.okular](thirdparty/ecdict/README.okular) for attribution.
+
 ### Android APK
 
 With Docker, an initialized Android Craft root next to the main checkout (`craft-kde-android`), Android SDK build tools 36.0.0, and an Android debug keystore, build and sign the arm64 APK with:
@@ -87,7 +106,16 @@ With Docker, an initialized Android Craft root next to the main checkout (`craft
 make android-apk
 ```
 
+The target loads `~/.local/share/okular-android/environment.sh` when it exists
+and uses `sg docker` if the current shell lacks access to the Docker socket.
+Set `ANDROID_ENV_FILE=/path/to/environment.sh` to use another environment file.
+
 The APK is written to `build-android/okular-mobile-arm64-selection-debug.apk`. Set `CRAFT_ROOT`, `ANDROID_SDK_ROOT`, `ANDROID_BUILD_TOOLS_DIR`, or `ANDROID_KEYSTORE` if they are in other locations. See [KDE's Android Craft setup guide](https://develop.kde.org/docs/packaging/android/building_applications/) for the initial Craft setup.
+
+The build forwards HTTP proxy environment variables to the container. Set
+`ANDROID_DOCKER_NETWORK=host` when the proxy listens on the WSL host's loopback
+address. Gradle uses Java proxy settings from
+`$CRAFT_ROOT/gradle-home/gradle.properties`.
 
 ### clang-format
 

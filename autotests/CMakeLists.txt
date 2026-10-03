@@ -20,6 +20,15 @@ endmacro ()
 
 add_conf_unittest(editdrawingtooldialogtest.cpp)
 
+ecm_add_test(mdxdictionarytest.cpp ../part/mdxdictionary.cpp
+    TEST_NAME "mdxdictionarytest"
+    LINK_LIBRARIES Qt6::Test Qt6::Widgets
+)
+okular_enable_mdict(mdxdictionarytest)
+if(MDICT_FOUND)
+    target_link_libraries(mdxdictionarytest ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
+endif()
+
 ecm_add_test(shelltest.cpp ../shell/shellutils.cpp
     TEST_NAME "shelltest"
     LINK_LIBRARIES Qt6::Test okularcore

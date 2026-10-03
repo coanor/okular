@@ -148,6 +148,12 @@ bool DictionaryLookup::mdxAvailable() const
 #endif
 }
 
+QString DictionaryLookup::bundledDictionaryFile() const
+{
+    const QString path = QStringLiteral(":/okular/dictionaries/default.mdx");
+    return mdxAvailable() && QFile::exists(path) ? path : QString();
+}
+
 void DictionaryLookup::clear()
 {
     ++m_request;

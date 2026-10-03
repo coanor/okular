@@ -82,17 +82,31 @@ Kirigami.ApplicationWindow {
             }
             QQC2.Label {
                 Layout.fillWidth: true
-                text: i18n("Local MDX dictionary file")
+                text: i18n("MDX dictionary")
             }
             QQC2.TextField {
                 id: dictionaryPath
+                property bool edited: false
                 Layout.fillWidth: true
                 enabled: Okular.DictionaryLookup.mdxAvailable
-                text: Okular.DictionaryLookup.dictionaryFile
-                placeholderText: i18n("Leave empty to use Eudic")
-                onEditingFinished: Okular.DictionaryLookup.dictionaryFile = text.trim()
+                text: Okular.DictionaryLookup.dictionaryFile === Okular.DictionaryLookup.bundledDictionaryFile ? "" : Okular.DictionaryLookup.dictionaryFile
+                placeholderText: Okular.DictionaryLookup.bundledDictionaryFile &&
+                                 Okular.DictionaryLookup.dictionaryFile === Okular.DictionaryLookup.bundledDictionaryFile ?
+                                 i18n("Built-in ECDICT") : i18n("Leave empty to use Eudic")
+                onTextEdited: edited = true
+                onEditingFinished: {
+                    if (edited) {
+                        edited = false
+                        Okular.DictionaryLookup.dictionaryFile = text.trim()
+                    }
+                }
             }
             RowLayout {
+                QQC2.Button {
+                    text: i18n("Use built-in")
+                    visible: !!Okular.DictionaryLookup.bundledDictionaryFile
+                    onClicked: Okular.DictionaryLookup.dictionaryFile = Okular.DictionaryLookup.bundledDictionaryFile
+                }
                 QQC2.Button {
                     text: i18n("Browse…")
                     enabled: Okular.DictionaryLookup.mdxAvailable && !Okular.DictionaryLookup.importing
@@ -117,7 +131,7 @@ Kirigami.ApplicationWindow {
                 target: Okular.DictionaryLookup
                 function onDictionaryFileChanged() {
                     if (!dictionaryPath.activeFocus) {
-                        dictionaryPath.text = Okular.DictionaryLookup.dictionaryFile
+                        dictionaryPath.text = Okular.DictionaryLookup.dictionaryFile === Okular.DictionaryLookup.bundledDictionaryFile ? "" : Okular.DictionaryLookup.dictionaryFile
                     }
                 }
             }

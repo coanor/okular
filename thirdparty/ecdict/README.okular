@@ -1,0 +1,16 @@
+Okular bundles the unmodified MDX dictionary from skywind3000/ECDICT 1.0.28:
+https://github.com/skywind3000/ECDICT/releases/tag/1.0.28
+
+Archive: ecdict-mdx-28.zip (97,755,340 bytes)
+SHA-256: b06a72a0cfc37485a0466ee62fb43137559ea75eea147d8b7715142faca2229f
+MDX: 97,786,525 bytes
+SHA-256: 275e71b58fd359bfe649af1cbee533ea81770bdbc53ec4a34567f84720a5751b
+
+The upstream describes this as the Concise English-Chinese Dictionary Enhanced
+Edition, with approximately 3.4 million entries. The release-tagged MIT license,
+Copyright (c) 2017 Linwei, is included here and embedded alongside the dictionary.
+
+CMake downloads and verifies the release archive when dictionary bundling is
+enabled. The large binary is kept in the build directory rather than Git.
+No download occurs at runtime. Only the MDX is needed for the plain-text lookup
+summary; no MDD, CSS, audio, or other external resources are required.

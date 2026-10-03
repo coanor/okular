@@ -12,8 +12,10 @@
 
 #include <QFile>
 #include <QHash>
+#include <QTemporaryFile>
 
 #include <cstdlib>
+#include <memory>
 #include <mutex>
 
 namespace
@@ -21,6 +23,7 @@ namespace
 struct DictionaryHandle {
     QString path;
     void *handle = nullptr;
+    std::unique_ptr<QTemporaryFile> resourceFile;
     std::mutex mutex;
 
     ~DictionaryHandle()
@@ -139,8 +142,26 @@ QString MdxDictionary::lookup(const QString &filePath, const QString &word)
             dictionary.handle = nullptr;
         }
         dictionary.path = filePath;
-        const QByteArray path = QFile::encodeName(filePath);
+        dictionary.resourceFile.reset();
+        QString nativePath = filePath;
+        if (filePath.startsWith(QLatin1String(":"))) {
+            // mdict-cpp uses std::ifstream, so Qt resources need a native file.
+            // Keep the extraction on the lookup worker.
+            QFile resource(filePath);
+            dictionary.resourceFile.reset(QTemporaryFile::createNativeFile(resource));
+            if (!dictionary.resourceFile) {
+                dictionary.path.clear();
+                return {};
+            }
+            nativePath = dictionary.resourceFile->fileName();
+        }
+        const QByteArray path = QFile::encodeName(nativePath);
         dictionary.handle = const_cast<void *>(mdict_init(path.constData()).data);
+#ifdef Q_OS_UNIX
+        // The parser keeps its stream open. Unlink now to avoid leaving large
+        // temporary files behind when Android terminates the application.
+        dictionary.resourceFile.reset();
+#endif
     }
     if (!dictionary.handle) {
         return {};
@@ -173,6 +194,7 @@ void MdxDictionary::invalidate(const QString &filePath)
             dictionary.handle = nullptr;
         }
         dictionary.path.clear();
+        dictionary.resourceFile.reset();
     }
 #else
     Q_UNUSED(filePath)

@@ -23,6 +23,7 @@ class DictionaryLookup : public QObject
     Q_PROPERTY(bool importing READ importing NOTIFY importChanged)
     Q_PROPERTY(QString importError READ importError NOTIFY importChanged)
     Q_PROPERTY(bool mdxAvailable READ mdxAvailable CONSTANT)
+    Q_PROPERTY(QString bundledDictionaryFile READ bundledDictionaryFile CONSTANT)
 
 public:
     explicit DictionaryLookup(QObject *parent = nullptr);
@@ -39,6 +40,7 @@ public:
     bool importing() const;
     QString importError() const;
     bool mdxAvailable() const;
+    QString bundledDictionaryFile() const;
 
     Q_INVOKABLE void lookup(const QString &selectedText);
     Q_INVOKABLE void retry(const QString &selectedText);

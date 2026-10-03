@@ -26,6 +26,19 @@ ecm_add_test(shelltest.cpp ../shell/shellutils.cpp
 )
 
 if(Poppler_Qt6_FOUND)
+    if(BUILD_MOBILE AND NOT ANDROID)
+        find_package(Qt6 ${QT_REQUIRED_VERSION} REQUIRED COMPONENTS QuickTest)
+        ecm_add_test(mobiledocumentviewtest.cpp
+            TEST_NAME "mobiledocumentviewtest"
+            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets KF6::I18n
+        )
+        target_compile_definitions(mobiledocumentviewtest PRIVATE
+            QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
+            OKULAR_QML_IMPORT_PATH="${CMAKE_BINARY_DIR}/bin"
+        )
+        add_dependencies(mobiledocumentviewtest okularplugin okularGenerator_poppler)
+    endif()
+
     if (BUILD_DESKTOP)
         ecm_add_test(parttest.cpp closedialoghelper.cpp
             TEST_NAME "parttest"

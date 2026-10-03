@@ -27,6 +27,13 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 set(CMAKE_FIND_USE_PACKAGE_REGISTRY OFF)
 set(CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY OFF)
+# Explicit prefixes are searched even when PROGRAM roots are disabled.
+# Never discover target executables in those prefixes on the Linux host.
+foreach(_root IN LISTS CMAKE_PREFIX_PATH CMAKE_FIND_ROOT_PATH)
+    foreach(_directory bin sbin usr/bin usr/sbin)
+        list(APPEND CMAKE_IGNORE_PATH "${_root}/${_directory}")
+    endforeach()
+endforeach()
 set(ENV{PKG_CONFIG_PATH} "")
 if(NOT DEFINED ENV{PKG_CONFIG_LIBDIR})
     set(ENV{PKG_CONFIG_LIBDIR} "")

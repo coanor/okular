@@ -100,12 +100,48 @@ build_windows_from_linux:
    - .cache/okular-windows/
  before_script:
   - apt-get update
-  - apt-get install --yes --no-install-recommends ca-certificates curl python3 make ninja-build g++ clang-20 lld-20 llvm-20 7zip gettext icoutils pkg-config zlib1g-dev libzstd-dev
+  - apt-get install --yes --no-install-recommends ca-certificates curl python3 make cmake ninja-build g++ clang-20 lld-20 llvm-20 7zip gettext icoutils pkg-config zlib1g-dev libzstd-dev
  script:
   - python3 autotests/windowscrossbuildtest.py
   - python3 autotests/unixcrossbuildtest.py
+  - python3 autotests/unixbootstraptest.py
   - make windows-cross
  artifacts:
   paths:
    - build-windows-cross/okular-windows-x64.zip
+  expire_in: 7 days
+
+# Linux hosts provision both ARM64 target stacks; no Mac/ARM runner is needed.
+build_unix_from_linux:
+ stage: build
+ image: ubuntu:24.04
+ tags:
+  - Linux
+ rules:
+  - if: '$CI_PIPELINE_SOURCE == "schedule" && $OKULAR_UNIX_CROSS == "1"'
+  - if: '$CI_PIPELINE_SOURCE == "web" && $OKULAR_UNIX_CROSS == "1"'
+ variables:
+  XDG_CACHE_HOME: "$CI_PROJECT_DIR/.cache"
+ cache:
+  key:
+   files:
+    - cmake/linux-dependencies.lock.json
+    - cmake/macos-dependencies.lock.json
+   prefix: unix-cross-linux-x64
+  paths:
+   - .cache/okular-unix/
+ before_script:
+  - apt-get update
+  - apt-get install --yes --no-install-recommends ca-certificates curl python3 make cmake ninja-build g++ clang-20 lld-20 llvm-20 7zip gettext pkg-config zlib1g-dev libzstd-dev
+ script:
+  - python3 autotests/unixcrossbuildtest.py
+  - python3 autotests/unixbootstraptest.py
+  - make linux-cross
+  - make macos-cross
+  - tar -C build-linux-cross-arm64/install -cJf build-linux-cross-arm64/okular-linux-arm64-install.tar.xz .
+  - tar -C build-macos-cross-arm64/install -cJf build-macos-cross-arm64/okular-macos-arm64-install.tar.xz .
+ artifacts:
+  paths:
+   - build-linux-cross-arm64/okular-linux-arm64-install.tar.xz
+   - build-macos-cross-arm64/okular-macos-arm64-install.tar.xz
   expire_in: 7 days

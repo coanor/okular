@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 REPOSITORY = Path(__file__).resolve().parent.parent
@@ -33,6 +33,40 @@ def quiet_run(*arguments):
 
 
 class UnixCrossBuildTest(unittest.TestCase):
+    def test_unmanaged_cache_is_rejected_before_sdk_preparation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            (output / "CMakeCache.txt").write_text("# another workflow\n")
+            arguments = ["build-unix.py", "linux", "--build-dir", str(output)]
+            with patch.object(sys, "argv", arguments), patch.object(build.runpy, "run_path") as bootstrap, self.assertRaises(SystemExit):
+                build.main()
+            bootstrap.assert_not_called()
+
+    def test_automatic_sdk_lock_change_is_rejected_before_preparation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            (source / "cmake").mkdir(parents=True)
+            lock = source / "cmake/linux-dependencies.lock.json"
+            lock.write_text('{"revision": 1}\n')
+            toolchain = root / "toolchain.cmake"
+            toolchain.touch()
+            prepare = Mock(return_value=(toolchain, []))
+            arguments = ["build-unix.py", "linux", "--build-dir", str(root / "output")]
+            with patch.object(build, "SOURCE", source), patch.object(sys, "argv", arguments), \
+                    patch.object(build.runpy, "run_path", return_value={"prepare": prepare}), \
+                    patch.object(build, "run", side_effect=RuntimeError("stop at configure")), self.assertRaises(RuntimeError):
+                build.main()
+            prepare.assert_called_once()
+            prepare.reset_mock()
+            lock.write_text('{"revision": 2}\n')
+            with patch.object(build, "SOURCE", source), patch.object(sys, "argv", arguments), \
+                    patch.object(build.runpy, "run_path", return_value={"prepare": prepare}), \
+                    patch.object(build, "run") as run, self.assertRaises(SystemExit):
+                build.main()
+            prepare.assert_not_called()
+            run.assert_not_called()
+
     def test_rejects_host_binary_for_arm64(self):
         if platform.machine() != "x86_64":
             self.skipTest("This fixture uses an x86_64 Linux host executable")

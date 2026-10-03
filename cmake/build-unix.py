@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-2-Clause
-"""Cross-build Linux or macOS with a supplied SDK/toolchain on a Linux host."""
+"""Cross-build Linux or macOS on Linux, preparing pinned ARM64 SDKs by default."""
 
 import argparse
 import fcntl
@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -43,7 +44,9 @@ def verify_binary(path, target, arch):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=("linux", "macos"))
-    parser.add_argument("--toolchain", type=Path, required=True, help="CMake toolchain specifying the target compiler and SDK/sysroot")
+    parser.add_argument("--toolchain", type=Path, help="Use a supplied SDK instead of the pinned automatic ARM64 SDK")
+    parser.add_argument("--cache", type=Path, default=Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "okular-unix")
+    parser.add_argument("--prepare-only", action="store_true", help="Prepare the automatic SDK without building Okular")
     parser.add_argument("--arch", choices=("arm64", "x86_64"), default="arm64")
     parser.add_argument("--build-dir", type=Path)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 8))
@@ -53,9 +56,6 @@ def main():
         parser.error("These entry points require a Linux host, including WSL2.")
     if args.jobs < 1:
         parser.error("--jobs must be positive")
-    toolchain = args.toolchain.resolve()
-    if not toolchain.is_file():
-        parser.error(f"Missing CMake toolchain: {toolchain}")
     if definitions[:1] == ["--"]:
         definitions = definitions[1:]
     reserved = {"CMAKE_TOOLCHAIN_FILE", "CMAKE_STAGING_PREFIX", "CMAKE_INSTALL_PREFIX",
@@ -68,6 +68,26 @@ def main():
     build = (args.build_dir or SOURCE / f"build-{args.target}-cross-{args.arch}").resolve()
     if build == SOURCE or SOURCE.is_relative_to(build):
         parser.error("The build directory must not be the source root or one of its parents.")
+    if not args.prepare_only and not (build / "cross-build-context.json").exists() and (build / "CMakeCache.txt").exists():
+        parser.error("Use a new --build-dir; this CMake cache belongs to another build workflow.")
+    dependency_hash = None
+    if args.toolchain:
+        toolchain = args.toolchain.resolve()
+        if not toolchain.is_file():
+            parser.error(f"Missing CMake toolchain: {toolchain}")
+        if args.prepare_only:
+            parser.error("--prepare-only applies to automatic SDK preparation; omit --toolchain.")
+    else:
+        dependency_hash = hashlib.sha256((SOURCE / f"cmake/{args.target}-dependencies.lock.json").read_bytes()).hexdigest()
+        stamp = build / "cross-build-context.json"
+        if not args.prepare_only and stamp.exists() and json.loads(stamp.read_text()).get("dependency_sha256") != dependency_hash:
+            parser.error("Dependency lock changed; use a new --build-dir or remove the old directory.")
+        bootstrap = runpy.run_path(str(SOURCE / "cmake/bootstrap-unix.py"))
+        toolchain, prepared_definitions = bootstrap["prepare"](args.target, args.arch, args.cache, args.jobs)
+        definitions = prepared_definitions + definitions
+        if args.prepare_only:
+            print("Prepared SDK toolchain:", toolchain)
+            return
     install = build / "install"
     contents = toolchain.read_text()
     environment = {name: os.environ.get(name) for name in re.findall(r"\$ENV\{([^}]+)\}", contents)}
@@ -75,6 +95,8 @@ def main():
                "toolchain": str(toolchain), "sha256": hashlib.sha256(toolchain.read_bytes()).hexdigest(),
                "definitions": definitions,
                "environment_sha256": hashlib.sha256(json.dumps(environment, sort_keys=True).encode()).hexdigest()}
+    if dependency_hash:
+        context["dependency_sha256"] = dependency_hash
     build.mkdir(parents=True, exist_ok=True)
     with (build / ".cross-build.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)

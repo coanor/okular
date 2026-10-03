@@ -1,88 +1,129 @@
 # Linux and macOS cross-builds
 
-`make linux-cross` and `make macos-cross` configure, compile and install Okular
-using a supplied CMake toolchain on a Linux host, including WSL2. The default
-target architecture is ARM64; `--arch x86_64` selects x86_64. Target libraries,
-SDK/sysroot and matching Linux Qt/KF6 host tools must already be prepared.
-These entry points do not bootstrap those dependencies or produce standalone
-deployment packages. The existing [Windows bootstrap](build-windows-from-linux.md)
-downloads its pinned dependency set.
-
-## Commands
-
-Replace the `/path/to/...` placeholders with your prepared SDK/tool directories:
+On a Linux x86_64 host, including WSL2, these commands prepare checksum-pinned
+target dependencies and build the complete desktop Okular for ARM64:
 
 ```bash
-make linux-cross LINUX_CROSS_ARGS='--toolchain /path/to/linux-arm64.cmake -- -DCMAKE_PREFIX_PATH=/path/to/linux-sysroot/usr -DQT_HOST_PATH=/path/to/linux-host/qt -DKF6_HOST_TOOLING=/path/to/linux-host/kf6/lib/cmake'
-make macos-cross MACOS_CROSS_ARGS='--toolchain /path/to/macos-arm64.cmake -- -DCMAKE_PREFIX_PATH=/path/to/macos-prefix -DQT_HOST_PATH=/path/to/linux-host/qt -DKF6_HOST_TOOLING=/path/to/linux-host/kf6/lib/cmake'
+make linux-cross
+make macos-cross
 ```
 
-Pass `--arch x86_64` with a corresponding x86_64 toolchain. Both commands accept
-`--jobs 4` and `--build-dir /path/to/output` before `--`. CMake `-D` definitions go
-after `--`. Use `make linux-cross LINUX_CROSS_ARGS=--help` or
-`make macos-cross MACOS_CROSS_ARGS=--help` to inspect the options.
+Both preserve AI/WebEngine, all 14 document generators, speech, multimedia,
+wallet integration and documentation. No ARM64 machine, macOS installation,
+Xcode installation or target compiler executable is used during the build.
+Linux Clang/LLD compile and link the target application. Native GCC builds the
+matching Linux Qt/KConfig tools needed by the macOS dependency stack.
 
-Default build directories are `build-linux-cross-arm64` and
-`build-macos-cross-arm64` under the repository; x86_64 uses the corresponding
-`-x86_64` directory. The installation tree is `<build-dir>/install`. The runtime
-install prefix is `/usr/local`, with `CMAKE_STAGING_PREFIX` directing installation
-into that local tree. macOS application bundles are staged under `install/bin`.
-The installed executable is checked for ELF/Mach-O format and the requested CPU.
+## Host prerequisites
 
-The build is incremental, and concurrent calls sharing a build directory are
-serialized. Changing the target, architecture, toolchain contents, CMake
-definitions, or environment variables referenced directly by the toolchain
-requires a new build directory. Keep dependency versions/paths fixed; changes in
-included toolchain files, SDK contents or indirectly referenced environment
-variables also require a new directory. The entry point rejects unmanaged CMake
-caches and recreates its installation tree to remove stale plugins.
+On Ubuntu 24.04:
 
-## Toolchain requirements
+```bash
+sudo apt-get update
+sudo apt-get install --no-install-recommends ca-certificates curl python3 make cmake ninja-build g++ clang-20 lld-20 llvm-20 7zip gettext pkg-config zlib1g-dev libzstd-dev
+```
 
-Use a Linux-hosted target compiler, CMake >= 3.22, Ninja and Python >= 3.9. The
-toolchain must set `CMAKE_SYSTEM_NAME` to `Linux` or `Darwin`, plus
-`CMAKE_SYSTEM_PROCESSOR` to `aarch64`/`arm64` or `x86_64`. For macOS, also set
-`CMAKE_OSX_ARCHITECTURES` to the requested single architecture. The helper checks
-these settings and requires `CMAKE_CROSSCOMPILING` to be true.
+Automatic preparation requires Python >= 3.12 and Linux Clang/LLVM >= 20.
+The Linux path also uses `dpkg-deb`, supplied by Ubuntu's `dpkg` package.
+The macOS path downloads pinned Linux CMake 4.1.4 and Ninja 1.13.2.
 
-Set `CMAKE_SYSROOT` for Linux, or `CMAKE_OSX_SYSROOT` for macOS, and populate
-`CMAKE_FIND_ROOT_PATH` with the target dependency prefix where necessary.
-The helper confines library/header/package discovery to target roots and program
-discovery to the host. Configure `PKG_CONFIG_LIBDIR` in the toolchain to include
-only target `.pc` directories, with an appropriate `PKG_CONFIG_SYSROOT_DIR` for
-your metadata layout. The helper clears `PKG_CONFIG_PATH`; if no target
-`PKG_CONFIG_LIBDIR` is set, pkg-config's default host directories are disabled.
+The default outputs are `build-linux-cross-arm64/install/bin/okular` and
+`build-macos-cross-arm64/install/bin/okular.app/Contents/MacOS/okular`.
+Installed binaries are checked for ELF/Mach-O format and the requested CPU.
+The runtime installation prefix is `/usr/local`; `CMAKE_STAGING_PREFIX` directs
+installation into the build directory. These installation trees contain Okular,
+plugins and resources; target Qt/KF6 libraries and WebEngine deployment resources
+remain in the prepared SDK. They are not standalone deployment packages.
 
-Linux ARM64 commonly uses `aarch64-linux-gnu-gcc/g++` with a complete target
-sysroot. Clang toolchains must set `CMAKE_C_COMPILER_TARGET` and
-`CMAKE_CXX_COMPILER_TARGET`, plus target C++ headers/runtime and linker paths.
-See the official [CMake cross-compiling examples](https://cmake.org/cmake/help/v3.22/manual/cmake-toolchains.7.html).
+## Dependencies and caching
 
-macOS needs an SDK, libc++ headers/libraries, macOS Qt/KF6/backend libraries and
-a Linux-hosted Darwin linker. A Linux Clang/LLD toolchain can set the compiler
-target to `arm64-apple-macos11.0` (or `x86_64-apple-macos11.0`) and use
-`ld64.lld`, LLVM archive tools and `llvm-install-name-tool`. Match the deployment
-target to the SDK and prebuilt dependencies. If passing an absolute LLD path,
-Clang 20 may need `-mlinker-version=520` in its initial C/C++ flags to emit the
-required `-platform_version` linker option. This was verified with the Linux
-LLVM 20 tools; see [Mach-O LLD](https://lld.llvm.org/MachO/index.html) and
-[Clang's Darwin linker options](https://github.com/llvm/llvm-project/blob/llvmorg-20.1.2/clang/lib/Driver/ToolChains/Darwin.cpp).
+[linux-dependencies.lock.json](../cmake/linux-dependencies.lock.json) pins Debian
+13 (trixie) ARM64 target packages with Qt 6.8.2, KF6 6.13 and Poppler 25.03, plus
+matching x86_64 Linux host tools. Packages are extracted into private directories;
+they are not installed on the host. Clang uses the target GCC C++ headers and
+runtime libraries without invoking target GCC. Native tools run with their own
+Linux dynamic loader/libraries so Debian's newer glibc does not replace the host's.
 
-Supply `QT_HOST_PATH` and `KF6_HOST_TOOLING` as CMake definitions or in the
-toolchain. They point to Linux tools, including `moc`, `rcc`, `uic` and
-`kconfig_compiler_kf6`; prepare matching native KDocTools if building documentation.
-Qt host tools must match target Qt as described in [Cross-compiling Qt](https://doc.qt.io/qt-6/cross-compiling-qt.html).
-The desktop UI, AI/WebEngine and existing document backend options are preserved.
+[macos-dependencies.lock.json](../cmake/macos-dependencies.lock.json) pins KDE
+Craft ARM64 packages with Qt 6.11.1, KF6 6.30 and Poppler 26.07, Linux documentation
+tools, native Qt/KConfig sources, LibSpectre 0.2.12 sources and the MacOSX26.1 SDK
+archive from [macosx-sdks](https://github.com/joseluisq/macosx-sdks/releases/tag/26.1).
+The application targets macOS 13.3 or later, matching the prebuilt KF6 libraries.
+The SDK is downloaded on Linux; no local Apple SDK directory is required.
+LibSpectre is compiled with Linux Clang instead of dropping the PostScript backend.
 
-## Verification scope
+Every downloaded archive requires its committed SHA256. The shared download cache
+defaults to `$XDG_CACHE_HOME/okular-unix` or `~/.cache/okular-unix`; prepared SDKs
+are keyed by dependency lock, compiler paths and Clang version. The initial
+download is roughly 370 MiB for the Linux target plus 166 MiB for its host tools;
+macOS additionally needs its Craft archives, SDK and host sources. Extracted SDKs
+occupy several GiB. Subsequent builds reuse the verified downloads and host tools.
+An unavailable pinned URL requires a verified mirror or a reviewed lock update.
 
-`python3 autotests/unixcrossbuildtest.py` tests the helper's safeguards and builds
-small freestanding C++ executables for Linux ARM64 and macOS ARM64/x86_64 using
-Linux Clang/LLD. It checks their binary format/CPU, incremental builds and removal
-of stale installed files. The fixtures need no SDK and do not execute target
-programs. These tests also run in the opt-in GitLab Linux cross-build job.
+The build is incremental, and calls sharing an SDK or build directory are
+serialized. Installation trees are recreated to remove stale plugins. A changed
+dependency lock, SDK/compiler location, generated toolchain or CMake definitions
+requires a new build directory. Both workflows use Linux executables for code
+generation and translation; target `bin` directories are excluded from program
+discovery, including when explicitly present in `CMAKE_PREFIX_PATH`.
 
-The complete Linux ARM64/macOS Okular builds and target runtime tests have not
-been verified in the current WSL environment: their SDK and full Qt/KF6/backend
-dependency stacks are not available. Startup, rendering, annotations, plugins and
-WebEngine deployment still need verification with the actual target dependencies.
+Use a Linux filesystem for faster WSL builds:
+
+```bash
+make linux-cross LINUX_CROSS_ARGS='--cache /home/user/.cache/okular-unix --build-dir /home/user/build/okular-linux-arm64 --jobs 8'
+make macos-cross MACOS_CROSS_ARGS='--cache /home/user/.cache/okular-unix --build-dir /home/user/build/okular-macos-arm64 --jobs 8'
+make macos-cross MACOS_CROSS_ARGS=--prepare-only
+```
+
+`--prepare-only` downloads/prepares the SDK and host tools without compiling
+Okular. Automatic macOS preparation currently requires a cache path without spaces
+because LibSpectre's Autoconf flags are split by its shell build scripts.
+
+## Other SDKs and architectures
+
+`--toolchain` retains the supplied-SDK workflow. For x86_64 or another dependency
+stack, prepare target libraries and matching Linux host tools, then run:
+
+```bash
+make linux-cross LINUX_CROSS_ARGS='--arch x86_64 --toolchain /path/to/linux-x86_64.cmake -- -DCMAKE_PREFIX_PATH=/path/to/sysroot/usr -DQT_HOST_PATH=/path/to/linux-qt -DKF6_HOST_TOOLING=/path/to/linux-kf6/lib/cmake'
+make macos-cross MACOS_CROSS_ARGS='--arch x86_64 --toolchain /path/to/macos-x86_64.cmake -- -DCMAKE_PREFIX_PATH=/path/to/target -DQT_HOST_PATH=/path/to/linux-qt -DKF6_HOST_TOOLING=/path/to/linux-kf6/lib/cmake'
+```
+
+Automatic package provisioning currently covers ARM64 only. Full x86_64 Okular
+cross-builds have not been verified. Both commands accept extra CMake `-D` options
+after `--`; target, toolchain and staging settings are reserved.
+
+Custom toolchains must set `CMAKE_SYSTEM_NAME=Linux`/`Darwin`, the matching
+`CMAKE_SYSTEM_PROCESSOR`, and target SDK/search roots. macOS also requires a single
+matching `CMAKE_OSX_ARCHITECTURES`. Libraries/headers/packages are confined to target
+roots; programs come from Linux. Set `PKG_CONFIG_LIBDIR` and
+`PKG_CONFIG_SYSROOT_DIR` for target metadata. Changes in included toolchains, SDK
+contents or indirectly referenced environment variables require a fresh build tree.
+See [CMake toolchains](https://cmake.org/cmake/help/v3.22/manual/cmake-toolchains.7.html),
+[Mach-O LLD](https://lld.llvm.org/MachO/index.html) and
+[Qt host tools](https://doc.qt.io/qt-6/cross-compiling-qt.html).
+
+## Daily CI and verification
+
+The existing GitLab configuration has an opt-in `build_unix_from_linux` job.
+Set `OKULAR_UNIX_CROSS=1` in a scheduled or manually started pipeline. It prepares
+both ARM64 SDKs on Ubuntu 24.04, runs helper tests, builds both applications and
+archives their installation trees. The schedule itself must be configured in the
+GitLab project; no remote pipeline or schedule was started during local validation.
+
+Validated on 2026-10-03 in WSL2 with Linux Clang/LLD 20.1.2 and GCC 13.3:
+
+- Both automatic Makefile commands completed configure, build and install from
+  newly assembled SDKs. macOS's Qt/KConfig host tools were built from pinned sources.
+- Both installation trees contain the desktop shell, KParts plugin and all 14
+  document generators, with AI/WebEngine enabled. Repeated builds required no
+  downloads, SDK extraction, host-tool rebuilding or C++ recompilation.
+- The Linux ARM64 executable ran `--version` under QEMU with target libraries and
+  Qt's offscreen platform. This checks basic startup; rendering/annotations and
+  WebEngine subprocess execution were not tested under emulation.
+- `unixcrossbuildtest.py`, `unixbootstraptest.py` and `windowscrossbuildtest.py`
+  cover CPU/format rejection, context changes, native program discovery, safe
+  archive links, restarted preparation, incremental builds and stale-file cleanup.
+
+The macOS executable has not been run on macOS. Standalone deployment, platform
+integration and target GUI behavior still require runtime validation.

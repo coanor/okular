@@ -190,7 +190,8 @@ def prepare(args, lock, root, downloads):
     return target, sdk
 
 
-def build_host(lock, root, downloads, target, jobs):
+def build_host(lock, root, downloads, target, jobs, downloader=None):
+    fetch = downloader or download
     host = root / "host"
     host_stamp = host / ".complete"
     if host_stamp.exists() and host_stamp.read_text() == str(host):
@@ -206,7 +207,7 @@ def build_host(lock, root, downloads, target, jobs):
     for name, spec in lock["host_sources"].items():
         source_stamp = sources / spec["directory"] / ".complete"
         if not source_stamp.exists():
-            extract(download(spec, downloads), sources, "tar", "")
+            extract(fetch(spec, downloads), sources, "tar", "")
             source_stamp.touch()
         build = root / "host-build" / name
         common = ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={host}",

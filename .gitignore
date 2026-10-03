@@ -4,6 +4,7 @@ CMakeLists.txt.user*
 /build*/
 .cmake/
 /cmake/__pycache__/
+/autotests/__pycache__/
 
 # LSP & IDE
 /.clang-format

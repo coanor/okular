@@ -16,7 +16,7 @@ Item {
     property alias pageNumber: page.pageNumber
     implicitWidth: page.implicitWidth
     implicitHeight: page.implicitHeight
-    readonly property real pageRatio: page.implicitWidth / page.implicitHeight
+    readonly property real pageRatio: page.implicitWidth > 0 && page.implicitHeight > 0 ? page.implicitWidth / page.implicitHeight : 1
     readonly property real scaleFactor: page.width / page.implicitWidth
 
     PageItem {
@@ -36,8 +36,6 @@ Item {
             bottom: parent.bottom
             left: page.left
             right: page.right
-            topMargin: -Kirigami.Units.gridUnit
-            bottomMargin: -Kirigami.Units.gridUnit
         }
         z: -1
         color: "white"

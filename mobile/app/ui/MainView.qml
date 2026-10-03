@@ -22,12 +22,16 @@ Kirigami.Page {
     bottomPadding: 0
 
     actions: Kirigami.Action {
-        icon.name: pageArea.page.bookmarked ? "bookmark-remove" : "bookmarks-organize"
+        icon.name: pageArea.page && pageArea.page.bookmarked ? "bookmark-remove" : "bookmarks-organize"
         checkable: true
         visible: document.opened
-        onCheckedChanged: (checked) => pageArea.page.bookmarked = checked
-        text: pageArea.page.bookmarked ? i18n("Remove bookmark") : i18n("Bookmark this page")
-        checked: pageArea.page.bookmarked
+        onCheckedChanged: (checked) => {
+            if (pageArea.page) {
+                pageArea.page.bookmarked = checked;
+            }
+        }
+        text: pageArea.page && pageArea.page.bookmarked ? i18n("Remove bookmark") : i18n("Bookmark this page")
+        checked: pageArea.page ? pageArea.page.bookmarked : false
     }
 
     Okular.DocumentView {

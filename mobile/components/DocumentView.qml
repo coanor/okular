@@ -47,7 +47,7 @@ QQC2.ScrollView {
     }
 
     function updateCurrentPage() {
-        if (positioning || !document || !document.opened || pinchArea.pinch.active) {
+        if (positioning || !document || !document.opened || pinchHandler.active) {
             return;
         }
         const index = flick.indexAt(flick.contentX + flick.width / 2, flick.contentY + flick.height / 2);
@@ -61,24 +61,29 @@ QQC2.ScrollView {
         }
     }
 
-    function zoomAt(factor, center) {
+    function zoomAt(factor, center, previousCenter = center) {
         const newZoom = Math.max(1, Math.min(3, factor));
-        if (newZoom === zoomFactor) {
+        if (newZoom === zoomFactor && center.x === previousCenter.x && center.y === previousCenter.y) {
             return;
         }
         clearSelection();
-        const item = flick.itemAt(flick.contentX + center.x, flick.contentY + center.y);
-        const relativeY = item ? (flick.contentY + center.y - item.y) / item.height : 0;
-        const relativeX = (flick.contentX + center.x) / zoomFactor;
+        const anchorY = flick.contentY + previousCenter.y;
+        const anchorX = flick.contentX + previousCenter.x;
+        const item = flick.itemAt(anchorX, anchorY) || flick.itemAt(anchorX, anchorY - flick.spacing);
+        const relativeY = item ? Math.min(1, (anchorY - item.y) / item.height) : 0;
+        // The space between pages stays fixed when the pinch center is in a gap.
+        const gapOffset = item ? Math.max(0, anchorY - item.y - item.height) : 0;
+        const relativeX = (flick.contentX + previousCenter.x) / zoomFactor;
         positioning = true;
         zoomFactor = newZoom;
         flick.forceLayout();
         flick.contentX = Math.max(0, Math.min(flick.contentWidth - flick.width, relativeX * zoomFactor - center.x));
         if (item) {
-            flick.contentY = item.y + relativeY * item.height - center.y;
+            flick.contentY = item.y + relativeY * item.height + gapOffset - center.y;
         }
         flick.returnToBounds();
         positioning = false;
+        updateCurrentPage();
     }
 
     Component.onCompleted: Qt.callLater(positionCurrentPage)
@@ -114,7 +119,7 @@ QQC2.ScrollView {
         spacing: 4
         cacheBuffer: height
         highlightFollowsCurrentItem: false
-        interactive: !pinchArea.pinch.active && !root.hasSelection
+        interactive: !pinchHandler.active && !root.hasSelection
 
         onContentYChanged: root.updateCurrentPage()
         onMovementStarted: root.clearSelection()
@@ -182,20 +187,31 @@ QQC2.ScrollView {
             }
         }
 
-        PinchArea {
-            id: pinchArea
+        PinchHandler {
+            id: pinchHandler
             parent: flick
-            anchors.fill: parent
+            target: null
+            // Take both points before Flickable locks a cross-page drag to one of them.
+            dragThreshold: 0
             property real initialZoom
+            property point previousCenter
 
-            onPinchStarted: {
-                root.clearSelection();
-                initialZoom = root.zoomFactor;
+            onActiveChanged: {
+                if (active) {
+                    root.clearSelection();
+                    flick.cancelFlick();
+                    initialZoom = root.zoomFactor;
+                    previousCenter = parent.mapToItem(flick, centroid.position);
+                } else {
+                    root.updateCurrentPage();
+                }
             }
-            onPinchUpdated: pinch => root.zoomAt(initialZoom * pinch.scale, pinch.center)
-            onPinchFinished: {
-                flick.returnToBounds();
-                root.updateCurrentPage();
+            onUpdated: {
+                if (active) {
+                    const center = parent.mapToItem(flick, centroid.position);
+                    root.zoomAt(initialZoom * activeScale, center, previousCenter);
+                    previousCenter = center;
+                }
             }
         }
 

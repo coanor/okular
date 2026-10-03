@@ -12,7 +12,7 @@ image=${ANDROID_CRAFT_IMAGE:-invent-registry.kde.org/sysadmin/ci-images/android-
 output_dir="$project_dir/build-android"
 output_apk="$output_dir/okular-mobile-arm64-selection-debug.apk"
 unsigned_apk="$craft_root/tmp/okularkirigami-arm64-v8a.apk"
-craft_work_key=$(printf '%s' "$project_dir" | sha256sum)
+craft_work_key=$(printf '%s' "$project_dir" | git -C "$project_dir" hash-object --stdin)
 craft_work_dir="$craft_root/build/okular-worktrees/${craft_work_key:0:16}/work"
 
 if [[ ! -f "$craft_root/craft/craftenv.sh" ]]; then

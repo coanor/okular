@@ -22,17 +22,29 @@ TestCase {
             width: testCase.width
             height: testCase.height
             document: Okular.DocumentItem {
-                url: Qt.resolvedUrl("../data/simple-multipage.pdf")
+                url: testDocumentUrl
             }
         }
     }
 
+    Component {
+        id: pageComponent
+        Okular.PageItem {}
+    }
+
     property var view
+
+    SignalSpy {
+        id: clickedSpy
+        target: view
+        signalName: "clicked"
+    }
 
     function init() {
         view = createTemporaryObject(viewComponent, testCase);
         verify(view !== null);
         tryCompare(view.document, "opened", true);
+        view.document.currentPage = 0;
         tryVerify(() => view.page !== null && view.page.height > 0);
         wait(300);
     }
@@ -116,6 +128,91 @@ TestCase {
         tryCompare(view.page, "width", view.width);
     }
 
+    function test_touchTapTogglesControls() {
+        const count = clickedSpy.count;
+        const touch = touchEvent(view);
+        touch.press(0, view, 180, 300).commit();
+        touch.release(0, view, 180, 300).commit();
+        tryCompare(clickedSpy, "count", count + 1);
+    }
+
+    function test_touchDoubleTapResetsZoom() {
+        view.zoomAt(2, Qt.point(180, 300));
+        const touch = touchEvent(view);
+        touch.press(0, view, 180, 300).commit();
+        touch.release(0, view, 180, 300).commit();
+        wait(50);
+        touch.press(0, view, 180, 300).commit();
+        touch.release(0, view, 180, 300).commit();
+        tryCompare(view, "zoomFactor", 1);
+    }
+
+    function test_touchLongPressAndDismissSelection() {
+        const page = view.page;
+        const word = page.mapToItem(view, page.width * 0.22, page.height * 0.162);
+        const touch = touchEvent(view);
+        touch.press(0, view, word.x, word.y).commit();
+        wait(1000);
+        touch.release(0, view, word.x, word.y).commit();
+        verify(view.hasSelection, "Long pressing the fixture's first word should select it");
+        const count = clickedSpy.count;
+        touch.press(0, view, 180, 800).commit();
+        for (let y = 750; y >= 400; y -= 50) {
+            touch.move(0, view, 180, y).commit();
+            wait(20);
+        }
+        verify(!view.hasSelection, "Dragging elsewhere should dismiss the selection");
+        verify(view.contentItem.contentY > 100, "The same drag should scroll the document");
+        touch.release(0, view, 180, 400).commit();
+        compare(clickedSpy.count, count, "Dismissing a selection should not toggle controls");
+    }
+
+    function test_resetZoomUpdatesCurrentPage() {
+        view.document.currentPage = 10;
+        view.zoomAt(3, Qt.point(180, 450));
+        mouseDoubleClickSequence(view, 180, 200);
+        tryCompare(view, "zoomFactor", 1);
+        const flick = view.contentItem;
+        const index = flick.indexAt(flick.contentX + flick.width / 2, flick.contentY + flick.height / 2);
+        compare(view.document.currentPage, index);
+        compare(view.page.pageNumber, index);
+    }
+
+    function test_twoFingerPan() {
+        view.document.currentPage = 10;
+        view.zoomAt(2, Qt.point(180, 450));
+        const touch = touchEvent(view);
+        touch.press(0, view, 100, 500).press(1, view, 260, 500).commit();
+        touch.move(0, view, 80, 500).move(1, view, 280, 500).commit();
+        wait(20);
+        const before = view.contentItem.contentY;
+        const zoom = view.zoomFactor;
+        for (let delta = 10; delta <= 140; delta += 10) {
+            touch.move(0, view, 80, 500 - delta).move(1, view, 280, 500 - delta).commit();
+            wait(20);
+        }
+        fuzzyCompare(view.contentItem.contentY - before, 140, 2, "Keeping the fingers apart should pan without changing zoom");
+        fuzzyCompare(view.zoomFactor, zoom, 0.01);
+        touch.release(0, view, 80, 360).release(1, view, 280, 360).commit();
+    }
+
+    function test_pinchAcrossPageBoundary() {
+        const first = visiblePages().find(item => item.pageNumber === 0);
+        const second = visiblePages().find(item => item.pageNumber === 1);
+        const boundary = first.mapToItem(view, 0, first.height).y;
+        const secondY = second.mapToItem(view, 0, 0).y;
+        const center = boundary + 2;
+        const touch = touchEvent(view);
+        touch.press(0, view, 140, center - 30).press(1, view, 220, center + 30).commit();
+        for (let delta = 10; delta <= 60; delta += 10) {
+            touch.move(0, view, 140 - delta, center - 30 - delta).move(1, view, 220 + delta, center + 30 + delta).commit();
+            wait(20);
+        }
+        verify(view.zoomFactor > 1.3, "A pinch should work when its fingers start on different pages");
+        fuzzyCompare(second.mapToItem(view, 0, 0).y, secondY, 2, "Pinching around the gap should keep the page boundary in place");
+        touch.release(0, view, 80, center - 90).release(1, view, 280, center + 90).commit();
+    }
+
     function test_lastPageHasNoTrailingSpace() {
         view.document.currentPage = view.document.pageCount - 1;
         tryVerify(() => view.page !== null && view.page.pageNumber === view.document.pageCount - 1);
@@ -129,5 +226,19 @@ TestCase {
         view.document.url = "";
         tryCompare(view.document, "opened", false);
         tryCompare(view, "page", null);
+    }
+
+    function test_detachedPageIgnoresPixmapUpdates() {
+        const page = createTemporaryObject(pageComponent, view, {
+            document: view.document,
+            width: view.page.width,
+            height: view.page.height
+        });
+        verify(page !== null);
+        page.parent = null;
+        view.zoomAt(2, Qt.point(180, 300));
+        // Detached ListView delegates can still receive the shared observer's pixmap updates.
+        wait(1000);
+        compare(view.page.width, view.width * 2);
     }
 }

@@ -1,4 +1,6 @@
-add_definitions( -DKDESRCDIR="${CMAKE_CURRENT_SOURCE_DIR}/" )
+set(OKULAR_TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE STRING
+    "Autotest source directory as seen by the test runtime")
+add_definitions( -DKDESRCDIR="${OKULAR_TEST_DATA_DIR}/" )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/..)
 

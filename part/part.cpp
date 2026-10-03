@@ -651,6 +651,10 @@ void Part::setupConfigSkeleton(const QVariantList &args)
     config.data()->sync();
 
     Okular::Settings::instance(config);
+    if (Okular::Settings::dictionaryFile() == QLatin1String(":/okular/dictionaries/default.mdx")) {
+        Okular::Settings::setDictionaryFile(QString());
+        Okular::Settings::self()->save();
+    }
 }
 
 void Part::setupViewerActions()

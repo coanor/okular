@@ -140,13 +140,10 @@ else()
     set(MDICT_FOUND FALSE)
 endif()
 
-include(cmake/OkularDictionary.cmake)
-
 function(okular_enable_mdict target)
     if(MDICT_FOUND)
         target_include_directories(${target} PRIVATE ${MDICT_INCLUDE_DIR})
         target_compile_definitions(${target} PRIVATE HAVE_MDICT=1)
-        okular_bundle_dictionary(${target})
     else()
         target_compile_definitions(${target} PRIVATE HAVE_MDICT=0)
     endif()

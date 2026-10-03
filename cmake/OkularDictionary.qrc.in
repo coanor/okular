@@ -1,6 +1,0 @@
-<RCC>
-    <qresource prefix="/okular/dictionaries">
-        <file alias="default.mdx">@okular_dictionary_file@</file>
-        <file alias="LICENSE">@okular_dictionary_license@</file>
-    </qresource>
-</RCC>

@@ -63,6 +63,7 @@ if (ANDROID)
         ${KIRIGAMI_ADDONS_ICONS}
 
         application-pkcs7-signature
+        applications-education-language-symbolic
         bookmark-remove
         bookmarks-organize
         dialog-close

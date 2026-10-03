@@ -313,7 +313,7 @@
   <default>false</default>
  </entry>
   <entry key="DictionaryFile" type="String" >
-   <default code="true">QFile::exists(QStringLiteral(":/okular/dictionaries/default.mdx")) ? QStringLiteral(":/okular/dictionaries/default.mdx") : QString()</default>
+   <default></default>
   </entry>
   <entry key="EditToolBarPlacement" type="Int" >
    <default>0</default>

@@ -79,24 +79,15 @@ cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/install/dir -DOKULAR_UI=desktop ..
 ```
 Available options are `desktop`, `mobile`, and `both`.
 
-### Built-in dictionary
+### Dictionary lookup
 
-Desktop and mobile builds include the bundled MDX parser and the
-[ECDICT 1.0.28 English-Chinese dictionary](https://github.com/skywind3000/ECDICT/releases/tag/1.0.28)
-by default. CMake downloads the pinned archive (about 93 MiB) and verifies its
-SHA-256 checksum. The dictionary and its MIT license are embedded in the package;
-word lookup works offline after installation. Enable automatic word lookup in
-settings to show definitions when selecting a word.
+Word lookup uses Eudic by default. Enable automatic word lookup in settings to
+look up a selected word. Android uses Eudic's popup lookup.
 
-The built-in dictionary is selected for new configurations. Existing custom MDX
-paths and explicit Eudic selections are preserved. On mobile, use **Use built-in**
-to restore ECDICT or **Use Eudic** to switch to Eudic. On desktop, restore the
-General settings defaults to select ECDICT again.
-
-For an offline build, pass `-DOKULAR_DICTIONARY_FILE=/path/to/ecdict.mdx`.
-Set `-DOKULAR_BUNDLE_DICTIONARY=OFF` to omit the dictionary, or
-`-DOKULAR_USE_BUNDLED_MDICT=OFF` to use a system mdict-cpp installation.
-See [thirdparty/ecdict/README.okular](thirdparty/ecdict/README.okular) for attribution.
+The package includes the MDX parser, and you can import your own MDX file for
+offline lookup. Leave the dictionary path empty, or choose **Use Eudic** on
+mobile, to use Eudic. Dictionary data is not downloaded or embedded during the
+build. Set `-DOKULAR_USE_BUNDLED_MDICT=OFF` to use a system mdict-cpp installation.
 
 ### Android APK
 

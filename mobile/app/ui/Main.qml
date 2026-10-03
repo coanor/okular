@@ -48,6 +48,7 @@ Kirigami.ApplicationWindow {
             },
             Kirigami.Action {
                 text: i18n("Dictionary…")
+                icon.name: "applications-education-language-symbolic"
                 onTriggered: dictionaryDialog.open()
             },
             Kirigami.Action {
@@ -89,10 +90,8 @@ Kirigami.ApplicationWindow {
                 property bool edited: false
                 Layout.fillWidth: true
                 enabled: Okular.DictionaryLookup.mdxAvailable
-                text: Okular.DictionaryLookup.dictionaryFile === Okular.DictionaryLookup.bundledDictionaryFile ? "" : Okular.DictionaryLookup.dictionaryFile
-                placeholderText: Okular.DictionaryLookup.bundledDictionaryFile &&
-                                 Okular.DictionaryLookup.dictionaryFile === Okular.DictionaryLookup.bundledDictionaryFile ?
-                                 i18n("Built-in ECDICT") : i18n("Leave empty to use Eudic")
+                text: Okular.DictionaryLookup.dictionaryFile
+                placeholderText: i18n("Leave empty to use Eudic")
                 onTextEdited: edited = true
                 onEditingFinished: {
                     if (edited) {
@@ -102,11 +101,6 @@ Kirigami.ApplicationWindow {
                 }
             }
             RowLayout {
-                QQC2.Button {
-                    text: i18n("Use built-in")
-                    visible: !!Okular.DictionaryLookup.bundledDictionaryFile
-                    onClicked: Okular.DictionaryLookup.dictionaryFile = Okular.DictionaryLookup.bundledDictionaryFile
-                }
                 QQC2.Button {
                     text: i18n("Browse…")
                     enabled: Okular.DictionaryLookup.mdxAvailable && !Okular.DictionaryLookup.importing
@@ -131,7 +125,7 @@ Kirigami.ApplicationWindow {
                 target: Okular.DictionaryLookup
                 function onDictionaryFileChanged() {
                     if (!dictionaryPath.activeFocus) {
-                        dictionaryPath.text = Okular.DictionaryLookup.dictionaryFile === Okular.DictionaryLookup.bundledDictionaryFile ? "" : Okular.DictionaryLookup.dictionaryFile
+                        dictionaryPath.text = Okular.DictionaryLookup.dictionaryFile
                     }
                 }
             }

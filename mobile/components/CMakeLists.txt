@@ -19,6 +19,7 @@ target_sources(okularplugin PRIVATE
     ${CMAKE_SOURCE_DIR}/gui/debug_ui.cpp
     ${CMAKE_SOURCE_DIR}/gui/recentitemsmodel.cpp
     pageitem.cpp
+    textselection.cpp
     dictionarylookup.cpp
     dictionarylookup.h
     ${CMAKE_SOURCE_DIR}/part/mdxdictionary.cpp
@@ -37,6 +38,7 @@ ecm_target_qml_sources(okularplugin SOURCES
 
 ecm_target_qml_sources(okularplugin PRIVATE PATH private SOURCES
     private/PageView.qml
+    private/SelectionMagnifier.qml
 )
 
 target_link_libraries(okularplugin PRIVATE

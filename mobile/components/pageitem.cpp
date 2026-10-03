@@ -7,6 +7,7 @@
 #include "pageitem.h"
 #include "documentitem.h"
 #include "part/mdxdictionary.h"
+#include "textselection.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -16,6 +17,7 @@
 #include <QStyleOptionGraphicsItem>
 #include <QTimer>
 #include <QTransform>
+#include <QtMath>
 
 #include <KLocalizedString>
 
@@ -202,7 +204,19 @@ QString PageItem::selectedWord() const
     if (!canCopySelection() || !m_page) {
         return {};
     }
-    return MdxDictionary::word(m_page->text(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour));
+    const auto entities = m_page->words(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    return MdxDictionary::word(MobileTextSelection::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
+}
+
+std::unique_ptr<Okular::RegularAreaRect> PageItem::wordNear(const QPointF &point, const Okular::TextEntity::List &entities) const
+{
+    // Use logical pixels so the touch tolerance stays consistent at every zoom level.
+    const auto nearest = MobileTextSelection::nearestTextPoint(entities, point, QSizeF(width(), height()), 22);
+    if (!nearest) {
+        return nullptr;
+    }
+    const QPointF unrotated = pageRotation(m_page->rotation()).inverted().map(*nearest);
+    return m_page->wordAt(Okular::NormalizedPoint(unrotated.x(), unrotated.y()));
 }
 
 bool PageItem::selectWordAt(qreal x, qreal y)
@@ -216,8 +230,8 @@ bool PageItem::selectWordAt(qreal x, qreal y)
     }
 
     const QTransform rotation = pageRotation(m_page->rotation());
-    const QPointF unrotated = rotation.inverted().map(QPointF(x / width(), y / height()));
-    auto word = m_page->wordAt(Okular::NormalizedPoint(unrotated.x(), unrotated.y()));
+    auto entities = m_page->words(nullptr, Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    auto word = wordNear(QPointF(x, y), entities);
     if (word) {
         word->transform(rotation);
     }
@@ -226,6 +240,7 @@ bool PageItem::selectWordAt(qreal x, qreal y)
     }
 
     clearSelection();
+    m_selectionText = std::move(entities);
     const auto &first = word->first();
     const auto &last = word->last();
     m_selectionStart = QPointF(first.left, (first.top + first.bottom) / 2);
@@ -242,21 +257,44 @@ void PageItem::moveSelectionHandle(bool start, qreal x, qreal y)
         return;
     }
 
-    const QPointF point(qBound(0.0, x / width(), 1.0), qBound(0.0, y / height(), 1.0));
-    const QPointF first = start ? point : m_selectionStart;
-    const QPointF last = start ? m_selectionEnd : point;
-    if (first == last) {
+    const QPointF point(qBound(0.0, x, width()), qBound(0.0, y, height()));
+    auto word = wordNear(point, m_selectionText);
+    if (!word || word->isEmpty()) {
         return;
     }
 
-    const QTransform unrotate = pageRotation(m_page->rotation()).inverted();
-    const QPointF unrotatedFirst = unrotate.map(first);
-    const QPointF unrotatedLast = unrotate.map(last);
-    Okular::TextSelection selection(Okular::NormalizedPoint(unrotatedFirst.x(), unrotatedFirst.y()), Okular::NormalizedPoint(unrotatedLast.x(), unrotatedLast.y()));
-    auto area = m_page->textArea(selection);
+    const QTransform rotation = pageRotation(m_page->rotation());
+    const QTransform unrotate = rotation.inverted();
+    const QPointF fixed = unrotate.map(start ? m_selectionEnd : m_selectionStart);
+    const auto &firstRect = word->first();
+    const auto &lastRect = word->last();
+    const QPointF beginning(firstRect.left, (firstRect.top + firstRect.bottom) / 2);
+    const QPointF ending(lastRect.right, (lastRect.top + lastRect.bottom) / 2);
+    QPointF first;
+    QPointF last;
+    std::unique_ptr<Okular::RegularAreaRect> area;
+    if (word->contains(fixed.x(), fixed.y())) {
+        // Keep at least one whole word when a handle returns to its anchor.
+        first = rotation.map(beginning);
+        last = rotation.map(ending);
+        area = std::move(word);
+    } else {
+        const bool before = firstRect.bottom < fixed.y() || (firstRect.top <= fixed.y() && beginning.x() < fixed.x());
+        const QPointF moving = rotation.map(before ? beginning : ending);
+        first = start ? moving : m_selectionStart;
+        last = start ? m_selectionEnd : moving;
+        const QPointF unrotatedFirst = unrotate.map(first);
+        const QPointF unrotatedLast = unrotate.map(last);
+        Okular::TextSelection selection(Okular::NormalizedPoint(unrotatedFirst.x(), unrotatedFirst.y()), Okular::NormalizedPoint(unrotatedLast.x(), unrotatedLast.y()));
+        area = m_page->textArea(selection);
+    }
     if (!area || area->isEmpty()) {
         return;
     }
+    if (first == m_selectionStart && last == m_selectionEnd) {
+        return;
+    }
+    area->transform(rotation);
 
     m_selectionStart = first;
     m_selectionEnd = last;
@@ -272,6 +310,7 @@ void PageItem::clearSelection()
     }
 
     m_selectedArea.reset();
+    m_selectionText.clear();
     if (m_documentItem && m_documentItem->isOpened() && uint(m_viewPort.pageNumber) < m_documentItem->document()->pages()) {
         m_documentItem->document()->setPageTextSelection(m_viewPort.pageNumber, nullptr, QColor());
     }
@@ -284,10 +323,8 @@ void PageItem::copySelection()
         return;
     }
 
-    QString text = m_page->text(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-    if (text.endsWith(QLatin1Char('\n'))) {
-        text.chop(1);
-    }
+    const auto entities = m_page->words(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    const QString text = Okular::removeLineBreaks(MobileTextSelection::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
     QGuiApplication::clipboard()->setText(text);
     clearSelection();
 }
@@ -497,7 +534,7 @@ QSGNode *PageItem::updatePaintNode(QSGNode *node, QQuickItem::UpdatePaintNodeDat
 
 void PageItem::requestPixmap()
 {
-    if (!m_documentItem || !m_page || !window() || width() <= 0 || height() < 0) {
+    if (!m_documentItem || !m_page || !window() || width() <= 0 || height() <= 0) {
         if (!m_buffer.isNull()) {
             m_buffer = QImage();
             update();
@@ -527,16 +564,31 @@ void PageItem::requestPixmap()
 
 void PageItem::paint()
 {
+    if (!m_documentItem || !m_page || !window() || width() <= 0 || height() <= 0) {
+        return;
+    }
     Observer *observer = m_isThumbnail ? m_documentItem.data()->thumbnailObserver() : m_documentItem.data()->pageviewObserver();
     const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::TextSelection | PagePainter::Annotations;
 
     const qreal dpr = window()->devicePixelRatio();
-    const QRect limits(QPoint(0, 0), QSize(width() * dpr, height() * dpr));
-    QPixmap pix(limits.size());
+    const QSize logicalSize {int(width()), int(height())};
+    const QSize pixelSize(qCeil(logicalSize.width() * dpr), qCeil(logicalSize.height() * dpr));
+    // The document may evict its bitmap while the scene graph still displays our
+    // last frame. Keep that frame and request a replacement instead of painting
+    // PagePainter's blank loading placeholder over it on a selection change.
+    if (!m_page->hasPixmap(observer, pixelSize.width(), pixelSize.height(), Okular::NormalizedRect(0, 0, 1, 1))) {
+        if (!m_redrawTimer->isActive()) {
+            m_redrawTimer->start();
+        }
+        return;
+    }
+    // PagePainter takes logical coordinates and applies DPR to its back buffer.
+    const QRect limits(QPoint(0, 0), logicalSize);
+    QPixmap pix(pixelSize);
     pix.setDevicePixelRatio(dpr);
     QPainter p(&pix);
     p.setRenderHint(QPainter::Antialiasing, false);
-    PagePainter::paintPageOnPainter(&p, m_page, observer, flags, width(), height(), limits);
+    PagePainter::paintPageOnPainter(&p, m_page, observer, flags, logicalSize.width(), logicalSize.height(), limits);
     p.end();
 
     m_buffer = pix.toImage();
@@ -551,7 +603,7 @@ void PageItem::pageHasChanged(int page, int flags)
         if (flags == Okular::DocumentObserver::BoundingBox) {
             // skip bounding box updates
             // kDebug() << "32" << m_page->boundingBox();
-        } else if (flags == Okular::DocumentObserver::Pixmap) {
+        } else if (flags & (Okular::DocumentObserver::Pixmap | Okular::DocumentObserver::TextSelection)) {
             // if pixmaps have updated, just repaint .. don't bother updating pixmaps AGAIN
             paint();
         } else {

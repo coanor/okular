@@ -98,6 +98,9 @@ QStringList fallbackWords(const QString &word)
 
 QString MdxDictionary::word(QString text)
 {
+    // Join words split by a line-ending hyphen, preserving ordinary hyphenated words.
+    static const QRegularExpression lineHyphen(QStringLiteral(R"((?<=[\p{L}\p{N}])[-\x{00ad}]\h*\R\h*(?=[\p{L}\p{N}]))"));
+    text.remove(lineHyphen);
     text = text.trimmed();
     while (!text.isEmpty() && !text.front().isLetterOrNumber()) {
         text.remove(0, 1);

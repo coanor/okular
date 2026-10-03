@@ -14,20 +14,30 @@ class MdxDictionaryTest : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
-    void testBundledLookup();
+    void testWordNormalization();
+    void testFileLookup();
     void testSwitchDictionary();
 };
 
-void MdxDictionaryTest::testBundledLookup()
+void MdxDictionaryTest::testWordNormalization()
 {
-    const QString path = QStringLiteral(":/okular/dictionaries/default.mdx");
-    if (!QFile::exists(path)) {
-        QSKIP("This build does not bundle ECDICT");
+    QCOMPARE(MdxDictionary::word(QStringLiteral("inter-\nnational")), QStringLiteral("international"));
+    QCOMPARE(MdxDictionary::word(QStringLiteral("inter- \r\n  national")), QStringLiteral("international"));
+    QCOMPARE(MdxDictionary::word(QStringLiteral("prin-\nted")), QStringLiteral("printed"));
+    QCOMPARE(MdxDictionary::word(QStringLiteral("prin\u00ad\nted")), QStringLiteral("printed"));
+    QCOMPARE(MdxDictionary::word(QStringLiteral("well-known")), QStringLiteral("well-known"));
+    QVERIFY(MdxDictionary::word(QStringLiteral("two words")).isEmpty());
+}
+
+void MdxDictionaryTest::testFileLookup()
+{
+    const QString path = qEnvironmentVariable("OKULAR_TEST_MDX");
+    if (path.isEmpty()) {
+        QSKIP("Set OKULAR_TEST_MDX to an ECDICT MDX file to test dictionary lookup");
     }
     const QFileInfo info(path);
     QVERIFY(info.isFile());
     QCOMPARE(info.suffix(), QStringLiteral("mdx"));
-    QVERIFY(QFile::exists(QStringLiteral(":/okular/dictionaries/LICENSE")));
 
     const QString definition = MdxDictionary::lookup(path, QStringLiteral("hello"));
     QVERIFY(!definition.isEmpty());
@@ -40,21 +50,21 @@ void MdxDictionaryTest::testBundledLookup()
 
 void MdxDictionaryTest::testSwitchDictionary()
 {
-    const QString bundled = QStringLiteral(":/okular/dictionaries/default.mdx");
-    if (!QFile::exists(bundled)) {
-        QSKIP("This build does not bundle ECDICT");
+    const QString source = qEnvironmentVariable("OKULAR_TEST_MDX");
+    if (source.isEmpty()) {
+        QSKIP("Set OKULAR_TEST_MDX to an ECDICT MDX file to test dictionary switching");
     }
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString local = directory.filePath(QStringLiteral("custom.mdx"));
-    QVERIFY(QFile::copy(bundled, local));
+    QVERIFY(QFile::copy(source, local));
 
-    const QString definition = MdxDictionary::lookup(bundled, QStringLiteral("dictionary"));
+    const QString definition = MdxDictionary::lookup(source, QStringLiteral("dictionary"));
     QVERIFY(!definition.isEmpty());
     QCOMPARE(MdxDictionary::lookup(local, QStringLiteral("dictionary")), definition);
-    QCOMPARE(MdxDictionary::lookup(bundled, QStringLiteral("dictionary")), definition);
-    QVERIFY(MdxDictionary::lookup(bundled, QStringLiteral("okular_nonexistent_word_12345")).isEmpty());
-    MdxDictionary::invalidate(bundled);
+    QCOMPARE(MdxDictionary::lookup(source, QStringLiteral("dictionary")), definition);
+    QVERIFY(MdxDictionary::lookup(source, QStringLiteral("okular_nonexistent_word_12345")).isEmpty());
+    MdxDictionary::invalidate(source);
 }
 
 QTEST_MAIN(MdxDictionaryTest)

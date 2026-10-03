@@ -20,6 +20,21 @@ endmacro ()
 
 add_conf_unittest(editdrawingtooldialogtest.cpp)
 
+ecm_add_test(textselectiontest.cpp ../mobile/components/textselection.cpp ../part/mdxdictionary.cpp
+    TEST_NAME "textselectiontest"
+    LINK_LIBRARIES Qt6::Test okularcore
+)
+target_compile_definitions(textselectiontest PRIVATE HAVE_MDICT=0)
+
+if(BUILD_MOBILE)
+    find_package(Qt6 REQUIRED COMPONENTS QuickTest)
+    ecm_add_test(selectionmagnifiertest.cpp
+        TEST_NAME "selectionmagnifiertest"
+        LINK_LIBRARIES Qt6::QuickTest
+    )
+    target_compile_definitions(selectionmagnifiertest PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mobile")
+endif()
+
 ecm_add_test(mdxdictionarytest.cpp ../part/mdxdictionary.cpp
     TEST_NAME "mdxdictionarytest"
     LINK_LIBRARIES Qt6::Test Qt6::Widgets

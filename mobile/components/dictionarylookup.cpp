@@ -72,6 +72,10 @@ DictionaryLookup::DictionaryLookup(QObject *parent)
     : QObject(parent)
 {
     Okular::Settings::instance(QStringLiteral("okularproviderrc"));
+    // Migrate configurations that explicitly selected the removed resource.
+    if (dictionaryFile() == QLatin1String(":/okular/dictionaries/default.mdx")) {
+        setDictionaryFile(QString());
+    }
 }
 
 bool DictionaryLookup::autoLookupEnabled() const
@@ -146,12 +150,6 @@ bool DictionaryLookup::mdxAvailable() const
 #else
     return false;
 #endif
-}
-
-QString DictionaryLookup::bundledDictionaryFile() const
-{
-    const QString path = QStringLiteral(":/okular/dictionaries/default.mdx");
-    return mdxAvailable() && QFile::exists(path) ? path : QString();
 }
 
 void DictionaryLookup::clear()

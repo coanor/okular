@@ -141,14 +141,21 @@ QQC2.ScrollView {
                 property real startMouseX
                 property real startMouseY
                 property bool longPressSelecting: false
+                property bool longPressExtended: false
+                property bool dragStartHandle: false
+                property point longPressOrigin
+                property point selectionFocus
                 property bool suppressClick: false
                 property bool incrementing: true
                 property PageView currPageDelegate: page1
                 property PageView prevPageDelegate: page2
                 property PageView nextPageDelegate: page3
+                pressAndHoldInterval: 450
+                preventStealing: longPressSelecting
 
                 onPressed: (mouse) => {
                     longPressSelecting = false;
+                    longPressExtended = false;
                     suppressClick = false;
                     var pos = mapToItem(flick, mouse.x, mouse.y);
                     startMouseX = oldMouseX = pos.x;
@@ -157,7 +164,18 @@ QQC2.ScrollView {
                 onPositionChanged: (mouse) => {
                     if (longPressSelecting) {
                         var selectionPos = mapToItem(root.page, mouse.x, mouse.y);
-                        root.page.moveSelectionHandle(false, selectionPos.x, selectionPos.y);
+                        var dx = selectionPos.x - longPressOrigin.x;
+                        var dy = selectionPos.y - longPressOrigin.y;
+                        // Finger jitter after a long press must not shrink the initial word.
+                        if (!longPressExtended) {
+                            if (dx * dx + dy * dy < 12 * 12) {
+                                return;
+                            }
+                            dragStartHandle = dy < -8 || (Math.abs(dy) <= 8 && dx < 0);
+                            longPressExtended = true;
+                        }
+                        root.page.moveSelectionHandle(dragStartHandle, selectionPos.x, selectionPos.y);
+                        selectionFocus = dragStartHandle ? root.page.selectionStart : root.page.selectionEnd;
                         return;
                     }
                     if (root.page.hasSelection) {
@@ -200,6 +218,8 @@ QQC2.ScrollView {
                 onPressAndHold: (mouse) => {
                     var pos = mapToItem(root.page, mouse.x, mouse.y);
                     longPressSelecting = root.page.selectWordAt(pos.x, pos.y);
+                    longPressOrigin = pos;
+                    selectionFocus = pos;
                     suppressClick = longPressSelecting;
                 }
                 onDoubleClicked: {
@@ -263,7 +283,7 @@ QQC2.ScrollView {
                 QQC2.ToolBar {
                     id: selectionMenu
                     z: 5
-                    visible: root.page.hasSelection
+                    visible: root.page.hasSelection && !magnifier.visible
                     width: Math.min(mouseArea.width - 16, Math.max(280, selectionActions.implicitWidth))
                     x: Math.max(0, Math.min(mouseArea.width - width,
                                             root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).x - width / 2))
@@ -322,10 +342,22 @@ QQC2.ScrollView {
                         anchors.centerIn: parent
                     }
                     MouseArea {
+                        id: startHandleMouse
                         anchors.fill: parent
-                        onPositionChanged: (mouse) => {
+                        preventStealing: true
+                        property point grabOffset
+                        onPressed: (mouse) => {
                             var pos = mapToItem(root.page, mouse.x, mouse.y);
-                            root.page.moveSelectionHandle(true, pos.x, pos.y);
+                            grabOffset = Qt.point(pos.x - root.page.selectionStart.x, pos.y - root.page.selectionStart.y);
+                            mouseArea.selectionFocus = root.page.selectionStart;
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (!pressed) {
+                                return;
+                            }
+                            var pos = mapToItem(root.page, mouse.x, mouse.y);
+                            root.page.moveSelectionHandle(true, pos.x - grabOffset.x, pos.y - grabOffset.y);
+                            mouseArea.selectionFocus = root.page.selectionStart;
                         }
                     }
                 }
@@ -349,12 +381,33 @@ QQC2.ScrollView {
                         anchors.centerIn: parent
                     }
                     MouseArea {
+                        id: endHandleMouse
                         anchors.fill: parent
-                        onPositionChanged: (mouse) => {
+                        preventStealing: true
+                        property point grabOffset
+                        onPressed: (mouse) => {
                             var pos = mapToItem(root.page, mouse.x, mouse.y);
-                            root.page.moveSelectionHandle(false, pos.x, pos.y);
+                            grabOffset = Qt.point(pos.x - root.page.selectionEnd.x, pos.y - root.page.selectionEnd.y);
+                            mouseArea.selectionFocus = root.page.selectionEnd;
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (!pressed) {
+                                return;
+                            }
+                            var pos = mapToItem(root.page, mouse.x, mouse.y);
+                            root.page.moveSelectionHandle(false, pos.x - grabOffset.x, pos.y - grabOffset.y);
+                            mouseArea.selectionFocus = root.page.selectionEnd;
                         }
                     }
+                }
+
+                SelectionMagnifier {
+                    id: magnifier
+                    parent: root
+                    z: 10
+                    sourceItem: root.page
+                    focusPoint: mouseArea.selectionFocus
+                    visible: root.page.hasSelection && (mouseArea.longPressSelecting || startHandleMouse.pressed || endHandleMouse.pressed)
                 }
 
                     

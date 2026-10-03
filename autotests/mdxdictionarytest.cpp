@@ -27,6 +27,9 @@ void MdxDictionaryTest::testWordNormalization()
     QCOMPARE(MdxDictionary::word(QStringLiteral("prin\u00ad\nted")), QStringLiteral("printed"));
     QCOMPARE(MdxDictionary::word(QStringLiteral("well-known")), QStringLiteral("well-known"));
     QVERIFY(MdxDictionary::word(QStringLiteral("two words")).isEmpty());
+    QVERIFY(MdxDictionary::word(QString(1000000, QLatin1Char('!'))).isEmpty());
+    QVERIFY(MdxDictionary::word(QString(129, QLatin1Char('a'))).isEmpty());
+    QCOMPARE(MdxDictionary::word(QString(128, QLatin1Char('a'))), QString(128, QLatin1Char('a')));
 }
 
 void MdxDictionaryTest::testFileLookup()

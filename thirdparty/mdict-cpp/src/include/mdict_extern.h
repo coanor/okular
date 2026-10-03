@@ -29,7 +29,7 @@ typedef struct {
     size_t size;
 } SizedData;
 
-#define WRAP_SIZED(ptr, len) ((SizedData){ .data = (ptr), .size = (len) })
+#define WRAP_SIZED(ptr, len) SizedData{(ptr), (len)}
 #define RETURN_SIZED(ptr, len) return WRAP_SIZED((ptr), (len))
 
 

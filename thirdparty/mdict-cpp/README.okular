@@ -4,7 +4,10 @@ Its BSD-3-Clause license and AUTHORS file are included.
 
 Okular builds this copy by default for desktop and mobile builds.
 Set OKULAR_USE_BUNDLED_MDICT=OFF to use a platform mdict-cpp package instead.
-The upstream miniz include was replaced with the platform zlib header, and the
-upstream TurboBase64 dependency was replaced with a small compatible encoder
-in src/turbobase64/turbob64.h. mdict_lookup now catches parser exceptions at
-the C API boundary. The mdict-cpp command-line tool is omitted.
+Okular's parser uses owned, bounded buffers, validates checksums and file sizes,
+and decodes key blocks on demand. It uses Qt Core for XML and text decoding and
+platform zlib for decompression. The C API catches all parser exceptions.
+Supported formats are MDX 1.x/2.x with UTF-8 or UTF-16 text, uncompressed or zlib
+blocks, and optional key-info encryption (Encrypted=2). Password encryption and
+LZO compression are unsupported. Individual blocks are limited to 64 MiB and
+definitions to 1 MiB. Dictionary data and the upstream CLI are omitted.

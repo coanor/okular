@@ -63,10 +63,14 @@ QStringList fallbackWords(const QString &word)
 {
     const QString lower = word.toLower();
     static const QHash<QString, QString> irregular {
-        {QStringLiteral("went"), QStringLiteral("go")},      {QStringLiteral("gone"), QStringLiteral("go")},
-        {QStringLiteral("ate"), QStringLiteral("eat")},      {QStringLiteral("eaten"), QStringLiteral("eat")},
-        {QStringLiteral("saw"), QStringLiteral("see")},      {QStringLiteral("seen"), QStringLiteral("see")},
-        {QStringLiteral("mice"), QStringLiteral("mouse")},  {QStringLiteral("teeth"), QStringLiteral("tooth")},
+        {QStringLiteral("went"), QStringLiteral("go")},
+        {QStringLiteral("gone"), QStringLiteral("go")},
+        {QStringLiteral("ate"), QStringLiteral("eat")},
+        {QStringLiteral("eaten"), QStringLiteral("eat")},
+        {QStringLiteral("saw"), QStringLiteral("see")},
+        {QStringLiteral("seen"), QStringLiteral("see")},
+        {QStringLiteral("mice"), QStringLiteral("mouse")},
+        {QStringLiteral("teeth"), QStringLiteral("tooth")},
         {QStringLiteral("children"), QStringLiteral("child")},
     };
     QStringList candidates;
@@ -98,6 +102,10 @@ QStringList fallbackWords(const QString &word)
 
 QString MdxDictionary::word(QString text)
 {
+    // Reject paragraphs before running regular expressions or trimming them.
+    if (text.size() > 1024) {
+        return {};
+    }
     // Join words split by a line-ending hyphen, preserving ordinary hyphenated words.
     static const QRegularExpression lineHyphen(QStringLiteral(R"((?<=[\p{L}\p{N}])[-\x{00ad}]\h*\R\h*(?=[\p{L}\p{N}]))"));
     text.remove(lineHyphen);

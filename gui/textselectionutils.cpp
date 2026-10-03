@@ -2,9 +2,9 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-#include "textselection.h"
+#include "textselectionutils.h"
 
-std::optional<QPointF> MobileTextSelection::nearestTextPoint(const Okular::TextEntity::List &entities, const QPointF &point, const QSizeF &size, qreal radius)
+std::optional<QPointF> TextSelectionUtils::nearestTextPoint(const Okular::TextEntity::List &entities, const QPointF &point, const QSizeF &size, qreal radius)
 {
     if (size.width() <= 0 || size.height() <= 0 || radius < 0) {
         return std::nullopt;
@@ -31,7 +31,7 @@ std::optional<QPointF> MobileTextSelection::nearestTextPoint(const Okular::TextE
     return nearest;
 }
 
-QString MobileTextSelection::selectionText(const Okular::TextEntity::List &entities, const QTransform &unrotate)
+QString TextSelectionUtils::selectionText(const Okular::TextEntity::List &entities, const QTransform &unrotate)
 {
     QString text;
     std::optional<Okular::NormalizedRect> previous;

@@ -7,7 +7,7 @@
 #include "pageitem.h"
 #include "documentitem.h"
 #include "part/mdxdictionary.h"
-#include "textselection.h"
+#include "gui/textselectionutils.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -161,6 +161,9 @@ void PageItem::setPageNumber(int number)
 void PageItem::refreshPage()
 {
     clearSelection();
+    // Retain cached frames only while repainting the same page.
+    m_buffer = QImage();
+    update();
     if (uint(m_viewPort.pageNumber) < m_documentItem.data()->document()->pages()) {
         m_page = m_documentItem.data()->document()->page(m_viewPort.pageNumber);
     } else {
@@ -205,13 +208,13 @@ QString PageItem::selectedWord() const
         return {};
     }
     const auto entities = m_page->words(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-    return MdxDictionary::word(MobileTextSelection::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
+    return MdxDictionary::word(TextSelectionUtils::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
 }
 
 std::unique_ptr<Okular::RegularAreaRect> PageItem::wordNear(const QPointF &point, const Okular::TextEntity::List &entities) const
 {
     // Use logical pixels so the touch tolerance stays consistent at every zoom level.
-    const auto nearest = MobileTextSelection::nearestTextPoint(entities, point, QSizeF(width(), height()), 22);
+    const auto nearest = TextSelectionUtils::nearestTextPoint(entities, point, QSizeF(width(), height()), 22);
     if (!nearest) {
         return nullptr;
     }
@@ -324,7 +327,7 @@ void PageItem::copySelection()
     }
 
     const auto entities = m_page->words(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-    const QString text = Okular::removeLineBreaks(MobileTextSelection::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
+    const QString text = Okular::removeLineBreaks(TextSelectionUtils::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
     QGuiApplication::clipboard()->setText(text);
     clearSelection();
 }

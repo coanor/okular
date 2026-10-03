@@ -116,13 +116,11 @@ if(OKULAR_USE_BUNDLED_MDICT)
     add_library(okular_mdict STATIC
         ${MDICT_SOURCE_DIR}/mdict.cc
         ${MDICT_SOURCE_DIR}/mdict_extern.cc
-        ${MDICT_SOURCE_DIR}/binutils.cc
-        ${MDICT_SOURCE_DIR}/adler32.cc
         ${MDICT_SOURCE_DIR}/ripemd128.c
     )
     set_target_properties(okular_mdict PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_include_directories(okular_mdict PRIVATE ${MDICT_SOURCE_DIR})
-    target_link_libraries(okular_mdict PRIVATE ZLIB::ZLIB)
+    target_link_libraries(okular_mdict PRIVATE Qt6::Core ZLIB::ZLIB)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(okular_mdict PRIVATE -fexceptions)
     endif()
@@ -600,6 +598,7 @@ if(BUILD_DESKTOP)
     part/pageviewmouseannotation.cpp
     part/pageview.cpp
     part/mdxdictionary.cpp
+    gui/textselectionutils.cpp
     part/magnifierview.cpp
     part/pageviewutils.cpp
     part/presentationsearchbar.cpp

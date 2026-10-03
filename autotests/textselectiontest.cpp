@@ -2,9 +2,9 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-#include "mobile/components/textselection.h"
 #include "core/misc.h"
 #include "core/textpage.h"
+#include "gui/textselectionutils.h"
 #include "part/mdxdictionary.h"
 
 #include <QTest>
@@ -50,7 +50,7 @@ void TextSelectionTest::testTouchTolerance()
         Okular::TextEntity(QStringLiteral(" "), Okular::NormalizedRect(0.3, 0.1, 0.35, 0.15)),
         Okular::TextEntity(QStringLiteral("world"), Okular::NormalizedRect(0.35, 0.1, 0.55, 0.15)),
     };
-    const auto nearest = MobileTextSelection::nearestTextPoint(entities, point, size, 22);
+    const auto nearest = TextSelectionUtils::nearestTextPoint(entities, point, size, 22);
     if (expected.isEmpty()) {
         QVERIFY(!nearest);
         return;
@@ -118,7 +118,7 @@ void TextSelectionTest::testSplitWord()
     entities.append(Okular::TextEntity(QStringLiteral("words"), following));
     Okular::TextPage page(entities);
     for (const auto &point : {first.center(), second.center()}) {
-        const auto nearest = MobileTextSelection::nearestTextPoint(entities, QPointF(point.x * 1000, point.y * 1000), QSizeF(1000, 1000), 22);
+        const auto nearest = TextSelectionUtils::nearestTextPoint(entities, QPointF(point.x * 1000, point.y * 1000), QSizeF(1000, 1000), 22);
         QVERIFY(nearest);
         const auto area = page.wordAt(Okular::NormalizedPoint(nearest->x(), nearest->y()));
         QVERIFY(area);
@@ -126,7 +126,7 @@ void TextSelectionTest::testSplitWord()
         QVERIFY(area->contains(second.center().x, second.center().y));
         QVERIFY(!area->contains(following.center().x, following.center().y));
         const auto selected = page.words(area.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-        QCOMPARE(MdxDictionary::word(MobileTextSelection::selectionText(selected)), QStringLiteral("printed"));
+        QCOMPARE(MdxDictionary::word(TextSelectionUtils::selectionText(selected)), QStringLiteral("printed"));
     }
 }
 
@@ -159,7 +159,7 @@ void TextSelectionTest::testWordBoundaries()
     const Okular::TextPage page(entities);
     const auto area = page.wordAt(first.center());
     QVERIFY(area);
-    QCOMPARE(MdxDictionary::word(MobileTextSelection::selectionText(page.words(area.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour))), expected);
+    QCOMPARE(MdxDictionary::word(TextSelectionUtils::selectionText(page.words(area.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour))), expected);
 }
 
 void TextSelectionTest::testRotatedSelectionText()
@@ -175,7 +175,7 @@ void TextSelectionTest::testRotatedSelectionText()
         for (const auto &entity : entities) {
             rotated.append(Okular::TextEntity(entity.text(), entity.transformedArea(rotation)));
         }
-        QCOMPARE(MdxDictionary::word(MobileTextSelection::selectionText(rotated, rotation.inverted())), QStringLiteral("printed"));
+        QCOMPARE(MdxDictionary::word(TextSelectionUtils::selectionText(rotated, rotation.inverted())), QStringLiteral("printed"));
     }
 }
 

@@ -2,8 +2,8 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-#ifndef OKULAR_MOBILE_TEXTSELECTION_H
-#define OKULAR_MOBILE_TEXTSELECTION_H
+#ifndef OKULAR_TEXTSELECTIONUTILS_H
+#define OKULAR_TEXTSELECTIONUTILS_H
 
 #include "core/textpage.h"
 
@@ -11,7 +11,7 @@
 #include <QSizeF>
 #include <optional>
 
-namespace MobileTextSelection
+namespace TextSelectionUtils
 {
 // Return the center of the nearest text entity within radius (in item coordinates).
 std::optional<QPointF> nearestTextPoint(const Okular::TextEntity::List &entities, const QPointF &point, const QSizeF &size, qreal radius);

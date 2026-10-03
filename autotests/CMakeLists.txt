@@ -20,7 +20,7 @@ endmacro ()
 
 add_conf_unittest(editdrawingtooldialogtest.cpp)
 
-ecm_add_test(textselectiontest.cpp ../mobile/components/textselection.cpp ../part/mdxdictionary.cpp
+ecm_add_test(textselectiontest.cpp ../gui/textselectionutils.cpp ../part/mdxdictionary.cpp
     TEST_NAME "textselectiontest"
     LINK_LIBRARIES Qt6::Test okularcore
 )
@@ -42,6 +42,14 @@ ecm_add_test(mdxdictionarytest.cpp ../part/mdxdictionary.cpp
 okular_enable_mdict(mdxdictionarytest)
 if(MDICT_FOUND)
     target_link_libraries(mdxdictionarytest ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
+endif()
+
+if(OKULAR_USE_BUNDLED_MDICT)
+    ecm_add_test(mdictparsertest.cpp
+        TEST_NAME "mdictparsertest"
+        LINK_LIBRARIES Qt6::Test okular_mdict ZLIB::ZLIB
+    )
+    target_include_directories(mdictparsertest PRIVATE ${MDICT_INCLUDE_DIR})
 endif()
 
 ecm_add_test(shelltest.cpp ../shell/shellutils.cpp

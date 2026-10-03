@@ -36,16 +36,19 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QFutureWatcher>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QScopeGuard>
+#include <QSemaphore>
 #include <QTabletEvent>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTextEdit>
+#include <QThreadPool>
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
@@ -53,6 +56,7 @@
 #include <QTreeView>
 #include <QUrl>
 #include <QUuid>
+#include <QtConcurrent>
 
 namespace Okular
 {
@@ -402,6 +406,32 @@ void PartTest::testLocalMdxDictionaryLookup()
     QTest::mouseMove(part.m_pageView->viewport(), wordPosition);
     QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, wordPosition);
     QTRY_VERIFY_WITH_TIMEOUT(QToolTip::text().contains(QStringLiteral("你好")), 5000);
+
+    // Hold the lookup worker so disabling automatic lookup races with a real
+    // pending result, rather than merely stopping the double-click timer.
+    QTRY_VERIFY(part.m_pageView->findChildren<QFutureWatcherBase *>().isEmpty());
+    QToolTip::hideText();
+    QTRY_VERIFY(QToolTip::text().isEmpty());
+    QThreadPool *pool = QThreadPool::globalInstance();
+    const int previousThreadCount = pool->maxThreadCount();
+    pool->setMaxThreadCount(1);
+    QSemaphore entered, unblock;
+    auto blocker = QtConcurrent::run([&] {
+        entered.release();
+        unblock.acquire();
+    });
+    const auto restorePool = qScopeGuard([&] {
+        unblock.release();
+        blocker.waitForFinished();
+        pool->setMaxThreadCount(previousThreadCount);
+    });
+    QVERIFY(entered.tryAcquire(1, 5000));
+    simulateMouseSelection(width * 0.12, wordPosition.y(), width * 0.16, wordPosition.y(), part.m_pageView->viewport());
+    QTRY_VERIFY(!part.m_pageView->findChildren<QFutureWatcherBase *>().isEmpty());
+    Okular::Settings::setAutoLookupSelectedWords(false);
+    unblock.release();
+    QTRY_VERIFY(part.m_pageView->findChildren<QFutureWatcherBase *>().isEmpty());
+    QVERIFY(QToolTip::text().isEmpty());
 }
 
 void PartTest::testSelectTextMultiline()

@@ -81,6 +81,7 @@
 #include "gui/guiutils.h"
 #include "gui/pagepainter.h"
 #include "gui/priorities.h"
+#include "gui/textselectionutils.h"
 #include "okmenutitle.h"
 #include "pageviewannotator.h"
 #include "pageviewmouseannotation.h"
@@ -158,6 +159,7 @@ public:
     OkularTTS *tts();
 #endif
     QString selectedText() const;
+    QString selectedDictionaryWord() const;
 
     // the document, pageviewItems and the 'visible cache'
     PageView *q;
@@ -358,8 +360,8 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->messageWindow = new PageViewMessage(this);
     d->dictionaryLookupTimer.setSingleShot(true);
     connect(&d->dictionaryLookupTimer, &QTimer::timeout, this, [this] {
-        if (MdxDictionary::word(d->selectedText()) == d->pendingDictionaryWord) {
-            lookupSelectedWord(d->pendingDictionaryWord);
+        if (d->selectedDictionaryWord() == d->pendingDictionaryWord) {
+            lookupSelectedWord();
         }
     });
     d->setting_viewCols = Okular::Settings::viewColumns();
@@ -1048,13 +1050,30 @@ QString PageViewPrivate::selectedText() const
     return text;
 }
 
-void PageView::lookupSelectedWord(const QString &text, bool waitForTripleClick)
+QString PageViewPrivate::selectedDictionaryWord() const
+{
+    if (pagesWithTextSelection.size() != 1) {
+        return {};
+    }
+    const Okular::Page *page = document->page(*pagesWithTextSelection.constBegin());
+    if (!page) {
+        return {};
+    }
+    const auto entities = page->words(page->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    QTransform unrotate;
+    unrotate.translate(0.5, 0.5);
+    unrotate.rotate(-90 * int(page->rotation()));
+    unrotate.translate(-0.5, -0.5);
+    return MdxDictionary::word(TextSelectionUtils::selectionText(entities, unrotate));
+}
+
+void PageView::lookupSelectedWord(bool waitForTripleClick)
 {
     if (!Okular::Settings::autoLookupSelectedWords() || !d->document->isAllowed(Okular::AllowCopy)) {
         return;
     }
 
-    const QString word = MdxDictionary::word(text);
+    const QString word = d->selectedDictionaryWord();
     if (word.isEmpty()) {
         return;
     }
@@ -1081,19 +1100,18 @@ void PageView::lookupSelectedWord(const QString &text, bool waitForTripleClick)
         const int request = d->dictionaryLookupRequest;
         const QPoint position = QCursor::pos();
         auto *watcher = new QFutureWatcher<QString>(this);
-        connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, request, word, position] {
+        connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, request, word, position, dictionaryFile] {
             const QString definition = watcher->result();
             watcher->deleteLater();
-            if (request != d->dictionaryLookupRequest || MdxDictionary::word(d->selectedText()) != word) {
+            if (request != d->dictionaryLookupRequest || !Okular::Settings::autoLookupSelectedWords() || !d->document->isAllowed(Okular::AllowCopy) || Okular::Settings::dictionaryFile().trimmed() != dictionaryFile ||
+                d->selectedDictionaryWord() != word) {
                 return;
             }
             const QString summary = definition.isEmpty() ? i18n("No definition found in the selected MDX dictionary.") : MdxDictionary::summary(definition);
             const QString tooltip = QStringLiteral("<b>%1</b><br>%2").arg(word.toHtmlEscaped(), summary.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br>")));
             QToolTip::showText(position, tooltip, viewport());
         });
-        watcher->setFuture(QtConcurrent::run([dictionaryFile, word] {
-            return MdxDictionary::lookup(dictionaryFile, word);
-        }));
+        watcher->setFuture(QtConcurrent::run([dictionaryFile, word] { return MdxDictionary::lookup(dictionaryFile, word); }));
 #else
         if (warnedDictionaryFile != dictionaryFile) {
             warnedDictionaryFile = dictionaryFile;
@@ -1341,6 +1359,8 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
 
     // mouseAnnotation must not access our PageViewItem widgets any longer
     d->mouseAnnotation->reset();
+    d->dictionaryLookupTimer.stop();
+    ++d->dictionaryLookupRequest;
 
     // delete all widgets (one for each page in pageSet)
     qDeleteAll(d->items);
@@ -3218,7 +3238,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                     if (cb->supportsSelection()) {
                         cb->setText(text, QClipboard::Selection);
                     }
-                    lookupSelectedWord(text);
+                    lookupSelectedWord();
                 }
             }
         } else if (!d->mousePressPos.isNull() && rightButton) {
@@ -3442,7 +3462,7 @@ void PageView::mouseDoubleClickEvent(QMouseEvent *e)
                             if (cb->supportsSelection()) {
                                 cb->setText(text, QClipboard::Selection);
                             }
-                            lookupSelectedWord(text, true);
+                            lookupSelectedWord(true);
                         }
                     }
 
@@ -3913,6 +3933,7 @@ PageViewItem *PageView::pickItemOnPoint(int x, int y)
 void PageView::textSelectionClear()
 {
     d->dictionaryLookupTimer.stop();
+    ++d->dictionaryLookupRequest;
     // something to clear
     if (!d->pagesWithTextSelection.isEmpty()) {
         for (const int page : std::as_const(d->pagesWithTextSelection)) {

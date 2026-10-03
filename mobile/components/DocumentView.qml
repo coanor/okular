@@ -29,39 +29,23 @@ QQC2.ScrollView {
 
     clip: true
 
-    Timer {
+    SelectionLookupTimer {
         id: dictionaryTimer
-        interval: 350
-        onTriggered: {
-            if (root.page && root.page.selectedWord) {
-                DictionaryLookup.lookup(root.page.selectedWord)
-            }
-        }
+        word: root.page ? root.page.selectedWord : ""
+        enabled: DictionaryLookup.autoLookupEnabled
+        selecting: mouseArea.pressed || startHandleMouse.pressed || endHandleMouse.pressed
+        onLookupRequested: (word) => DictionaryLookup.lookup(word)
     }
     Connections {
         target: root.page
         function onSelectionChanged() {
-            dictionaryTimer.stop()
-            if (!root.page || !root.page.selectedWord) {
-                DictionaryLookup.clear()
-            } else if (DictionaryLookup.autoLookupEnabled) {
-                dictionaryTimer.start()
-            }
+            DictionaryLookup.clear()
         }
     }
     Connections {
         target: DictionaryLookup
         function onDictionaryFileChanged() {
-            if (DictionaryLookup.autoLookupEnabled && root.page && root.page.selectedWord) {
-                dictionaryTimer.restart()
-            }
-        }
-        function onAutoLookupEnabledChanged() {
-            if (DictionaryLookup.autoLookupEnabled && root.page && root.page.selectedWord) {
-                dictionaryTimer.restart()
-            } else {
-                dictionaryTimer.stop()
-            }
+            dictionaryTimer.restartWhenReady()
         }
     }
     

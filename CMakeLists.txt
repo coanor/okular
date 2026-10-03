@@ -224,8 +224,8 @@ endif()
 
 if (BUILD_MOBILE)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Qml Quick)
-    find_package(KF6Kirigami2)
-    set_package_properties(KF6Kirigami2 PROPERTIES
+    find_package(KF6Kirigami)
+    set_package_properties(KF6Kirigami PROPERTIES
         DESCRIPTION "A QtQuick based components set"
         PURPOSE "Required at runtime by the mobile app"
         TYPE RUNTIME
@@ -532,7 +532,7 @@ if (TARGET Qt6::Qml)
     target_link_libraries(okularcore PRIVATE Qt6::Qml)
 endif()
 
-set_target_properties(okularcore PROPERTIES VERSION 4.0.0 SOVERSION 4 OUTPUT_NAME Okular6Core EXPORT_NAME Core)
+set_target_properties(okularcore PROPERTIES VERSION 5.0.0 SOVERSION 5 OUTPUT_NAME Okular6Core EXPORT_NAME Core)
 
 install(TARGETS okularcore EXPORT Okular6Targets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 

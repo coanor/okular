@@ -116,13 +116,7 @@ static SidecarAnnotation sidecarRecord(int page, const Annotation *annotation)
     QDomElement element = xml.createElement(QStringLiteral("annotation"));
     xml.appendChild(element);
     AnnotationUtils::storeAnnotation(annotation, element, xml);
-    return {annotation->uniqueName(),
-            page,
-            annotation->subType(),
-            xml.toString(-1),
-            annotation->contents(),
-            annotation->author(),
-            annotation->style().color().name(QColor::HexArgb)};
+    return {annotation->uniqueName(), page, annotation->subType(), xml.toString(-1), annotation->contents(), annotation->author(), annotation->style().color().name(QColor::HexArgb)};
 }
 
 struct AllocatedPixmap {
@@ -1031,7 +1025,7 @@ DocumentViewport DocumentPrivate::nextDocumentViewport() const
 {
     DocumentViewport ret = m_nextDocumentViewport;
     if (!m_nextDocumentDestination.isEmpty() && m_generator) {
-        DocumentViewport vp(m_parent->metaData(QStringLiteral("NamedViewport"), m_nextDocumentDestination).toString());
+        DocumentViewport vp = m_parent->metaData(QStringLiteral("NamedViewport"), m_nextDocumentDestination).value<DocumentViewport>();
         if (vp.isValid()) {
             ret = vp;
         }
@@ -1214,7 +1208,7 @@ void DocumentPrivate::recalculateForms()
                 for (FormField *form : forms) {
                     if (form->id() == formId) {
                         const Action *action = form->additionalAction(FormField::CalculateField);
-                        if (action) {
+                        if (action && action->actionType() == Action::Script) {
                             std::shared_ptr<Event> event;
                             if (dynamic_cast<FormFieldText *>(form) || dynamic_cast<FormFieldChoice *>(form)) {
                                 // Prepare text calculate event
@@ -2536,8 +2530,7 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
 
     if (mime.inherits(QStringLiteral("application/pdf")) && (d->m_url.isLocalFile() || fromFileDescriptor) && !d->m_archiveData && !d->m_docdataMigrationNeeded) {
         QString sidecarError;
-        const QString hash = fromFileDescriptor ? QString::fromLatin1(QCryptographicHash::hash(filedata, QCryptographicHash::Sha256).toHex())
-                                                : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
+        const QString hash = fromFileDescriptor ? QString::fromLatin1(QCryptographicHash::hash(filedata, QCryptographicHash::Sha256).toHex()) : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
         if (!hash.isEmpty()) {
             QList<SidecarAnnotation> savedAnnotations;
             qint64 revision = 0;
@@ -3261,7 +3254,7 @@ QVariant Document::metaData(const QString &key, const QVariant &option) const
                     view.rePos.enabled = true;
                     view.rePos.pos = Okular::DocumentViewport::Center;
 
-                    return view.toString();
+                    return QVariant::fromValue(view);
                 }
             }
         }
@@ -4041,13 +4034,6 @@ void Document::redo()
     d->m_undoStack->redo();
 }
 
-void Document::editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos)
-{
-    d->m_formChanges = true;
-    QUndoCommand *uc = new EditFormTextCommand(this->d, form, pageNumber, newContents, newCursorPos, form->text(), prevCursorPos, prevAnchorPos);
-    d->m_undoStack->push(uc);
-}
-
 void Document::editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos, const QString &oldContents)
 {
     d->m_formChanges = true;
@@ -4412,11 +4398,6 @@ void Document::processAction(const Action *action)
     }
 }
 
-void Document::processFormatAction(const Action *action, Okular::FormFieldText *fft)
-{
-    processFormatAction(action, static_cast<FormField *>(fft));
-}
-
 void Document::processFormatAction(const Action *action, Okular::FormField *ff)
 {
     if (action->actionType() != Action::Script) {
@@ -4562,18 +4543,6 @@ void Document::processKeystrokeAction(const Action *action, Okular::FormField *f
     }
 }
 
-void Document::processKeystrokeAction(const Action *action, Okular::FormFieldText *fft, const QVariant &newValue)
-{
-    // use -1 as default
-    processKeystrokeAction(action, fft, newValue, -1, -1);
-}
-
-void Document::processKeystrokeCommitAction(const Action *action, Okular::FormFieldText *fft)
-{
-    bool returnCode = false;
-    processKeystrokeCommitAction(action, fft, returnCode);
-}
-
 void Document::processKeystrokeCommitAction(const Action *action, Okular::FormField *ff, bool &returnCode)
 {
     if (action->actionType() != Action::Script) {
@@ -4625,11 +4594,6 @@ void Document::processFocusAction(const Action *action, Okular::FormField *field
     const ScriptAction *linkscript = static_cast<const ScriptAction *>(action);
 
     d->executeScriptEvent(event, *linkscript);
-}
-
-void Document::processValidateAction(const Action *action, Okular::FormFieldText *fft, bool &returnCode)
-{
-    processValidateAction(action, static_cast<FormField *>(fft), returnCode);
 }
 
 void Document::processValidateAction(const Action *action, Okular::FormField *ff, bool &returnCode)
@@ -4790,18 +4754,6 @@ void Document::processFormMouseScriptAction(const Action *action, Okular::FormFi
     const ScriptAction *linkscript = static_cast<const ScriptAction *>(action);
 
     d->executeScriptEvent(event, *linkscript);
-}
-
-void Document::processFormMouseUpScripAction(const Action *action, Okular::FormField *ff)
-{
-    processFormMouseScriptAction(action, ff, FieldMouseUp);
-}
-
-void Document::processSourceReference(const SourceReference *ref)
-{
-    if (ref) {
-        processSourceReference(*ref);
-    }
 }
 
 void Document::processSourceReference(const SourceReference &ref)
@@ -5012,17 +4964,6 @@ KPluginMetaData Document::generatorInfo() const
     auto genIt = d->m_loadedGenerators.constFind(d->m_generatorName);
     Q_ASSERT(genIt != d->m_loadedGenerators.constEnd());
     return genIt.value().metadata;
-}
-
-int Document::configurableGenerators() const
-{
-    int configurableGenerators = 0;
-    for (auto generator : std::as_const(d->m_loadedGenerators)) {
-        if (d->generatorConfig(generator)) {
-            configurableGenerators++;
-        }
-    }
-    return configurableGenerators;
 }
 
 QStringList Document::supportedMimeTypes() const
@@ -5259,12 +5200,6 @@ bool Document::canSaveChanges(SaveCapability cap) const
     }
 
     return false;
-}
-
-bool Document::saveChanges(const QString &fileName)
-{
-    QString errorText;
-    return saveChanges(fileName, &errorText);
 }
 
 bool Document::saveChanges(const QString &fileName, QString *errorText)
@@ -6278,16 +6213,120 @@ QString DocumentInfo::getKeyTitle(const QString &key) const
 }
 
 /** DocumentSynopsis **/
-
-DocumentSynopsis::DocumentSynopsis()
-    : QDomDocument(QStringLiteral("DocumentSynopsis"))
+class DocumentSynopsis::ElementPrivate
 {
-    // void implementation, only subclassed for naming
+public:
+    explicit ElementPrivate(const QString &_title)
+        : title(_title)
+    {
+    }
+    QVector<DocumentSynopsis::Element> children;
+    QString title;
+    std::optional<DocumentViewport> viewPort;
+    std::optional<QString> viewPortName;
+    QString url;
+    QString externalFileName;
+    bool open = false;
+};
+
+DocumentSynopsis::ElementBuilder::ElementBuilder(const QString &title)
+    : d(std::make_shared<ElementPrivate>(title))
+{
 }
 
-DocumentSynopsis::DocumentSynopsis(const QDomDocument &document)
-    : QDomDocument(document)
+DocumentSynopsis::ElementBuilder::~ElementBuilder() = default;
+
+void DocumentSynopsis::ElementBuilder::addChild(const Element &element)
 {
+    d->children.push_back(element);
+}
+
+void DocumentSynopsis::ElementBuilder::setViewPort(const DocumentViewport &viewPort)
+{
+    d->viewPort = viewPort;
+}
+void DocumentSynopsis::ElementBuilder::setUrl(const QString &url)
+{
+    d->url = url;
+}
+
+void DocumentSynopsis::ElementBuilder::setExternalFileName(const QString &externalFileName)
+{
+    d->externalFileName = externalFileName;
+}
+
+void DocumentSynopsis::ElementBuilder::setOpen(bool open)
+{
+    d->open = open;
+}
+
+void DocumentSynopsis::ElementBuilder::setViewPortName(const QString &viewPortName)
+{
+    d->viewPortName = viewPortName;
+}
+
+DocumentSynopsis::Element::Element(const ElementBuilder &builder)
+    : d(builder.d)
+{
+}
+
+DocumentSynopsis::Element::~Element() = default;
+
+QString DocumentSynopsis::Element::url() const
+{
+    return d->url;
+}
+
+QString DocumentSynopsis::Element::title() const
+{
+    return d->title;
+}
+
+std::optional<DocumentViewport> DocumentSynopsis::Element::viewPort() const
+{
+    return d->viewPort;
+}
+
+std::optional<QString> DocumentSynopsis::Element::viewPortName() const
+{
+    return d->viewPortName;
+}
+QVector<DocumentSynopsis::Element> DocumentSynopsis::Element::children() const
+{
+    return d->children;
+}
+
+QString DocumentSynopsis::Element::externalFileName() const
+{
+    return d->externalFileName;
+}
+
+bool DocumentSynopsis::Element::isOpen() const
+{
+    return d->open;
+}
+
+class DocumentSynopsis::DocumentSynopsisPrivate
+{
+public:
+    QVector<DocumentSynopsis::Element> children;
+};
+
+DocumentSynopsis::DocumentSynopsis()
+    : d(std::make_shared<DocumentSynopsisPrivate>())
+{
+}
+
+DocumentSynopsis::~DocumentSynopsis() = default;
+
+QVector<DocumentSynopsis::Element> DocumentSynopsis::children() const
+{
+    return d->children;
+}
+
+void DocumentSynopsis::addChild(const Element &element)
+{
+    d->children.push_back(element);
 }
 
 /** EmbeddedFile **/

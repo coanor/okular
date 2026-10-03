@@ -100,9 +100,10 @@ build_windows_from_linux:
    - .cache/okular-windows/
  before_script:
   - apt-get update
-  - apt-get install --yes --no-install-recommends ca-certificates curl python3 make g++ clang-20 lld-20 llvm-20 7zip gettext icoutils pkg-config zlib1g-dev libzstd-dev
+  - apt-get install --yes --no-install-recommends ca-certificates curl python3 make ninja-build g++ clang-20 lld-20 llvm-20 7zip gettext icoutils pkg-config zlib1g-dev libzstd-dev
  script:
   - python3 autotests/windowscrossbuildtest.py
+  - python3 autotests/unixcrossbuildtest.py
   - make windows-cross
  artifacts:
   paths:

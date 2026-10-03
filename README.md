@@ -82,6 +82,9 @@ Available options are `desktop`, `mobile`, and `both`.
 For Windows x64 builds using Linux Clang and LLVM tools, run `make windows-cross`; see
 [Building Windows from Linux](doc/build-windows-from-linux.md).
 
+For Linux or macOS cross-builds with a prepared target SDK/toolchain, use
+`make linux-cross` or `make macos-cross`; see [Linux and macOS cross-builds](doc/build-linux-macos-cross.md).
+
 ### Android APK
 
 With Docker, an initialized Android Craft root next to the main checkout (`craft-kde-android`), Android SDK build tools 36.0.0, and an Android debug keystore, build and sign the arm64 APK with:

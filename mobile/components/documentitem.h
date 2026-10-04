@@ -157,7 +157,7 @@ public:
 
     // Internal, not binded to qml
     AiAssistant *aiAssistant();
-    QUrl aiDocumentUrl() const;
+    std::shared_ptr<QFile> aiDocumentFile() const;
     Okular::Document *document();
     Observer *pageviewObserver();
     Observer *thumbnailObserver();
@@ -205,7 +205,7 @@ private Q_SLOTS:
 private:
     void openUrl(const QUrl &url, const QString &password);
 
-    std::unique_ptr<QFile> m_aiDocumentFile;
+    std::shared_ptr<QFile> m_aiDocumentFile;
     AiAssistant *m_aiAssistant = nullptr;
     Okular::Document *m_document;
     TOCModel *m_tocModel;

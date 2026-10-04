@@ -60,6 +60,41 @@ TestCase {
         compare(aiTestServer.requestCount, 1);
     }
 
+    function test_descriptorWithoutPathAccessCanAsk() {
+        const url = aiTestFiles.restrictedDescriptorUrl();
+        if (!url.toString()) {
+            skip("File descriptors are unavailable on this platform");
+        }
+        const descriptorDocument = createTemporaryObject(documentComponent, testCase, {url: url});
+        verify(descriptorDocument.opened);
+        const descriptorAssistant = descriptorDocument.aiAssistant;
+        verify(descriptorAssistant.saveProfile(-1, fields(false)));
+        const index = descriptorAssistant.currentProfile;
+        try {
+            descriptorAssistant.question = "Explain the descriptor document";
+            descriptorAssistant.activate();
+            tryCompare(descriptorAssistant, "busy", false);
+            verify(descriptorAssistant.ready, "An opened descriptor document must enable Ask");
+            descriptorAssistant.ask();
+            tryCompare(descriptorAssistant, "busy", false);
+            compare(aiTestServer.requestCount, 1);
+            compare(descriptorAssistant.messages.length, 2);
+            const reopenedDocument = createTemporaryObject(documentComponent, testCase, {
+                url: aiTestFiles.restrictedDescriptorUrl()
+            });
+            verify(reopenedDocument.opened);
+            const reopenedAssistant = reopenedDocument.aiAssistant;
+            reopenedAssistant.currentProfile = index;
+            reopenedAssistant.activate();
+            tryCompare(reopenedAssistant, "ready", true);
+            compare(reopenedAssistant.messages.length, 2);
+            descriptorAssistant.clearConversation();
+        } finally {
+            descriptorAssistant.cancel();
+            descriptorAssistant.removeProfile(index);
+        }
+    }
+
     function test_configureBeforeOpeningDocument() {
         const emptyDocument = createTemporaryObject(documentComponent, testCase, {url: ""});
         verify(emptyDocument !== null && !emptyDocument.opened);

@@ -8,7 +8,9 @@
 
 #include <KLocalizedString>
 #include <QBuffer>
+#include <QCryptographicHash>
 #include <QDesktopServices>
+#include <QFile>
 #include <QFutureWatcher>
 #include <QJsonDocument>
 #include <QPainter>
@@ -161,7 +163,8 @@ void AiAssistant::activate()
     m_hashing = true;
     Q_EMIT busyChanged();
     const int generation = m_documentGeneration;
-    const QUrl url = m_document->aiDocumentUrl();
+    const QUrl url = m_document->url();
+    const auto file = m_document->aiDocumentFile();
     auto *watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, generation] {
         const QString key = watcher->result();
@@ -172,10 +175,24 @@ void AiAssistant::activate()
         m_hashing = false;
         m_documentKey = key;
         loadConversation();
+        if (key.isEmpty()) {
+            setStatus(i18n("Could not prepare this document for AI. Reopen the document and try again."));
+        }
         Q_EMIT readyChanged();
         Q_EMIT busyChanged();
     });
-    watcher->setFuture(QtConcurrent::run([url] { return AiStore::documentKey(url); }));
+    watcher->setFuture(QtConcurrent::run([url, file] {
+        if (!file) {
+            return AiStore::documentKey(url);
+        }
+        // Core finished reading the shared descriptor before activation. Keep
+        // the reader alive if the document closes while hashing in the worker.
+        QCryptographicHash hash(QCryptographicHash::Sha256);
+        if (file->seek(0) && hash.addData(file.get())) {
+            return QString::fromLatin1(hash.result().toHex());
+        }
+        return QString();
+    }));
 }
 
 QVariantMap AiAssistant::profile(int index) const

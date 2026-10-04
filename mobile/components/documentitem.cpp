@@ -15,6 +15,10 @@
 #include <QJniObject>
 #endif
 
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
+
 #include <core/bookmarkmanager.h>
 #include <core/document_p.h>
 #include <core/page.h>
@@ -71,14 +75,23 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
         QUrl(QJniObject(QNativeInterface::QAndroidApplication::context()).callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
 #endif
 
-    // The core consumes and closes Android content descriptors without keeping
-    // a document URL. Retain an independent reader for lazy AI content hashing.
+#ifdef Q_OS_UNIX
+    // Core consumes and closes content descriptors without keeping a URL.
+    // Duplicate the granted descriptor: reopening its path can be forbidden.
     if (realUrl.scheme() == QLatin1String("fd")) {
-        auto file = std::make_unique<QFile>(QStringLiteral("/proc/self/fd/") + realUrl.path().mid(1));
-        if (file->open(QIODevice::ReadOnly)) {
-            m_aiDocumentFile = std::move(file);
+        bool ok;
+        const int descriptor = realUrl.path().mid(1).toInt(&ok);
+        const int reader = ok ? dup(descriptor) : -1;
+        if (reader >= 0) {
+            auto file = std::make_shared<QFile>();
+            if (file->open(reader, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle)) {
+                m_aiDocumentFile = std::move(file);
+            } else {
+                close(reader);
+            }
         }
     }
+#endif
 
     const QString path = realUrl.isLocalFile() ? realUrl.toLocalFile() : QStringLiteral("-");
 
@@ -258,12 +271,9 @@ AiAssistant *DocumentItem::aiAssistant()
     return m_aiAssistant;
 }
 
-QUrl DocumentItem::aiDocumentUrl() const
+std::shared_ptr<QFile> DocumentItem::aiDocumentFile() const
 {
-    if (m_aiDocumentFile) {
-        return QUrl::fromLocalFile(QStringLiteral("/proc/self/fd/%1").arg(m_aiDocumentFile->handle()));
-    }
-    return url();
+    return m_aiDocumentFile;
 }
 
 Okular::Document *DocumentItem::document()

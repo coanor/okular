@@ -6,6 +6,7 @@
 
 #include <KLocalizedContext>
 #include <QApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -20,6 +21,10 @@
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QtQuickTest/quicktest.h>
+
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
 
 // The mobile assistant talks to a local HTTP fixture, never a real provider.
 class MobileAiServer : public QTcpServer
@@ -110,6 +115,30 @@ class DocumentViewTestSetup : public QObject
     Q_OBJECT
 
 public:
+    Q_INVOKABLE QUrl restrictedDescriptorUrl()
+    {
+#ifdef Q_OS_UNIX
+        const QString path = m_restrictedFixtureDir.filePath(QStringLiteral("document.pdf"));
+        if (!QFile::exists(path) && !QFile::copy(m_fixturePath, path)) {
+            qFatal("Could not copy the descriptor fixture");
+        }
+        QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            qFatal("Could not open the descriptor fixture");
+        }
+        const int descriptor = dup(file.handle());
+        if (descriptor < 0 || !file.setPermissions({})) {
+            qFatal("Could not restrict the descriptor fixture");
+        }
+        // The descriptor stays readable while reopening its pathname fails,
+        // as with an Android provider granting access only through a descriptor.
+        return QUrl(QStringLiteral("fd:///%1").arg(descriptor));
+#else
+        return {};
+#endif
+    }
+
     ~DocumentViewTestSetup() override
     {
         const QFileInfo fixture(m_fixturePath);
@@ -133,12 +162,21 @@ public Q_SLOTS:
         engine->addImportPath(QStringLiteral(OKULAR_QML_IMPORT_PATH));
         engine->rootContext()->setContextObject(new KLocalizedContext(engine));
         engine->rootContext()->setContextProperty(QStringLiteral("aiTestServer"), &m_aiServer);
+        engine->rootContext()->setContextProperty(QStringLiteral("aiTestFiles"), this);
         engine->rootContext()->setContextProperty(QStringLiteral("testDocumentUrl"), QUrl::fromLocalFile(m_fixturePath));
     }
 
 private:
+    static QString fixtureTemplate()
+    {
+        const QString cache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+        QDir().mkpath(cache);
+        return cache + QStringLiteral("/mobile-document-test-XXXXXX");
+    }
+
     MobileAiServer m_aiServer;
-    QTemporaryDir m_fixtureDir;
+    QTemporaryDir m_fixtureDir {fixtureTemplate()};
+    QTemporaryDir m_restrictedFixtureDir {fixtureTemplate()};
     QString m_fixturePath;
 };
 

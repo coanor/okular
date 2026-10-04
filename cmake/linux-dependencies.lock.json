@@ -501,6 +501,13 @@
       "size": 854152
     },
     {
+      "name": "libsqlite3-dev",
+      "version": "3.46.1-7+deb13u2",
+      "url": "https://deb.debian.org/debian/pool/main/s/sqlite3/libsqlite3-dev_3.46.1-7%2Bdeb13u2_arm64.deb",
+      "sha256": "094aabe9e348895d14e1ec3d33fcb261df7722f33eca15c9318a4a880ea17a95",
+      "size": 1060688
+    },
+    {
       "name": "libuuid1",
       "version": "2.41.5-0+deb13u1",
       "url": "https://deb.debian.org/debian/pool/main/u/util-linux/libuuid1_2.41.5-0%2bdeb13u1_arm64.deb",
@@ -1584,6 +1591,13 @@
       "url": "https://deb.debian.org/debian/pool/main/c/curl/libcurl3t64-gnutls_8.14.1-2%2bdeb13u5_arm64.deb",
       "sha256": "e7907dba88227fa61f86e1e3ea198c770cb0a255d506f31d9564278dfba3c898",
       "size": 354020
+    },
+    {
+      "name": "libcurl4-gnutls-dev",
+      "version": "8.14.1-2+deb13u5",
+      "url": "https://deb.debian.org/debian/pool/main/c/curl/libcurl4-gnutls-dev_8.14.1-2%2Bdeb13u5_arm64.deb",
+      "sha256": "fb7fab0ed2a5d4e853bf75421ea0ed2be20ab2a55002697d6c1880b340ad47af",
+      "size": 489904
     },
     {
       "name": "libduktape207",

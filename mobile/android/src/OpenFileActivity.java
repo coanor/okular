@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.app.Activity;
 
 import java.io.FileNotFoundException;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.qtproject.qt.android.bindings.QtActivity;
 
@@ -19,17 +20,36 @@ class FileClass
 
 public class OpenFileActivity extends QtActivity
 {
+    private final ConcurrentHashMap<String, String> sourceUrls = new ConcurrentHashMap<>();
+
+    private String descriptorUrl(ParcelFileDescriptor file, Uri source) throws FileNotFoundException
+    {
+        if (file == null)
+            throw new FileNotFoundException("Document provider returned no descriptor");
+        String url = "fd:///" + file.detachFd();
+        sourceUrls.put(url, source.toString());
+        return url;
+    }
+
+    public String takeSourceUrl(String descriptorUrl)
+    {
+        String source = sourceUrls.remove(descriptorUrl);
+        return source == null ? descriptorUrl : source;
+    }
 
     public String contentUrlToFd(String url)
     {
-        if (Uri.parse(url).getScheme().equals("fd")) {
+        if (url.isEmpty())
+            return "";
+        Uri source = Uri.parse(url);
+        if ("fd".equals(source.getScheme())) {
             return url;
         }
 
         try {
             ContentResolver resolver = getBaseContext().getContentResolver();
-            ParcelFileDescriptor fdObject = resolver.openFileDescriptor(Uri.parse(url), "r");
-            return "fd:///" + fdObject.detachFd();
+            ParcelFileDescriptor fdObject = resolver.openFileDescriptor(source, "r");
+            return descriptorUrl(fdObject, source);
         } catch (FileNotFoundException e) {
             Log.e("Okular", "Cannot find file", e);
         }
@@ -42,7 +62,20 @@ public class OpenFileActivity extends QtActivity
         if (uri == null)
             return;
 
-        // DocumentItem opens the provider URI and retains it for reopening after sync.
+        if (!uri.getScheme().equals("file")) {
+            try {
+                ContentResolver resolver = getBaseContext().getContentResolver();
+                ParcelFileDescriptor fdObject = resolver.openFileDescriptor(uri, "r");
+                uri = Uri.parse(descriptorUrl(fdObject, uri));
+            } catch (Exception e) {
+                e.printStackTrace();
+
+                //TODO: emit warning that couldn't be opened
+                Log.e("Okular", "failed to open");
+                return;
+            }
+        }
+
         Log.e("Okular", "opening url: " + uri.toString());
         FileClass.openUri(uri.toString());
     }

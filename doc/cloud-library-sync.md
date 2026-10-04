@@ -4,6 +4,10 @@ This feature is being developed in `feature/s3-library-sync`. See
 [`spec.md`](../spec.md) for the full first-release contract. The current
 desktop actions cover local import, opening managed books, manual sync, and
 conflict resolution for PDF annotations and AI settings.
+Mobile also supports importing, opening and syncing books, and resolving PDF
+annotation conflicts through **Cloud Library…**. See the
+[mobile setup](../README.md#mobile-cloud-library). AI settings sync remains a
+desktop feature.
 
 ## Project identity and local import
 
@@ -12,7 +16,7 @@ its bytes. Importing identical bytes reuses the existing project; different
 bytes always create a separate project, even when the filename or title is the
 same. Okular must never merge their source text or annotations.
 
-The reader chooses a managed library directory before the first import. Only
+On desktop, the reader chooses a managed library directory before the first import. Only
 an explicit **Add to cloud library** action imports a local file. The import
 copies the file into `books/<sha256>/source.<extension>`, writes a local
 `manifest.json`, then removes the original file. A failed copy or manifest
@@ -20,14 +24,17 @@ write leaves the original in place. Other files that the reader opens remain
 outside the library. All remote projects are downloaded into the selected
 managed directory during sync.
 
-The UI integration must close an open source document before the final move on
+Mobile keeps its managed library in the app's private data directory. Import
+stages a copy and keeps the original document, including Android provider files.
+
+The desktop UI integration must close an open source document before the final move on
 platforms that do not permit removing an open file, then reopen the managed
 copy. Existing PDF annotation sidecars and local AI conversations remain
 associated because both already use the source bytes' hash.
 
 ## Remote data
 
-Set `OKULAR_S3_BUCKET` and optionally `OKULAR_S3_PREFIX`. Set `AWS_REGION`,
+On desktop, set `OKULAR_S3_BUCKET` and optionally `OKULAR_S3_PREFIX`. Set `AWS_REGION`,
 and use either `AWS_ACCESS_KEY_ID` plus `AWS_SECRET_ACCESS_KEY` (with optional
 `AWS_SESSION_TOKEN`) or a static profile selected by `AWS_PROFILE` in the AWS
 shared credentials file. `AWS_ENDPOINT_URL_S3` selects a compatible endpoint;

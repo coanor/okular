@@ -40,6 +40,12 @@ TestCase {
         signalName: "clicked"
     }
 
+    SignalSpy {
+        id: askAiSpy
+        target: view
+        signalName: "askAiRequested"
+    }
+
     function init() {
         view = createTemporaryObject(viewComponent, testCase);
         verify(view !== null);
@@ -183,6 +189,27 @@ TestCase {
         verify(view.selectingText, "The magnifier should follow the finger on the selected page");
         touch.release(0, view, word.x, word.y).commit();
         tryCompare(view, "selectingText", false);
+    }
+
+    function test_askAiUsesSelectedPageAndPassage() {
+        const page = visiblePages().find(item => item.pageNumber === 1).pageItem;
+        const word = page.mapToItem(view, page.width * 0.22, page.height * 0.162);
+        const currentPage = view.document.currentPage;
+        const touch = touchEvent(view);
+        touch.press(0, view, word.x, word.y).commit();
+        wait(1000);
+        touch.release(0, view, word.x, word.y).commit();
+        verify(view.hasSelection);
+        verify(page.selectedText.length > 0);
+        const button = findChild(view, "askAiSelection");
+        verify(button !== null && button.enabled);
+        const count = askAiSpy.count;
+        mouseClick(button);
+        tryCompare(askAiSpy, "count", count + 1);
+        const args = askAiSpy.signalArguments[count];
+        compare(args[0], page.selectedText);
+        compare(args[1], 1);
+        compare(view.document.currentPage, currentPage);
     }
 
     function test_dictionaryWaitsForSelectionRelease() {

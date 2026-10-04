@@ -28,6 +28,7 @@ QQC2.ScrollView {
     onSelectionPageChanged: DictionaryLookup.clear()
 
     signal clicked
+    signal askAiRequested(string text, int pageNumber)
     signal urlOpened
 
     clip: true
@@ -285,14 +286,15 @@ QQC2.ScrollView {
                     id: selectionMenu
                     z: 5
                     visible: root.hasSelection && !root.selectingText
-                    width: Math.min(selectionOverlay.width - 16, Math.max(280, selectionActions.implicitWidth))
+                    width: Math.min(selectionOverlay.width - 16, Math.max(280, selectionActions.childrenRect.width))
                     x: Math.max(0, Math.min(selectionOverlay.width - width, root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).x - width / 2))
                     y: Math.max(0, root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).y - height - 12)
 
                     contentItem: Column {
                         spacing: 4
-                        Row {
+                        Flow {
                             id: selectionActions
+                            width: parent.width
                             QQC2.ToolButton {
                                 text: i18n("Copy")
                                 enabled: root.selectionPage.canCopySelection
@@ -302,6 +304,12 @@ QQC2.ScrollView {
                                 text: i18n("Highlight")
                                 enabled: root.selectionPage.canHighlightSelection
                                 onClicked: root.selectionPage.highlightSelection()
+                            }
+                            QQC2.ToolButton {
+                                objectName: "askAiSelection"
+                                text: i18n("Ask AI")
+                                enabled: root.selectionPage.canCopySelection
+                                onClicked: root.askAiRequested(root.selectionPage.selectedText, root.selectionPage.pageNumber)
                             }
                             QQC2.ToolButton {
                                 text: i18n("Look up")

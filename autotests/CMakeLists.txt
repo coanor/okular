@@ -71,7 +71,7 @@ if(Poppler_Qt6_FOUND)
         find_package(Qt6 ${QT_REQUIRED_VERSION} REQUIRED COMPONENTS QuickTest)
         ecm_add_test(mobiledocumentviewtest.cpp
             TEST_NAME "mobiledocumentviewtest"
-            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets KF6::I18n
+            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets Qt6::Network Qt6::Concurrent KF6::I18n KF6::ConfigCore
         )
         target_compile_definitions(mobiledocumentviewtest PRIVATE
             QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
@@ -165,10 +165,19 @@ if(BUILD_DESKTOP)
         TEST_NAME "booklibrarytest"
         LINK_LIBRARIES Qt6::Test
     )
-    ecm_add_test(aiprovidertest.cpp ../part/aiprovider.cpp
-        TEST_NAME "aiprovidertest"
-        LINK_LIBRARIES Qt6::Test Qt6::Network
+endif()
+ecm_add_test(aiprovidertest.cpp ../part/aiprovider.cpp
+    TEST_NAME "aiprovidertest"
+    LINK_LIBRARIES Qt6::Test Qt6::Network
+)
+if(BUILD_MOBILE AND OpenSSL_FOUND)
+    ecm_add_test(chatgptconnectiontest.cpp ../mobile/components/chatgptconnection.cpp ../mobile/components/chatgpttoken.cpp
+        TEST_NAME "chatgptconnectiontest"
+        LINK_LIBRARIES Qt6::Test Qt6::Network OpenSSL::Crypto
     )
+    target_compile_definitions(chatgptconnectiontest PRIVATE HAVE_CHATGPT_AUTH=1)
+endif()
+if(BUILD_DESKTOP)
     ecm_add_test(aimarkdownviewtest.cpp ../part/aimarkdownview.cpp ../part/aiassets/aiassets.qrc
         TEST_NAME "aimarkdownviewtest"
         LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::WebEngineWidgets KF6::I18n

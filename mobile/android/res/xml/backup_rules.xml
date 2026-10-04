@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ChatGPT credentials and the device's host ID stay on this installation. -->
 <full-backup-content>
+    <exclude domain="file" path="ai-chatgpt/" />
     <exclude domain="sharedpref" path="okular-cloud.xml" />
 </full-backup-content>

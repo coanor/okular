@@ -8,6 +8,7 @@ add_executable(okularkirigami main.cpp)
 target_link_libraries(okularkirigami PRIVATE
     Qt6::Widgets
     Qt6::Qml
+    Qt6::Network
     KF6::I18n
     KF6::CoreAddons
     KF6::Crash
@@ -19,6 +20,9 @@ ecm_add_qml_module(okularkirigami
 )
 
 ecm_target_qml_sources(okularkirigami SOURCES
+    ui/AiAssistantPage.qml
+    ui/AiModelDialog.qml
+    ui/ChatGptModelDialog.qml
     ui/Bookmarks.qml
     ui/CloudLibraryPage.qml
     ui/CertificateViewerPage.qml
@@ -37,6 +41,9 @@ ecm_target_qml_sources(okularkirigami SOURCES
 
 if (ANDROID)
     target_sources(okularkirigami PRIVATE android.cpp)
+    if(OpenSSL_FOUND)
+        target_link_libraries(okularkirigami PRIVATE OpenSSL::Crypto)
+    endif()
 
     # androiddeployqt only packages libraries needed by the main binary.
     # That is problematic because some of the libraries we need we only use in plugins
@@ -67,7 +74,9 @@ if (ANDROID)
         applications-education-language-symbolic
         bookmark-remove
         bookmarks-organize
+        configure
         dialog-close
+        dialog-messages
         document-open
         view-refresh
         help-about-symbolic

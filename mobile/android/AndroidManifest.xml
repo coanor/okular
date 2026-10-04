@@ -7,12 +7,12 @@
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <supports-screens android:largeScreens="true" android:normalScreens="true" android:anyDensity="true" android:smallScreens="true"/>
     <!-- %%INSERT_FEATURES -->
 
-    <application android:name="org.qtproject.qt.android.bindings.QtApplication" android:label="Okular" android:icon="@drawable/icon" android:extractNativeLibs="true"
-                 android:fullBackupContent="@xml/cloud_backup_rules"
-                 android:dataExtractionRules="@xml/cloud_data_extraction_rules">
+    <application android:name="org.qtproject.qt.android.bindings.QtApplication" android:label="Okular" android:icon="@drawable/icon" android:extractNativeLibs="true" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules">
         <activity android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|locale|fontScale|keyboard|keyboardHidden|navigation"
                   android:name="org.kde.something.OpenFileActivity"
                   android:label="Okular"
@@ -49,9 +49,14 @@
             <!--  Messages maps -->
 
             <meta-data android:name="android.app.extract_android_style" android:value="minimal"/>
-            <meta-data android:name="android.app.background_running" android:value="false"/>
+            <!-- The ChatGPT loopback callback needs Qt socket events while the browser is open. -->
+            <meta-data android:name="android.app.background_running" android:value="true"/>
             <meta-data android:name="android.app.auto_screen_scale_factor" android:value="false"/>
         </activity>
+
+        <service android:name="org.kde.something.ChatGptSignInService"
+                 android:exported="false"
+                 android:foregroundServiceType="dataSync"/>
 
         <meta-data android:name="io.sentry.dsn" android:value="https://5e81265d771a44a6b04d661600f47cbe@crash-reports.kde.org/24"/>
 

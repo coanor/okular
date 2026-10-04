@@ -16,7 +16,8 @@ struct AiProfile {
     QString model;
     QString extraArguments; // CLI options for Codex, JSON request fields for HTTP providers.
     bool vision = true;
-    QString apiKey; // Kept in memory and, when available, in KWallet.
+    QString apiKey;           // Kept in memory and, when available, in KWallet.
+    QString chatGptAccountId; // OAuth registration; tokens are stored separately on mobile.
 };
 
 struct AiMessage {

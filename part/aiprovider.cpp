@@ -60,6 +60,12 @@ void AiProvider::send(const AiProfile &profile, const AiConversation &conversati
     m_outputBuffer.clear();
     m_errorBuffer.clear();
     m_extraPayload = {};
+    m_streamCompleted = false;
+    m_streamError.clear();
+    if (!profile.chatGptAccountId.isEmpty()) {
+        sendChatGptResponse();
+        return;
+    }
     if (profile.kind != AiProfile::Kind::Codex && !profile.extraArguments.trimmed().isEmpty()) {
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(profile.extraArguments.toUtf8(), &error);
@@ -163,21 +169,20 @@ void AiProvider::sendOpenAiChat()
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + m_profile.apiKey.toUtf8());
     QJsonArray messages;
-    messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), conversationInstructions()}});
+    messages.append(QJsonObject {{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), conversationInstructions()}});
     for (const AiMessage &message : std::as_const(m_conversation.messages)) {
         if (message.role == QLatin1String("assistant")) {
-            messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), message.content}});
+            messages.append(QJsonObject {{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), message.content}});
             continue;
         }
         QJsonArray content;
-        content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), contextText(message)}});
+        content.append(QJsonObject {{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), contextText(message)}});
         if (!message.pageImage.isEmpty()) {
             QString imageUrl = QStringLiteral("data:image/jpeg;base64,");
             imageUrl += message.pageImage;
-            content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("image_url")},
-                                       {QStringLiteral("image_url"), QJsonObject{{QStringLiteral("url"), imageUrl}}}});
+            content.append(QJsonObject {{QStringLiteral("type"), QStringLiteral("image_url")}, {QStringLiteral("image_url"), QJsonObject {{QStringLiteral("url"), imageUrl}}}});
         }
-        messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
+        messages.append(QJsonObject {{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
     }
     QJsonObject payload = m_extraPayload;
     payload.insert(QStringLiteral("model"), m_profile.model);
@@ -216,18 +221,17 @@ void AiProvider::sendOpenAiResponse()
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + m_profile.apiKey.toUtf8());
     QJsonArray content;
-    content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("input_text")}, {QStringLiteral("text"), contextText(m_message)}});
+    content.append(QJsonObject {{QStringLiteral("type"), QStringLiteral("input_text")}, {QStringLiteral("text"), contextText(m_message)}});
     if (!m_message.pageImage.isEmpty()) {
         QString imageUrl = QStringLiteral("data:image/jpeg;base64,");
         imageUrl += m_message.pageImage;
-        content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("input_image")},
-                                   {QStringLiteral("image_url"), imageUrl}});
+        content.append(QJsonObject {{QStringLiteral("type"), QStringLiteral("input_image")}, {QStringLiteral("image_url"), imageUrl}});
     }
     QJsonObject payload = m_extraPayload;
     payload.insert(QStringLiteral("model"), m_profile.model);
     payload.insert(QStringLiteral("conversation"), m_sessionId);
     payload.insert(QStringLiteral("instructions"), conversationInstructions());
-    payload.insert(QStringLiteral("input"), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}}});
+    payload.insert(QStringLiteral("input"), QJsonArray {QJsonObject {{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}}});
     m_reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     finishHttp(m_reply, [this](const QJsonObject &json) {
         QString answer;
@@ -247,6 +251,111 @@ void AiProvider::sendOpenAiResponse()
     });
 }
 
+void AiProvider::sendChatGptResponse()
+{
+    QNetworkRequest request(endpoint(QStringLiteral("responses")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + m_profile.apiKey.toUtf8());
+    request.setRawHeader("Accept", "text/event-stream");
+    request.setTransferTimeout(120000);
+    QJsonArray input;
+    for (const AiMessage &message : std::as_const(m_conversation.messages)) {
+        if (message.role == QLatin1String("assistant")) {
+            input.append(QJsonObject {{QStringLiteral("role"), message.role}, {QStringLiteral("content"), message.content}});
+            continue;
+        }
+        QJsonArray content {QJsonObject {{QStringLiteral("type"), QStringLiteral("input_text")}, {QStringLiteral("text"), contextText(message)}}};
+        if (!message.pageImage.isEmpty()) {
+            const QString imageUrl = QStringLiteral("data:image/jpeg;base64,") + message.pageImage;
+            content.append(QJsonObject {{QStringLiteral("type"), QStringLiteral("input_image")}, {QStringLiteral("image_url"), imageUrl}});
+        }
+        input.append(QJsonObject {{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
+    }
+    // ChatGPT plan usage accepts stateless, streaming Responses requests only.
+    // API-key options and remote conversation IDs must not enter this payload.
+    const QJsonObject payload {{QStringLiteral("model"), m_profile.model}, {QStringLiteral("instructions"), conversationInstructions()}, {QStringLiteral("input"), input}, {QStringLiteral("store"), false}, {QStringLiteral("stream"), true}};
+    auto *reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    m_reply = reply;
+    connect(reply, &QNetworkReply::readyRead, this, &AiProvider::processResponseStream);
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        processResponseStream();
+        m_reply = nullptr;
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const auto error = reply->error();
+        reply->deleteLater();
+        m_profile.apiKey.clear();
+        if (m_cancelled) {
+            Q_EMIT stopped();
+        } else if (status == 401) {
+            Q_EMIT failed(QStringLiteral("ChatGPT authorization expired or was revoked. Sign in again."));
+        } else if (error != QNetworkReply::NoError || status != 200) {
+            Q_EMIT failed(QStringLiteral("ChatGPT request failed (HTTP %1). Check your connection and plan usage limits.").arg(status));
+        } else if (!m_streamError.isEmpty()) {
+            Q_EMIT failed(m_streamError);
+        } else if (!m_streamCompleted || m_lastAnswer.isEmpty()) {
+            Q_EMIT failed(QStringLiteral("ChatGPT did not complete the response. Please retry."));
+        } else {
+            Q_EMIT completed(m_lastAnswer, QString());
+        }
+    });
+}
+
+void AiProvider::processResponseStream()
+{
+    if (!m_reply || m_cancelled) {
+        return;
+    }
+    if (m_reply->isOpen()) {
+        m_outputBuffer += m_reply->readAll();
+    }
+    m_outputBuffer.replace("\r\n", "\n");
+    if (m_outputBuffer.size() > 1024 * 1024 || m_lastAnswer.size() > 4 * 1024 * 1024) {
+        m_streamError = QStringLiteral("The ChatGPT response is too large.");
+        m_reply->abort();
+        return;
+    }
+    qsizetype end;
+    while ((end = m_outputBuffer.indexOf("\n\n")) >= 0) {
+        const QByteArray event = m_outputBuffer.left(end);
+        m_outputBuffer.remove(0, end + 2);
+        QByteArray data;
+        for (const QByteArray &line : event.split('\n')) {
+            if (line.startsWith("data:")) {
+                if (!data.isEmpty()) {
+                    data += '\n';
+                }
+                data += line.mid(5).trimmed();
+            }
+        }
+        if (data.isEmpty() || data == "[DONE]") {
+            continue;
+        }
+        const QJsonObject json = QJsonDocument::fromJson(data).object();
+        const QString type = json.value(QStringLiteral("type")).toString();
+        if (type == QLatin1String("response.output_text.delta")) {
+            m_lastAnswer += json.value(QStringLiteral("delta")).toString();
+            Q_EMIT answerUpdated(m_lastAnswer);
+        } else if (type == QLatin1String("response.completed")) {
+            const QJsonObject response = json.value(QStringLiteral("response")).toObject();
+            m_streamCompleted = response.value(QStringLiteral("status")) == QLatin1String("completed");
+            QString answer;
+            for (const QJsonValue &output : response.value(QStringLiteral("output")).toArray()) {
+                for (const QJsonValue &part : output.toObject().value(QStringLiteral("content")).toArray()) {
+                    if (part.toObject().value(QStringLiteral("type")) == QLatin1String("output_text")) {
+                        answer += part.toObject().value(QStringLiteral("text")).toString();
+                    }
+                }
+            }
+            if (!answer.isEmpty()) {
+                m_lastAnswer = answer;
+            }
+        } else if (type == QLatin1String("error") || type == QLatin1String("response.failed") || type == QLatin1String("response.incomplete") || json.isEmpty()) {
+            m_streamError = QStringLiteral("ChatGPT could not complete the response. Check your plan usage and retry.");
+        }
+    }
+}
+
 void AiProvider::sendAnthropic()
 {
     QNetworkRequest request(endpoint(QStringLiteral("v1/messages")));
@@ -256,18 +365,17 @@ void AiProvider::sendAnthropic()
     QJsonArray messages;
     for (const AiMessage &message : std::as_const(m_conversation.messages)) {
         if (message.role == QLatin1String("assistant")) {
-            messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), message.content}});
+            messages.append(QJsonObject {{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), message.content}});
             continue;
         }
         QJsonArray content;
-        content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), contextText(message)}});
+        content.append(QJsonObject {{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), contextText(message)}});
         if (!message.pageImage.isEmpty()) {
-            content.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("image")},
-                                       {QStringLiteral("source"), QJsonObject{{QStringLiteral("type"), QStringLiteral("base64")},
-                                                                                {QStringLiteral("media_type"), QStringLiteral("image/jpeg")},
-                                                                                {QStringLiteral("data"), message.pageImage}}}});
+            content.append(
+                QJsonObject {{QStringLiteral("type"), QStringLiteral("image")},
+                             {QStringLiteral("source"), QJsonObject {{QStringLiteral("type"), QStringLiteral("base64")}, {QStringLiteral("media_type"), QStringLiteral("image/jpeg")}, {QStringLiteral("data"), message.pageImage}}}});
         }
-        messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
+        messages.append(QJsonObject {{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
     }
     QJsonObject payload = m_extraPayload;
     payload.insert(QStringLiteral("model"), m_profile.model);
@@ -304,7 +412,7 @@ void AiProvider::sendCodex()
         Q_EMIT failed(QStringLiteral("Cannot create a temporary directory for Codex"));
         return;
     }
-    QStringList args{QStringLiteral("exec")};
+    QStringList args {QStringLiteral("exec")};
     if (m_sessionId.isEmpty()) {
         args << QStringLiteral("--json") << QStringLiteral("--sandbox") << QStringLiteral("read-only") << QStringLiteral("--skip-git-repo-check");
         args << QStringLiteral("-C") << directory;
@@ -320,8 +428,7 @@ void AiProvider::sendCodex()
     bool hasReasoningEffort = false;
     for (qsizetype index = 0; index < extraArgs.size(); ++index) {
         const QString &arg = extraArgs[index];
-        if ((arg == QLatin1String("-c") || arg == QLatin1String("--config")) && index + 1 < extraArgs.size()
-            && extraArgs[index + 1].startsWith(QLatin1String("model_reasoning_effort="))) {
+        if ((arg == QLatin1String("-c") || arg == QLatin1String("--config")) && index + 1 < extraArgs.size() && extraArgs[index + 1].startsWith(QLatin1String("model_reasoning_effort="))) {
             hasReasoningEffort = true;
             break;
         }

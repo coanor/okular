@@ -22,6 +22,14 @@ Kirigami.ApplicationWindow {
     wideScreen: width > columnWidth * 5
     visible: true
 
+    function openAiAssistant(text, pageNumber) {
+        const assistant = documentItem.aiAssistant;
+        assistant.setSelection(text || "", pageNumber === undefined ? -1 : pageNumber);
+        assistant.activate();
+        controlsVisible = true;
+        pageStack.layers.push(Qt.createComponent("AiAssistantPage.qml"), {assistant: assistant, document: documentItem});
+    }
+
     globalDrawer: Kirigami.GlobalDrawer {
         title: i18n("Okular")
         titleIcon: "okular"
@@ -45,6 +53,12 @@ Kirigami.ApplicationWindow {
                 onTriggered: {
                     fileDialog.open()
                 }
+            },
+            Kirigami.Action {
+                text: i18n("AI Reading Assistant")
+                icon.name: "dialog-messages"
+                enabled: fileBrowserRoot.pageStack.layers.depth === 1
+                onTriggered: fileBrowserRoot.openAiAssistant("", -1)
             },
             Kirigami.Action {
                 text: i18n("Dictionary…")

@@ -23,12 +23,24 @@ target_sources(okularplugin PRIVATE
     dictionarylookup.cpp
     dictionarylookup.h
     ${CMAKE_SOURCE_DIR}/part/mdxdictionary.cpp
+    aiassistant.cpp
+    aiassistant.h
+    chatgptconnection.cpp
+    chatgptconnection.h
+    chatgpttoken.cpp
+    ${CMAKE_SOURCE_DIR}/part/aiprovider.cpp
+    ${CMAKE_SOURCE_DIR}/part/aistore.cpp
     documentitem.cpp
     thumbnailitem.cpp
     okularsingleton.cpp
     types.cpp
     welcomeitem.cpp
 )
+
+target_compile_definitions(okularplugin PRIVATE HAVE_CHATGPT_AUTH=$<BOOL:${OpenSSL_FOUND}>)
+if(OpenSSL_FOUND)
+    target_link_libraries(okularplugin PRIVATE OpenSSL::Crypto)
+endif()
 
 kconfig_add_kcfg_files(okularplugin GENERATE_MOC ${CMAKE_SOURCE_DIR}/conf/settings_mobile.kcfgc)
 
@@ -46,6 +58,8 @@ target_link_libraries(okularplugin PRIVATE
     Qt6::Quick
     Qt6::Qml
     Qt6::Core
+    Qt6::Network
+    KF6::ConfigCore
     Qt6::Concurrent
     Qt6::Xml
     Qt6::Svg
@@ -54,6 +68,10 @@ target_link_libraries(okularplugin PRIVATE
     KF6::Service
     okularcore
 )
+
+if(KF6Wallet_FOUND)
+    target_link_libraries(okularplugin PRIVATE KF6::Wallet)
+endif()
 
 okular_enable_mdict(okularplugin)
 if(MDICT_FOUND)

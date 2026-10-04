@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chatgpt_sign_in">Okular: ChatGPT sign-in</string>
+    <string name="chatgpt_sign_in_waiting">Complete sign-in in your browser. Tap to return to Okular.</string>
+</resources>

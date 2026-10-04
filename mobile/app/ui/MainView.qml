@@ -21,7 +21,7 @@ Kirigami.Page {
     rightPadding: 0
     bottomPadding: 0
 
-    actions: Kirigami.Action {
+    actions: [Kirigami.Action {
         icon.name: pageArea.page && pageArea.page.bookmarked ? "bookmark-remove" : "bookmarks-organize"
         checkable: true
         visible: document.opened
@@ -32,12 +32,17 @@ Kirigami.Page {
         }
         text: pageArea.page && pageArea.page.bookmarked ? i18n("Remove bookmark") : i18n("Bookmark this page")
         checked: pageArea.page ? pageArea.page.bookmarked : false
-    }
+    }, Kirigami.Action {
+        text: i18n("AI Reading Assistant")
+        icon.name: "dialog-messages"
+        onTriggered: fileBrowserRoot.openAiAssistant("", -1)
+    }]
 
     Okular.DocumentView {
         id: pageArea
         anchors.fill: parent
 
+        onAskAiRequested: (text, pageNumber) => fileBrowserRoot.openAiAssistant(text, pageNumber)
         onClicked: fileBrowserRoot.controlsVisible = !fileBrowserRoot.controlsVisible
         onUrlOpened: welcomeView.saveRecentDocument(document.url)
     }

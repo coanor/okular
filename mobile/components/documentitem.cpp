@@ -6,12 +6,17 @@
 
 #include "documentitem.h"
 
+#include <QFile>
 #include <QMimeDatabase>
 #include <QQmlEngine>
 
 #ifdef Q_OS_ANDROID
 #include <QCoreApplication>
 #include <QJniObject>
+#endif
+
+#ifdef Q_OS_UNIX
+#include <unistd.h>
 #endif
 
 #include <core/bookmarkmanager.h>
@@ -43,6 +48,7 @@ DocumentItem::DocumentItem(QObject *parent)
 
 DocumentItem::~DocumentItem()
 {
+    delete m_aiAssistant;
     delete m_signaturesModel;
     delete m_document;
 }
@@ -54,6 +60,11 @@ void DocumentItem::setUrl(const QUrl &url)
 
 void DocumentItem::openUrl(const QUrl &url, const QString &password)
 {
+    if (m_aiAssistant) {
+        m_aiAssistant->resetDocument();
+    }
+    m_aiDocumentFile.reset();
+    m_aiDocumentSourceUrl = url;
     m_document->closeDocument();
     // TODO: password
     QMimeDatabase db;
@@ -61,8 +72,28 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
     QUrl realUrl = url; // NOLINT(performance-unnecessary-copy-initialization) because of the ifdef below this can't be const &
 
 #ifdef Q_OS_ANDROID
+    const QJniObject activity(QNativeInterface::QAndroidApplication::context());
     realUrl = /* cppcheck-suppress redundantInitialization */
-        QUrl(QJniObject(QNativeInterface::QAndroidApplication::context()).callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+        QUrl(activity.callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+    m_aiDocumentSourceUrl = QUrl(activity.callObjectMethod("takeSourceUrl", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(realUrl.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+#endif
+
+#ifdef Q_OS_UNIX
+    // Core consumes and closes content descriptors without keeping a URL.
+    // Duplicate the granted descriptor: reopening its path can be forbidden.
+    if (realUrl.scheme() == QLatin1String("fd")) {
+        bool ok;
+        const int descriptor = realUrl.path().mid(1).toInt(&ok);
+        const int reader = ok ? dup(descriptor) : -1;
+        if (reader >= 0) {
+            auto file = std::make_shared<QFile>();
+            if (file->open(reader, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle)) {
+                m_aiDocumentFile = std::move(file);
+            } else {
+                close(reader);
+            }
+        }
+    }
 #endif
 
     const QString path = realUrl.isLocalFile() ? realUrl.toLocalFile() : QStringLiteral("-");
@@ -233,6 +264,24 @@ void DocumentItem::resetSearch()
 void DocumentItem::setPassword(const QString &password)
 {
     openUrl(m_document->currentDocument(), password);
+}
+
+AiAssistant *DocumentItem::aiAssistant()
+{
+    if (!m_aiAssistant) {
+        m_aiAssistant = new AiAssistant(this);
+    }
+    return m_aiAssistant;
+}
+
+std::shared_ptr<QFile> DocumentItem::aiDocumentFile() const
+{
+    return m_aiDocumentFile;
+}
+
+QUrl DocumentItem::aiDocumentSourceUrl() const
+{
+    return m_aiDocumentSourceUrl;
 }
 
 Okular::Document *DocumentItem::document()

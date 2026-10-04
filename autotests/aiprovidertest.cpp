@@ -12,6 +12,7 @@
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 
 #include <cstdio>
 
@@ -24,6 +25,8 @@ public:
         QJsonObject body;
     };
     QList<Request> requests;
+    QByteArray streamBody;
+    int responseCode = 200;
 
     FakeAiServer()
     {
@@ -47,6 +50,17 @@ public:
                 }
                 const QByteArray path = header.split(' ').value(1);
                 requests.append({path, QJsonDocument::fromJson(data.mid(headerEnd + 4, contentLength)).object()});
+                if (requests.last().body.value(QStringLiteral("stream")).toBool()) {
+                    const QByteArray head = "HTTP/1.1 " + QByteArray::number(responseCode) + " Result\r\nContent-Type: text/event-stream\r\nConnection: close\r\nContent-Length: " + QByteArray::number(streamBody.size()) + "\r\n\r\n";
+                    // Split inside an event to exercise fragmented SSE delivery.
+                    const qsizetype split = streamBody.indexOf("\n\n") + 9;
+                    socket->write(head + streamBody.left(split));
+                    QTimer::singleShot(20, socket, [this, socket, split] {
+                        socket->write(streamBody.mid(split));
+                        socket->disconnectFromHost();
+                    });
+                    return;
+                }
                 QJsonObject response;
                 if (path.endsWith("/conversations")) {
                     response.insert(QStringLiteral("id"), QStringLiteral("conv-123"));
@@ -70,6 +84,77 @@ class AiProviderTest : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void chatGptPlanStream()
+    {
+        FakeAiServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.streamBody =
+            "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"你好\"}\n\n"
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"，世界\"}\n\n"
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[{\"content\":[{\"type\":\"output_text\",\"text\":\"你好，世界\"}]}]}}\n\n";
+        AiProvider provider;
+        QSignalSpy completed(&provider, &AiProvider::completed);
+        QSignalSpy updated(&provider, &AiProvider::answerUpdated);
+        QSignalSpy failed(&provider, &AiProvider::failed);
+        AiProfile profile;
+        profile.kind = AiProfile::Kind::OpenAiResponses;
+        profile.chatGptAccountId = QStringLiteral("oaiapp_test");
+        profile.apiKey = QStringLiteral("test-access-token");
+        profile.model = QStringLiteral("account-model");
+        profile.endpoint = QStringLiteral("http://127.0.0.1:%1/v1").arg(server.serverPort());
+        profile.extraArguments = QStringLiteral("{\"temperature\":1,\"store\":true,\"conversation\":\"ignored\"}");
+        AiConversation history;
+        history.sessionId = QStringLiteral("old-remote-session");
+        history.messages = {{QStringLiteral("user"), QStringLiteral("Earlier"), 0, QStringLiteral("Earlier page"), {}, {}},
+                            {QStringLiteral("assistant"), QStringLiteral("Earlier answer"), 0, {}, {}, {}},
+                            {QStringLiteral("user"), QStringLiteral("Now"), 1, QStringLiteral("New page"), {}, QStringLiteral("Zm9v")}};
+        provider.send(profile, history, history.messages.last());
+        QVERIFY(completed.wait());
+        QVERIFY(failed.isEmpty());
+        QCOMPARE(completed.takeFirst().at(0).toString(), QStringLiteral("你好，世界"));
+        QCOMPARE(updated.size(), 2);
+        QCOMPARE(updated.first().at(0).toString(), QStringLiteral("你好"));
+        QCOMPARE(server.requests.size(), 1);
+        QCOMPARE(server.requests.first().path, QByteArray("/v1/responses"));
+        const QJsonObject body = server.requests.first().body;
+        QCOMPARE(body.value(QStringLiteral("store")).toBool(true), false);
+        QCOMPARE(body.value(QStringLiteral("stream")).toBool(), true);
+        QVERIFY(!body.contains(QStringLiteral("conversation")));
+        QVERIFY(!body.contains(QStringLiteral("temperature")));
+        const QJsonArray input = body.value(QStringLiteral("input")).toArray();
+        QCOMPARE(input.size(), 3);
+        QCOMPARE(input.last().toObject().value(QStringLiteral("content")).toArray().size(), 2);
+
+        server.streamBody = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Partial\"}\n\n";
+        provider.send(profile, history, history.messages.last());
+        QVERIFY(failed.wait());
+        QVERIFY(completed.isEmpty());
+        server.streamBody += "data: {\"type\":\"response.failed\"}\n\n";
+        provider.send(profile, history, history.messages.last());
+        QVERIFY(failed.wait());
+        QVERIFY(completed.isEmpty());
+    }
+
+    void cancelChatGptStream()
+    {
+        FakeAiServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.streamBody = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Partial\"}\n\n";
+        AiProvider provider;
+        QSignalSpy stopped(&provider, &AiProvider::stopped);
+        QSignalSpy completed(&provider, &AiProvider::completed);
+        connect(&provider, &AiProvider::answerUpdated, &provider, &AiProvider::cancel);
+        AiProfile profile;
+        profile.chatGptAccountId = QStringLiteral("oaiapp_test");
+        profile.endpoint = QStringLiteral("http://127.0.0.1:%1/v1").arg(server.serverPort());
+        AiConversation history;
+        history.messages = {{QStringLiteral("user"), QStringLiteral("Question"), 0, {}, {}, {}}};
+        provider.send(profile, history, history.messages.last());
+        QVERIFY(stopped.wait());
+        QVERIFY(completed.isEmpty());
+        QVERIFY(!provider.isBusy());
+    }
+
     void protocols()
     {
         FakeAiServer server;

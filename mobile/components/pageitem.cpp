@@ -6,8 +6,8 @@
 
 #include "pageitem.h"
 #include "documentitem.h"
-#include "part/mdxdictionary.h"
 #include "gui/textselectionutils.h"
+#include "part/mdxdictionary.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -320,15 +320,22 @@ void PageItem::clearSelection()
     Q_EMIT selectionChanged();
 }
 
+QString PageItem::selectedText() const
+{
+    if (!canCopySelection() || !m_page) {
+        return {};
+    }
+    const auto entities = m_page->words(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
+    return Okular::removeLineBreaks(TextSelectionUtils::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
+}
+
 void PageItem::copySelection()
 {
     if (!canCopySelection() || !m_page) {
         return;
     }
 
-    const auto entities = m_page->words(m_selectedArea.get(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-    const QString text = Okular::removeLineBreaks(TextSelectionUtils::selectionText(entities, pageRotation(m_page->rotation()).inverted()));
-    QGuiApplication::clipboard()->setText(text);
+    QGuiApplication::clipboard()->setText(selectedText());
     clearSelection();
 }
 

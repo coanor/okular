@@ -3,11 +3,11 @@
 
 #include "aistore.h"
 
+#include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QPointer>
 #include <QProcess>
-#include <QJsonObject>
 #include <functional>
 
 class QNetworkReply;
@@ -26,11 +26,14 @@ Q_SIGNALS:
     void completed(const QString &answer, const QString &sessionId);
     void failed(const QString &message);
     void stopped();
+    void answerUpdated(const QString &answer);
 
 private:
     void sendOpenAiChat();
     void createOpenAiConversation();
     void sendOpenAiResponse();
+    void sendChatGptResponse();
+    void processResponseStream();
     void sendAnthropic();
     void sendCodex();
     void finishHttp(QNetworkReply *reply, const std::function<void(const QJsonObject &)> &onSuccess);
@@ -52,4 +55,6 @@ private:
     QByteArray m_outputBuffer;
     QByteArray m_errorBuffer;
     bool m_cancelled = false;
+    bool m_streamCompleted = false;
+    QString m_streamError;
 };

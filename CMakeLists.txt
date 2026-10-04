@@ -109,9 +109,13 @@ ecm_setup_version(${PROJECT_VERSION}
                   VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/core/version.h"
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
-find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql Concurrent)
+find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql Concurrent Network)
 if(BUILD_DESKTOP)
-    find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
+    find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS WebEngineWidgets)
+endif()
+if(BUILD_MOBILE)
+    find_package(OpenSSL 1.1.1 QUIET COMPONENTS Crypto)
+    set_package_properties(OpenSSL PROPERTIES TYPE OPTIONAL PURPOSE "Verify identities for ChatGPT subscription sign-in in the mobile assistant")
 endif()
 
 find_path(MDICT_INCLUDE_DIR mdict_extern.h PATH_SUFFIXES mdict)

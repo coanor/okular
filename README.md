@@ -85,6 +85,12 @@ For Windows x64 builds using Linux Clang and LLVM tools, run `make windows-cross
 For Linux ARM64 or macOS ARM64 builds from Linux, with automatic SDK preparation, use
 `make linux-cross` or `make macos-cross`; see [Linux and macOS cross-builds](doc/build-linux-macos-cross.md).
 
+### AI reading assistant
+
+Desktop and mobile support questions about the current page or selected text,
+HTTP model profiles and local conversation history. See
+[AI reading assistant](doc/ai-reading-assistant.md) for setup and platform details.
+
 ### Dictionary lookup
 
 Word lookup uses Eudic by default. Enable automatic word lookup in settings to
@@ -113,6 +119,10 @@ The build forwards HTTP proxy environment variables to the container. Set
 `ANDROID_DOCKER_NETWORK=host` when the proxy listens on the WSL host's loopback
 address. Gradle uses Java proxy settings from
 `$CRAFT_ROOT/gradle-home/gradle.properties`.
+
+`autotests/mobilechatgptcallbacktest.py` checks the ChatGPT callback while the
+mobile app is in the background, including Android cached-app freezing and
+service cleanup. See its header for emulator requirements and the invocation.
 
 ### clang-format
 

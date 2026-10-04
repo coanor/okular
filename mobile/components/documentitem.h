@@ -8,8 +8,10 @@
 #define QDOCUMENTITEM_H
 
 #include <QObject>
+#include <memory>
 #include <qqmlregistration.h>
 
+#include "aiassistant.h"
 #include "settings.h"
 
 #include <core/document.h>
@@ -23,6 +25,7 @@ namespace Okular
 class Document;
 }
 
+class QFile;
 class Observer;
 class SignatureModel;
 class TOCModel;
@@ -31,6 +34,8 @@ class DocumentItem : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
+
+    Q_PROPERTY(AiAssistant *aiAssistant READ aiAssistant CONSTANT)
 
     /**
      * Absolute URI to document file to open
@@ -151,6 +156,8 @@ public:
     Q_INVOKABLE void setPassword(const QString &password);
 
     // Internal, not binded to qml
+    AiAssistant *aiAssistant();
+    QUrl aiDocumentUrl() const;
     Okular::Document *document();
     Observer *pageviewObserver();
     Observer *thumbnailObserver();
@@ -198,6 +205,8 @@ private Q_SLOTS:
 private:
     void openUrl(const QUrl &url, const QString &password);
 
+    std::unique_ptr<QFile> m_aiDocumentFile;
+    AiAssistant *m_aiAssistant = nullptr;
     Okular::Document *m_document;
     TOCModel *m_tocModel;
     SignatureModel *m_signaturesModel;

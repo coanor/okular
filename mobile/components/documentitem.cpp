@@ -6,6 +6,7 @@
 
 #include "documentitem.h"
 
+#include <QFile>
 #include <QMimeDatabase>
 #include <QQmlEngine>
 
@@ -43,6 +44,7 @@ DocumentItem::DocumentItem(QObject *parent)
 
 DocumentItem::~DocumentItem()
 {
+    delete m_aiAssistant;
     delete m_signaturesModel;
     delete m_document;
 }
@@ -54,6 +56,10 @@ void DocumentItem::setUrl(const QUrl &url)
 
 void DocumentItem::openUrl(const QUrl &url, const QString &password)
 {
+    if (m_aiAssistant) {
+        m_aiAssistant->resetDocument();
+    }
+    m_aiDocumentFile.reset();
     m_document->closeDocument();
     // TODO: password
     QMimeDatabase db;
@@ -64,6 +70,15 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
     realUrl = /* cppcheck-suppress redundantInitialization */
         QUrl(QJniObject(QNativeInterface::QAndroidApplication::context()).callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
 #endif
+
+    // The core consumes and closes Android content descriptors without keeping
+    // a document URL. Retain an independent reader for lazy AI content hashing.
+    if (realUrl.scheme() == QLatin1String("fd")) {
+        auto file = std::make_unique<QFile>(QStringLiteral("/proc/self/fd/") + realUrl.path().mid(1));
+        if (file->open(QIODevice::ReadOnly)) {
+            m_aiDocumentFile = std::move(file);
+        }
+    }
 
     const QString path = realUrl.isLocalFile() ? realUrl.toLocalFile() : QStringLiteral("-");
 
@@ -233,6 +248,22 @@ void DocumentItem::resetSearch()
 void DocumentItem::setPassword(const QString &password)
 {
     openUrl(m_document->currentDocument(), password);
+}
+
+AiAssistant *DocumentItem::aiAssistant()
+{
+    if (!m_aiAssistant) {
+        m_aiAssistant = new AiAssistant(this);
+    }
+    return m_aiAssistant;
+}
+
+QUrl DocumentItem::aiDocumentUrl() const
+{
+    if (m_aiDocumentFile) {
+        return QUrl::fromLocalFile(QStringLiteral("/proc/self/fd/%1").arg(m_aiDocumentFile->handle()));
+    }
+    return url();
 }
 
 Okular::Document *DocumentItem::document()

@@ -1,4 +1,4 @@
-# AI reading assistant (desktop)
+# AI reading assistant
 
 Open a document and choose **View → AI Reading Assistant**. Add a model in **Models…**, then ask a question about the current page. The **Ask** button is inside the prompt field and changes to **Cancel** while a request is running. Canceling restores the question for another try. For a selected passage, right-click it and choose **Ask AI about Selected Text**; the panel opens with the selection as context, and waits for a question.
 
@@ -26,3 +26,56 @@ Use **Models… → Conversation instructions…** to set a basic prompt for the
 Answers render offline with Markdown and KaTeX math (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`). Raw HTML and Mermaid are not supported. Remote images are shown as links; external links open in the browser.
 
 Choose **Save as annotation** under an answer and click a point on the answer's PDF page. Okular creates a note containing the question and answer and saves it to the local PDF annotation sidecar. The original PDF bytes remain unchanged. This action is available for local PDFs only. See [annotation-sidecars.md](annotation-sidecars.md) for the sidecar format and location.
+
+## Mobile app
+
+Open **AI Reading Assistant** from the document toolbar or main menu. To use a
+passage as context, long-press text, adjust the selection handles and tap
+**Ask AI**. This keeps the reading position and uses the selected passage's page.
+You can configure models before opening a document; asking questions requires
+an open document.
+
+Use **Models… → Add model…** to configure an OpenAI-compatible Chat Completions,
+OpenAI Responses or Anthropic-compatible Messages profile. Local Codex CLI is
+available in the desktop assistant only. Model settings and local conversations
+use the same storage format as the desktop assistant. On Android, where KWallet
+is unavailable, API keys stay in memory and must be entered again after restart.
+
+To use an eligible **ChatGPT Plus or Pro subscription**, choose **Models… →
+Continue with ChatGPT…**, then **Continue with ChatGPT**. Okular opens the system
+browser for sign-in and permission to use your ChatGPT plan. Return to Okular,
+choose a model from your account's available models, and press **Save**. This also
+works before opening a document. Use **Add account…** for another account or
+workspace and **Sign out** to revoke that saved session. **Manage usage** opens
+ChatGPT's settings; requests share your existing plan limits. OpenAI API keys
+remain a separate, usage-billed option.
+
+The browser returns to a temporary listener inside Okular at
+`http://127.0.0.1:<port>/auth/callback`; no separate server is needed on your
+phone. Android shows a sign-in notification while Okular waits for this callback
+and retrieves your account's models. Tap it to return to Okular. The service
+stops when sign-in finishes, is canceled, or times out.
+
+ChatGPT authorization is independent of the desktop Codex CLI login. Credentials
+are stored atomically in the app's private data directory with owner-only
+permissions, excluded from Android backup and device transfer, and refreshed
+before expiry. They are never exposed to QML or saved in model profiles or
+conversation records. The mobile build uses optional OpenSSL for ID-token
+signature verification; builds without it keep the API-key providers available.
+
+ChatGPT plan requests use the public Responses endpoint with `store: false` and
+`stream: true`, replaying local text history and the current page image rather
+than creating a remote conversation. Answers appear while streaming; canceled
+or incomplete responses are discarded so the question can be retried. See the
+[OpenAI sign-in documentation](https://developers.openai.com/siwc/token-sharing-open-source).
+
+Press **Ask** to send the current page's text and, for vision profiles, its image.
+Text-only profiles work with extracted page text or selected text. Rendering and
+image encoding are asynchronous. **Cancel** restores the question and previous
+conversation so you can retry. **Models… → Start new conversation** removes the
+local conversation for this document and model after confirmation.
+
+The first mobile version displays answers as selectable plain text, including
+any Markdown or math source. It does not yet provide the desktop assistant's
+KaTeX rendering, conversation instruction editor or save-answer-as-annotation
+action.

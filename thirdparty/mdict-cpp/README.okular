@@ -1,0 +1,13 @@
+This directory contains the mdict-cpp parser from https://github.com/dictlab/mdict-cpp,
+commit 6661d75d443a2cd24f23f548e4586b677b628346, downloaded on 2026-09-27.
+Its BSD-3-Clause license and AUTHORS file are included.
+
+Okular builds this copy by default for desktop and mobile builds.
+Set OKULAR_USE_BUNDLED_MDICT=OFF to use a platform mdict-cpp package instead.
+Okular's parser uses owned, bounded buffers, validates checksums and file sizes,
+and decodes key blocks on demand. It uses Qt Core for XML and text decoding and
+platform zlib for decompression. The C API catches all parser exceptions.
+Supported formats are MDX 1.x/2.x with UTF-8 or UTF-16 text, uncompressed or zlib
+blocks, and optional key-info encryption (Encrypted=2). Password encryption and
+LZO compression are unsupported. Individual blocks are limited to 64 MiB and
+definitions to 1 MiB. Dictionary data and the upstream CLI are omitted.

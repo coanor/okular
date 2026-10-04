@@ -4,238 +4,321 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-import QtQuick 2.15
-import QtQuick.Controls 2.15 as QQC2
+import QtQuick
+import QtQuick.Controls as QQC2
 import org.kde.okular 2.0
 import "private"
 
 /**
- * A touchscreen optimized view for a document
- * 
- * It supports changing pages by a swipe gesture, pinch zoom
- * and flicking to scroll around
+ * A touchscreen optimized, continuous view for a document.
+ * Pages fit the available width and support flicking, pinch zoom and text selection.
  */
 QQC2.ScrollView {
     id: root
     property DocumentItem document
-    property PageItem page: mouseArea.currPageDelegate.pageItem
-    signal clicked
+    readonly property PageItem page: flick.currentItem ? flick.currentItem.pageItem : null
+    property real zoomFactor: 1
+    property PageItem selectionPage: null
+    readonly property bool hasSelection: selectionPage !== null && selectionPage.hasSelection
+    property bool positioning: false
+    property Item selectionInput: null
+    property point selectionFocus
+    readonly property bool selectingText: (selectionInput !== null && selectionInput.longPressSelecting) ||
+                                          (selectionOverlayLoader.item !== null && selectionOverlayLoader.item.handlePressed)
+    onSelectionPageChanged: DictionaryLookup.clear()
 
+    signal clicked
     signal urlOpened
 
     clip: true
-    
-    //NOTE: on some themes it tries to set the flickable to interactive
-    //but we need it always non interactive as we need to manage
-    //dragging by ourselves
-    Component.onCompleted: flick.interactive = false
-    Flickable {
+    padding: 0
+
+    SelectionLookupTimer {
+        id: dictionaryTimer
+        word: root.selectionPage ? root.selectionPage.selectedWord : ""
+        enabled: DictionaryLookup.autoLookupEnabled
+        selecting: root.selectingText || (root.selectionInput !== null && root.selectionInput.pressed)
+        onLookupRequested: word => DictionaryLookup.lookup(word)
+    }
+    Connections {
+        target: root.selectionPage
+        function onSelectionChanged() {
+            DictionaryLookup.clear()
+        }
+    }
+    Connections {
+        target: DictionaryLookup
+        function onDictionaryFileChanged() {
+            dictionaryTimer.restartWhenReady()
+        }
+    }
+
+    function clearSelection() {
+        dictionaryTimer.stop();
+        DictionaryLookup.clear();
+        selectionInput = null;
+        if (selectionPage) {
+            selectionPage.clearSelection();
+            selectionPage = null;
+        }
+    }
+
+    function positionCurrentPage() {
+        if (!document || !document.opened || flick.count === 0) {
+            return;
+        }
+        positioning = true;
+        clearSelection();
+        flick.currentIndex = document.currentPage;
+        flick.positionViewAtIndex(document.currentPage, ListView.Beginning);
+        positioning = false;
+    }
+
+    function updateCurrentPage() {
+        if (positioning || !document || !document.opened || pinchHandler.active) {
+            return;
+        }
+        const index = flick.indexAt(flick.contentX + flick.width / 2, flick.contentY + flick.height / 2);
+        if (index >= 0) {
+            flick.currentIndex = index;
+            if (document.currentPage !== index) {
+                positioning = true;
+                document.currentPage = index;
+                positioning = false;
+            }
+        }
+    }
+
+    function zoomAt(factor, center, previousCenter = center) {
+        const newZoom = Math.max(1, Math.min(3, factor));
+        if (newZoom === zoomFactor && center.x === previousCenter.x && center.y === previousCenter.y) {
+            return;
+        }
+        clearSelection();
+        const anchorY = flick.contentY + previousCenter.y;
+        const anchorX = flick.contentX + previousCenter.x;
+        const item = flick.itemAt(anchorX, anchorY) || flick.itemAt(anchorX, anchorY - flick.spacing);
+        const relativeY = item ? Math.min(1, (anchorY - item.y) / item.height) : 0;
+        // The space between pages stays fixed when the pinch center is in a gap.
+        const gapOffset = item ? Math.max(0, anchorY - item.y - item.height) : 0;
+        const relativeX = (flick.contentX + previousCenter.x) / zoomFactor;
+        positioning = true;
+        zoomFactor = newZoom;
+        flick.forceLayout();
+        flick.contentX = Math.max(0, Math.min(flick.contentWidth - flick.width, relativeX * zoomFactor - center.x));
+        if (item) {
+            flick.contentY = item.y + relativeY * item.height + gapOffset - center.y;
+        }
+        flick.returnToBounds();
+        positioning = false;
+        updateCurrentPage();
+    }
+
+    Component.onCompleted: Qt.callLater(positionCurrentPage)
+
+    Connections {
+        target: root.document
+
+        function onUrlChanged() {
+            root.clearSelection();
+            root.zoomFactor = 1;
+            flick.contentX = 0;
+            Qt.callLater(root.positionCurrentPage);
+            root.urlOpened();
+        }
+
+        function onPageCountChanged() {
+            Qt.callLater(root.positionCurrentPage);
+        }
+
+        function onCurrentPageChanged() {
+            if (!root.positioning) {
+                root.positionCurrentPage();
+            }
+        }
+    }
+
+    SelectionMagnifier {
+        parent: root
+        z: 10
+        sourceItem: root.selectionPage
+        focusPoint: root.selectionFocus
+        visible: root.hasSelection && root.selectingText
+    }
+
+    contentItem: ListView {
         id: flick
-        interactive: false
-        onWidthChanged: resizeTimer.restart()
-        onHeightChanged: resizeTimer.restart()
-        
-        Component.onCompleted: {
-            flick.contentWidth = flick.width
-            flick.contentHeight = flick.width / mouseArea.currPageDelegate.pageRatio
-        }
-        Connections {
-            target: root.document
-            function onUrlChanged() {
-                resizeTimer.restart()
-                root.urlOpened()
-            }
-        }
-        Timer {
-            id: resizeTimer
-            interval: 250
-            onTriggered: {
-                flick.contentWidth = flick.width
-                flick.contentHeight = flick.width / mouseArea.currPageDelegate.pageRatio
-            }
-        }
+        model: root.document ? root.document.pageCount : 0
+        contentWidth: width * root.zoomFactor
+        flickableDirection: Flickable.AutoFlickDirection
+        boundsBehavior: Flickable.StopAtBounds
+        spacing: 4
+        cacheBuffer: height
+        highlightFollowsCurrentItem: false
+        interactive: !pinchHandler.active && !root.hasSelection
 
-        PinchArea {
+        onContentYChanged: root.updateCurrentPage()
+        onMovementStarted: root.clearSelection()
+        onMovementEnded: root.updateCurrentPage()
+        onWidthChanged: Qt.callLater(root.positionCurrentPage)
+
+        delegate: PageView {
+            id: pageDelegate
+            required property int index
             width: flick.contentWidth
-            height: flick.contentHeight
+            height: width / pageRatio
+            document: root.document
+            pageNumber: index
 
-            property real initialWidth
-            property real initialHeight
-
-            onPinchStarted: {
-                root.page.clearSelection()
-                initialWidth = mouseArea.currPageDelegate.implicitWidth * mouseArea.currPageDelegate.scaleFactor
-                initialHeight = mouseArea.currPageDelegate.implicitHeight * mouseArea.currPageDelegate.scaleFactor
-            }
-
-            onPinchUpdated: {
-                // adjust content pos due to drag
-                flick.contentX += pinch.previousCenter.x - pinch.center.x
-                flick.contentY += pinch.previousCenter.y - pinch.center.y
-
-                // resize content
-                //use the scale property during pinch, for speed reasons
-                if (initialHeight * pinch.scale > flick.height &&
-                    initialHeight * pinch.scale < flick.height * 3) {
-                    mouseArea.scale = pinch.scale;
-                }
-                resizeTimer.stop();
-                flick.returnToBounds();
-            }
-            onPinchFinished: {
-                flick.resizeContent(Math.max(flick.width+1, initialWidth * mouseArea.scale), Math.max(flick.height, initialHeight * mouseArea.scale), pinch.center);
-                mouseArea.scale = 1;
-
-                resizeTimer.stop()
-                flick.returnToBounds();
-            }
             MouseArea {
                 id: mouseArea
-                width: parent.width
-                height: parent.height
-
-                property real oldMouseX
-                property real oldMouseY
-                property real startMouseX
-                property real startMouseY
+                anchors.fill: parent
                 property bool longPressSelecting: false
                 property bool suppressClick: false
-                property bool incrementing: true
-                property PageView currPageDelegate: page1
-                property PageView prevPageDelegate: page2
-                property PageView nextPageDelegate: page3
+                property bool longPressExtended: false
+                property bool dragStartHandle: false
+                property point longPressOrigin
+                pressAndHoldInterval: 450
+                preventStealing: longPressSelecting
 
-                onPressed: (mouse) => {
+                onPressed: {
                     longPressSelecting = false;
-                    suppressClick = false;
-                    var pos = mapToItem(flick, mouse.x, mouse.y);
-                    startMouseX = oldMouseX = pos.x;
-                    startMouseY = oldMouseY = pos.y;
+                    longPressExtended = false;
+                    suppressClick = root.hasSelection;
+                    root.clearSelection();
+                    root.selectionInput = mouseArea;
                 }
-                onPositionChanged: (mouse) => {
+                onPressAndHold: mouse => {
+                    root.clearSelection();
+                    const pos = mapToItem(pageDelegate.pageItem, mouse.x, mouse.y);
+                    longPressSelecting = pageDelegate.pageItem.selectWordAt(pos.x, pos.y);
+                    longPressOrigin = pos;
+                    root.selectionFocus = pos;
+                    root.selectionInput = mouseArea;
                     if (longPressSelecting) {
-                        var selectionPos = mapToItem(root.page, mouse.x, mouse.y);
-                        root.page.moveSelectionHandle(false, selectionPos.x, selectionPos.y);
-                        return;
+                        root.selectionPage = pageDelegate.pageItem;
+                        suppressClick = true;
                     }
-                    if (root.page.hasSelection) {
-                        root.page.clearSelection();
-                    }
-                    var pos = mapToItem(flick, mouse.x, mouse.y);
-
-                    flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY - (pos.y - oldMouseY)));
-
-                    if ((pos.x - oldMouseX > 0 && flick.atXBeginning) ||
-                        (pos.x - oldMouseX < 0 && flick.atXEnd)) {
-                        currPageDelegate.x += pos.x - oldMouseX;
-                        mouseArea.incrementing = currPageDelegate.x <= 0;
-                    } else {
-                        flick.contentX = Math.max(0, Math.min(flick.contentWidth - flick.width, flick.contentX - (pos.x - oldMouseX)));
-                    }
-
-                    oldMouseX = pos.x;
-                    oldMouseY = pos.y;
                 }
-                onReleased: {
+                onPositionChanged: mouse => {
                     if (longPressSelecting) {
-                        longPressSelecting = false;
-                        return;
+                        const pos = mapToItem(pageDelegate.pageItem, mouse.x, mouse.y);
+                        const dx = pos.x - longPressOrigin.x;
+                        const dy = pos.y - longPressOrigin.y;
+                        // Finger jitter must not shrink the initially selected word.
+                        if (!longPressExtended) {
+                            if (dx * dx + dy * dy < 12 * 12) {
+                                return;
+                            }
+                            dragStartHandle = dy < -8 || (Math.abs(dy) <= 8 && dx < 0);
+                            longPressExtended = true;
+                        }
+                        pageDelegate.pageItem.moveSelectionHandle(dragStartHandle, pos.x, pos.y);
+                        root.selectionFocus = dragStartHandle ? pageDelegate.pageItem.selectionStart : pageDelegate.pageItem.selectionEnd;
                     }
-                    if (root.document.currentPage > 0 &&
-                        currPageDelegate.x > width/6) {
-                        switchAnimation.running = true;
-                    } else if (root.document.currentPage < document.pageCount-1 &&
-                        currPageDelegate.x < -width/6) {
-                        switchAnimation.running = true;
-                    } else {
-                        resetAnim.running = true;
-                    }
                 }
-                onCanceled: {
-                    longPressSelecting = false;
-                    resetAnim.running = true;
-                }
-                onPressAndHold: (mouse) => {
-                    var pos = mapToItem(root.page, mouse.x, mouse.y);
-                    longPressSelecting = root.page.selectWordAt(pos.x, pos.y);
-                    suppressClick = longPressSelecting;
-                }
-                onDoubleClicked: {
-                    root.page.clearSelection();
-                    flick.contentWidth = flick.width
-                    flick.contentHeight = flick.width / mouseArea.currPageDelegate.pageRatio
-                }
-                onClicked: (mouse) => {
+                onReleased: longPressSelecting = false
+                onCanceled: longPressSelecting = false
+                onClicked: {
                     if (suppressClick) {
                         suppressClick = false;
-                        return;
-                    }
-                    if (root.page.hasSelection) {
-                        root.page.clearSelection();
-                        return;
-                    }
-                    var pos = mapToItem(flick, mouse.x, mouse.y);
-                    if (Math.abs(startMouseX - pos.x) < 20 &&
-                        Math.abs(startMouseY - pos.y) < 20) {
+                    } else if (root.hasSelection) {
+                        root.clearSelection();
+                    } else {
                         root.clicked();
                     }
                 }
-                onWheel: (wheel) => {
-                    root.page.clearSelection();
+                onDoubleClicked: mouse => {
+                    const pos = mapToItem(flick, mouse.x, mouse.y);
+                    root.zoomAt(1, pos);
+                }
+                onWheel: wheel => {
                     if (wheel.modifiers & Qt.ControlModifier) {
-                        //generate factors between 0.8 and 1.2
-                        var factor = (((wheel.angleDelta.y / 120)+1) / 5 )+ 0.8;
-
-                        var newWidth = flick.contentWidth * factor;
-                        var newHeight = flick.contentHeight * factor;
-
-                        if (newWidth < flick.width || newHeight < flick.height ||
-                            newHeight > flick.height * 3) {
-                            return;
-                        }
-
-                        flick.resizeContent(newWidth, newHeight, Qt.point(wheel.x, wheel.y));
-                        flick.returnToBounds();
-                        resizeTimer.stop();
+                        const pos = mapToItem(flick, wheel.x, wheel.y);
+                        root.zoomAt(root.zoomFactor * Math.pow(1.2, wheel.angleDelta.y / 120), pos);
                     } else {
-                        flick.contentY = Math.min(flick.contentHeight-flick.height, Math.max(0, flick.contentY - wheel.angleDelta.y));
+                        wheel.accepted = false;
                     }
                 }
+            }
+        }
 
-                PageView {
-                    id: page1
-                    document: root.document
-                    z: 2
-                }
-                PageView {
-                    id: page2
-                    document: root.document
-                    z: 1
-                }
-                PageView {
-                    id: page3
-                    document: root.document
-                    z: 0
-                }
+        PinchHandler {
+            id: pinchHandler
+            parent: flick
+            target: null
+            // Take both points before Flickable locks a cross-page drag to one of them.
+            dragThreshold: 0
+            property real initialZoom
+            property point previousCenter
 
+            onActiveChanged: {
+                if (active) {
+                    root.clearSelection();
+                    flick.cancelFlick();
+                    initialZoom = root.zoomFactor;
+                    previousCenter = parent.mapToItem(flick, centroid.position);
+                } else {
+                    root.updateCurrentPage();
+                }
+            }
+            onUpdated: {
+                if (active) {
+                    const center = parent.mapToItem(flick, centroid.position);
+                    root.zoomAt(initialZoom * activeScale, center, previousCenter);
+                    previousCenter = center;
+                }
+            }
+        }
+
+        Loader {
+            id: selectionOverlayLoader
+            parent: flick
+            anchors.fill: parent
+            z: 5
+            active: root.hasSelection
+            sourceComponent: Item {
+                id: selectionOverlay
+                anchors.fill: parent
+                readonly property bool handlePressed: startHandleMouse.pressed || endHandleMouse.pressed
                 QQC2.ToolBar {
                     id: selectionMenu
                     z: 5
-                    visible: root.page.hasSelection
-                    x: Math.max(0, Math.min(mouseArea.width - width,
-                                            root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).x - width / 2))
-                    y: Math.max(0, root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).y - height - 12)
+                    visible: root.hasSelection && !root.selectingText
+                    width: Math.min(selectionOverlay.width - 16, Math.max(280, selectionActions.implicitWidth))
+                    x: Math.max(0, Math.min(selectionOverlay.width - width, root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).x - width / 2))
+                    y: Math.max(0, root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).y - height - 12)
 
-                    contentItem: Row {
-                        QQC2.ToolButton {
-                            text: i18n("Copy")
-                            enabled: root.page.canCopySelection
-                            onClicked: root.page.copySelection()
+                    contentItem: Column {
+                        spacing: 4
+                        Row {
+                            id: selectionActions
+                            QQC2.ToolButton {
+                                text: i18n("Copy")
+                                enabled: root.selectionPage.canCopySelection
+                                onClicked: root.selectionPage.copySelection()
+                            }
+                            QQC2.ToolButton {
+                                text: i18n("Highlight")
+                                enabled: root.selectionPage.canHighlightSelection
+                                onClicked: root.selectionPage.highlightSelection()
+                            }
+                            QQC2.ToolButton {
+                                text: i18n("Look up")
+                                enabled: !!root.selectionPage.selectedWord
+                                onClicked: DictionaryLookup.retry(root.selectionPage.selectedWord)
+                            }
                         }
-                        QQC2.ToolButton {
-                            text: i18n("Highlight")
-                            enabled: root.page.canHighlightSelection
-                            onClicked: root.page.highlightSelection()
+                        QQC2.Label {
+                            width: parent.width
+                            visible: !!DictionaryLookup.word && DictionaryLookup.word === root.selectionPage.selectedWord &&
+                                     (DictionaryLookup.loading || !!DictionaryLookup.definition || !!DictionaryLookup.error)
+                            text: DictionaryLookup.loading ? i18n("Looking up %1…", DictionaryLookup.word) :
+                                  DictionaryLookup.word + "\n" + (DictionaryLookup.definition || DictionaryLookup.error)
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 8
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
                         }
                     }
                 }
@@ -243,11 +326,11 @@ QQC2.ScrollView {
                 Item {
                     id: startHandle
                     z: 5
-                    visible: root.page.hasSelection
+                    visible: root.selectionPage.hasSelection
                     width: 40
                     height: 40
-                    x: root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).x - width / 2
-                    y: root.page.mapToItem(mouseArea, root.page.selectionStart.x, root.page.selectionStart.y).y - height / 2
+                    x: root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).x - width / 2
+                    y: root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionStart.x, root.selectionPage.selectionStart.y).y - height / 2
 
                     Rectangle {
                         width: 18
@@ -259,10 +342,22 @@ QQC2.ScrollView {
                         anchors.centerIn: parent
                     }
                     MouseArea {
+                        id: startHandleMouse
                         anchors.fill: parent
-                        onPositionChanged: (mouse) => {
-                            var pos = mapToItem(root.page, mouse.x, mouse.y);
-                            root.page.moveSelectionHandle(true, pos.x, pos.y);
+                        preventStealing: true
+                        property point grabOffset
+                        onPressed: mouse => {
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            grabOffset = Qt.point(pos.x - root.selectionPage.selectionStart.x, pos.y - root.selectionPage.selectionStart.y);
+                            root.selectionFocus = root.selectionPage.selectionStart;
+                        }
+                        onPositionChanged: mouse => {
+                            if (!pressed) {
+                                return;
+                            }
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            root.selectionPage.moveSelectionHandle(true, pos.x - grabOffset.x, pos.y - grabOffset.y);
+                            root.selectionFocus = root.selectionPage.selectionStart;
                         }
                     }
                 }
@@ -270,11 +365,11 @@ QQC2.ScrollView {
                 Item {
                     id: endHandle
                     z: 5
-                    visible: root.page.hasSelection
+                    visible: root.selectionPage.hasSelection
                     width: 40
                     height: 40
-                    x: root.page.mapToItem(mouseArea, root.page.selectionEnd.x, root.page.selectionEnd.y).x - width / 2
-                    y: root.page.mapToItem(mouseArea, root.page.selectionEnd.x, root.page.selectionEnd.y).y - height / 2
+                    x: root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionEnd.x, root.selectionPage.selectionEnd.y).x - width / 2
+                    y: root.selectionPage.mapToItem(selectionOverlay, root.selectionPage.selectionEnd.x, root.selectionPage.selectionEnd.y).y - height / 2
 
                     Rectangle {
                         width: 18
@@ -286,114 +381,24 @@ QQC2.ScrollView {
                         anchors.centerIn: parent
                     }
                     MouseArea {
+                        id: endHandleMouse
                         anchors.fill: parent
-                        onPositionChanged: (mouse) => {
-                            var pos = mapToItem(root.page, mouse.x, mouse.y);
-                            root.page.moveSelectionHandle(false, pos.x, pos.y);
+                        preventStealing: true
+                        property point grabOffset
+                        onPressed: mouse => {
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            grabOffset = Qt.point(pos.x - root.selectionPage.selectionEnd.x, pos.y - root.selectionPage.selectionEnd.y);
+                            root.selectionFocus = root.selectionPage.selectionEnd;
                         }
-                    }
-                }
-
-                    
-                Binding {
-                    target: mouseArea.currPageDelegate
-                    property: "pageNumber"
-                    value: root.document.currentPage
-                    restoreMode: Binding.RestoreNone
-                }
-                Binding {
-                    target: mouseArea.currPageDelegate
-                    property: "visible"
-                    value: true
-                    restoreMode: Binding.RestoreNone
-                }
-
-                Binding {
-                    target: mouseArea.prevPageDelegate
-                    property: "pageNumber"
-                    value: root.document.currentPage - 1
-                    restoreMode: Binding.RestoreNone
-                }
-                Binding {
-                    target: mouseArea.prevPageDelegate
-                    property: "visible"
-                    value: !mouseArea.incrementing && root.document.currentPage > 0
-                    restoreMode: Binding.RestoreNone
-                }
-
-                Binding {
-                    target: mouseArea.nextPageDelegate
-                    property: "pageNumber"
-                    value: root.document.currentPage + 1
-                    restoreMode: Binding.RestoreNone
-                }
-                Binding {
-                    target: mouseArea.nextPageDelegate
-                    property: "visible"
-                    value: mouseArea.incrementing && root.document.currentPage < document.pageCount-1
-                    restoreMode: Binding.RestoreNone
-                }
-                
-                SequentialAnimation {
-                    id: switchAnimation
-                    ParallelAnimation {
-                        NumberAnimation {
-                            target: flick
-                            properties: "contentY"
-                            to: 0
-                            easing.type: Easing.InQuad
-                            //hardcoded number, we would need units from kirigami
-                            //which cannot depend from here
-                            duration: 250
-                        }
-                        NumberAnimation {
-                            target: mouseArea.currPageDelegate
-                            properties: "x"
-                            to: mouseArea.incrementing ? -mouseArea.currPageDelegate.width : mouseArea.currPageDelegate.width
-                            easing.type: Easing.InQuad
-                            //hardcoded number, we would need units from kirigami
-                            //which cannot depend from here
-                            duration: 250
-                        }
-                    }
-                    ScriptAction {
-                        script: {
-                            mouseArea.currPageDelegate.z = 0;
-                            mouseArea.prevPageDelegate.z = 1;
-                            mouseArea.nextPageDelegate.z = 2;
-                        }
-                    }
-                    ScriptAction {
-                        script: {
-                            mouseArea.currPageDelegate.x = 0
-                            var oldCur = mouseArea.currPageDelegate;
-                            var oldPrev = mouseArea.prevPageDelegate;
-                            var oldNext = mouseArea.nextPageDelegate;
-
-                            if (mouseArea.incrementing) {
-                                root.document.currentPage++;
-                                mouseArea.currPageDelegate = oldNext;
-                                mouseArea.prevPageDelegate = oldCur;
-                                mouseArea. nextPageDelegate = oldPrev;
-                            } else {
-                                root.document.currentPage--;
-                                mouseArea.currPageDelegate = oldPrev;
-                                mouseArea.nextPageDelegate = oldCur;
-                                mouseArea.prevPageDelegate = oldNext;
+                        onPositionChanged: mouse => {
+                            if (!pressed) {
+                                return;
                             }
-                            mouseArea.currPageDelegate.z = 2;
-                            mouseArea.prevPageDelegate.z = 1;
-                            mouseArea.nextPageDelegate.z = 0;
+                            const pos = mapToItem(root.selectionPage, mouse.x, mouse.y);
+                            root.selectionPage.moveSelectionHandle(false, pos.x - grabOffset.x, pos.y - grabOffset.y);
+                            root.selectionFocus = root.selectionPage.selectionEnd;
                         }
                     }
-                }
-                NumberAnimation {
-                    id: resetAnim
-                    target: mouseArea.currPageDelegate
-                    properties: "x"
-                    to: 0
-                    easing.type: Easing.InQuad
-                    duration: 250
                 }
             }
         }

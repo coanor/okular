@@ -1,4 +1,6 @@
-add_definitions( -DKDESRCDIR="${CMAKE_CURRENT_SOURCE_DIR}/" )
+set(OKULAR_TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE STRING
+    "Autotest source directory as seen by the test runtime")
+add_definitions( -DKDESRCDIR="${OKULAR_TEST_DATA_DIR}/" )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/..)
 
@@ -20,12 +22,57 @@ endmacro ()
 
 add_conf_unittest(editdrawingtooldialogtest.cpp)
 
+ecm_add_test(textselectiontest.cpp ../gui/textselectionutils.cpp ../part/mdxdictionary.cpp
+    TEST_NAME "textselectiontest"
+    LINK_LIBRARIES Qt6::Test okularcore
+)
+target_compile_definitions(textselectiontest PRIVATE HAVE_MDICT=0)
+
+if(BUILD_MOBILE)
+    find_package(Qt6 REQUIRED COMPONENTS QuickTest)
+    ecm_add_test(selectionmagnifiertest.cpp
+        TEST_NAME "selectionmagnifiertest"
+        LINK_LIBRARIES Qt6::QuickTest
+    )
+    target_compile_definitions(selectionmagnifiertest PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mobile")
+endif()
+
+ecm_add_test(mdxdictionarytest.cpp ../part/mdxdictionary.cpp
+    TEST_NAME "mdxdictionarytest"
+    LINK_LIBRARIES Qt6::Test Qt6::Widgets
+)
+okular_enable_mdict(mdxdictionarytest)
+if(MDICT_FOUND)
+    target_link_libraries(mdxdictionarytest ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
+endif()
+
+if(OKULAR_USE_BUNDLED_MDICT)
+    ecm_add_test(mdictparsertest.cpp
+        TEST_NAME "mdictparsertest"
+        LINK_LIBRARIES Qt6::Test okular_mdict ZLIB::ZLIB
+    )
+    target_include_directories(mdictparsertest PRIVATE ${MDICT_INCLUDE_DIR})
+endif()
+
 ecm_add_test(shelltest.cpp ../shell/shellutils.cpp
     TEST_NAME "shelltest"
     LINK_LIBRARIES Qt6::Test okularcore
 )
 
 if(Poppler_Qt6_FOUND)
+    if(BUILD_MOBILE AND NOT ANDROID)
+        find_package(Qt6 ${QT_REQUIRED_VERSION} REQUIRED COMPONENTS QuickTest)
+        ecm_add_test(mobiledocumentviewtest.cpp
+            TEST_NAME "mobiledocumentviewtest"
+            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets KF6::I18n
+        )
+        target_compile_definitions(mobiledocumentviewtest PRIVATE
+            QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
+            OKULAR_QML_IMPORT_PATH="${CMAKE_BINARY_DIR}/bin"
+        )
+        add_dependencies(mobiledocumentviewtest okularplugin okularGenerator_poppler)
+    endif()
+
     if (BUILD_DESKTOP)
         ecm_add_test(parttest.cpp closedialoghelper.cpp
             TEST_NAME "parttest"

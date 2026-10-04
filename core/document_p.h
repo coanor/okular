@@ -8,8 +8,8 @@
 #ifndef _OKULAR_DOCUMENT_P_H_
 #define _OKULAR_DOCUMENT_P_H_
 
-#include "document.h"
 #include "annotationsidecar_p.h"
+#include "document.h"
 #include "script/event_p.h"
 
 #include "synctex/synctex_parser.h"
@@ -109,7 +109,6 @@ public:
         , m_docdataMigrationNeeded(false)
         , m_synctex_scanner(nullptr)
     {
-        QDomImplementation::setInvalidDataPolicy(QDomImplementation::AcceptInvalidChars);
         calculateMaxTextPages();
     }
 

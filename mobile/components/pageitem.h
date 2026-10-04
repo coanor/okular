@@ -16,6 +16,7 @@
 #include <memory>
 
 #include <core/document.h>
+#include <core/textpage.h>
 #include <core/view.h>
 
 class QTimer;
@@ -76,6 +77,7 @@ class PageItem : public QQuickItem, public Okular::View
     Q_PROPERTY(QPointF selectionEnd READ selectionEnd NOTIFY selectionChanged)
     Q_PROPERTY(bool canCopySelection READ canCopySelection NOTIFY selectionChanged)
     Q_PROPERTY(bool canHighlightSelection READ canHighlightSelection NOTIFY selectionChanged)
+    Q_PROPERTY(QString selectedWord READ selectedWord NOTIFY selectionChanged)
 
 public:
     explicit PageItem(QQuickItem *parent = nullptr);
@@ -133,6 +135,7 @@ public:
     QPointF selectionEnd() const;
     bool canCopySelection() const;
     bool canHighlightSelection() const;
+    QString selectedWord() const;
 
     Q_INVOKABLE bool selectWordAt(qreal x, qreal y);
     Q_INVOKABLE void moveSelectionHandle(bool start, qreal x, qreal y);
@@ -164,6 +167,7 @@ private Q_SLOTS:
 private:
     void paint();
     void refreshPage();
+    std::unique_ptr<Okular::RegularAreaRect> wordNear(const QPointF &point, const Okular::TextEntity::List &entities) const;
 
     const Okular::Page *m_page;
     bool m_bookmarked;
@@ -174,6 +178,7 @@ private:
     Okular::DocumentViewport m_viewPort;
     QImage m_buffer;
     std::unique_ptr<Okular::RegularAreaRect> m_selectedArea;
+    Okular::TextEntity::List m_selectionText;
     QPointF m_selectionStart;
     QPointF m_selectionEnd;
 };

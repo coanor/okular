@@ -1,0 +1,1082 @@
+{
+  "craft_base": "https://files.kde.org/craft/Qt6/26.05/macos/clang/arm64/RelWithDebInfo/",
+  "packages": [
+    {
+      "name": "libs/libb2",
+      "version": "0.98.1",
+      "file": "libs/libb2/libb2-0.98.1-84-20260523T143134-macos-clang-arm64.tar.7z",
+      "sha256": "7b586b7f3219cdb2e0ca5113884453056efb4fd8e797a2f86acc855fd731829b"
+    },
+    {
+      "name": "libs/libbzip2",
+      "version": "1.0.8-1",
+      "file": "libs/libbzip2/libbzip2-1.0.8-1-84-20260523T143137-macos-clang-arm64.tar.7z",
+      "sha256": "1a456b0665ce9dc70ecb2ca603a93b203cdfb4a676566f78433aee26bdee30a5"
+    },
+    {
+      "name": "libs/expat",
+      "version": "2.7.3",
+      "file": "libs/expat/expat-2.7.3-84-20260523T143142-macos-clang-arm64.tar.7z",
+      "sha256": "6f7bd144570e54176b070e20db47f24096b28f3936930d1ac69732e55d754cd2"
+    },
+    {
+      "name": "libs/zlib",
+      "version": "1.3.1",
+      "file": "libs/zlib/zlib-1.3.1-84-20260523T143145-macos-clang-arm64.tar.7z",
+      "sha256": "b80f1bd23a5408873a2ba6d117cc2115d6e296a8a2480566caaf325241c4e349"
+    },
+    {
+      "name": "libs/openssl",
+      "version": "3.6.3",
+      "file": "libs/openssl/openssl-3.6.3-97-20260612T213826-macos-clang-arm64.tar.7z",
+      "sha256": "8ad6487e88905d24c14a50626ad8fd33e26d8f6861dfd99caeabe32f0fda5e8d"
+    },
+    {
+      "name": "libs/liblzma",
+      "version": "5.2.3-1",
+      "file": "libs/liblzma/liblzma-5.2.3-1-119-20260816T092724-macos-clang-arm64.tar.7z",
+      "sha256": "92a19e320c83abc3cf9ff3238985eb0d18d83d14ed05f13dc7f853c912f27efc"
+    },
+    {
+      "name": "libs/icu",
+      "version": "78.1",
+      "file": "libs/icu/icu-78.1-84-20260523T143409-macos-clang-arm64.tar.7z",
+      "sha256": "e96d2333856d224130df0f5aefc4a7cc92ce2c25b23a9edafacdff0071c829fd"
+    },
+    {
+      "name": "libs/libxml2",
+      "version": "2.14.5",
+      "file": "libs/libxml2/libxml2-2.14.5-84-20260523T143426-macos-clang-arm64.tar.7z",
+      "sha256": "1b587a448739c5dbbac9491588ee61af4a55ef18edc71aa4f2701971f63dcb1b"
+    },
+    {
+      "name": "libs/libunistring",
+      "version": "1.4.1",
+      "file": "libs/libunistring/libunistring-1.4.1-84-20260523T143650-macos-clang-arm64.tar.7z",
+      "sha256": "740cb9822a346cac2d1a4f48ffec5f0e1c5bceab4cb37135124f681963b60bd5"
+    },
+    {
+      "name": "libs/gettext",
+      "version": "0.22.3-3",
+      "file": "libs/gettext/gettext-0.22.3-3-84-20260523T144051-macos-clang-arm64.tar.7z",
+      "sha256": "a64b14a327846fcf3c05a646205931501901dff04319254e213d0ba61551d69c"
+    },
+    {
+      "name": "libs/sqlite",
+      "version": "3.50.4",
+      "file": "libs/sqlite/sqlite-3.50.4-84-20260523T144110-macos-clang-arm64.tar.7z",
+      "sha256": "dd64e6fd1618c58865569d22dfc008f587e943ee8ca5c8cdfc02254535f46162"
+    },
+    {
+      "name": "libs/libffi",
+      "version": "3.5.2",
+      "file": "libs/libffi/libffi-3.5.2-84-20260523T144126-macos-clang-arm64.tar.7z",
+      "sha256": "f103767109a6107e75267472f5fae8f788610c62fea8ac91728f1627eff5a906"
+    },
+    {
+      "name": "libs/libzstd",
+      "version": "1.5.7",
+      "file": "libs/libzstd/libzstd-1.5.7-84-20260523T144408-macos-clang-arm64.tar.7z",
+      "sha256": "aed1e003a8ed5450dbea71f2a897b586e48c0dffec119121ebb5ff89069b5ef1"
+    },
+    {
+      "name": "libs/dbus",
+      "version": "1.14.10",
+      "file": "libs/dbus/dbus-1.14.10-84-20260523T144508-macos-clang-arm64.tar.7z",
+      "sha256": "16dab57eeaf0c55ce126d168ab195defbcc714a251625febc7efa849f521892e"
+    },
+    {
+      "name": "libs/pcre2",
+      "version": "10.44",
+      "file": "libs/pcre2/pcre2-10.44-84-20260523T144517-macos-clang-arm64.tar.7z",
+      "sha256": "c15de9cac8abbc3eac50b93ada727db2cf7d0aa6b8e5e0190072b50bcbc97a83"
+    },
+    {
+      "name": "libs/glib",
+      "version": "2.86.0-1",
+      "file": "libs/glib/glib-2.86.0-1-116-20260720T102415-macos-clang-arm64.tar.7z",
+      "sha256": "9b2ef0840e5e5e07282f926499b2f7d90b24b8ea47e87be82b282432c7218f64"
+    },
+    {
+      "name": "libs/shared-mime-info",
+      "version": "2.4",
+      "file": "libs/shared-mime-info/shared-mime-info-2.4-84-20260523T144641-macos-clang-arm64.tar.7z",
+      "sha256": "fc14b8a2511fd289a6b1732a2c55f51e4476fb547ae71a092aa9e530616315f0"
+    },
+    {
+      "name": "libs/brotli",
+      "version": "1.1.0",
+      "file": "libs/brotli/brotli-1.1.0-84-20260523T144647-macos-clang-arm64.tar.7z",
+      "sha256": "30931536a255b83005eaa787f179b78b7156b785bcfd68eed7dd71b0bbe30fb0"
+    },
+    {
+      "name": "libs/libpng",
+      "version": "1.6.45",
+      "file": "libs/libpng/libpng-1.6.45-84-20260523T144651-macos-clang-arm64.tar.7z",
+      "sha256": "6f11c480876dc23dc9cebbd3e57d954c1fd8f58e14cee56bc42716dc163a6b2b"
+    },
+    {
+      "name": "libs/libjpeg-turbo",
+      "version": "3.0.3",
+      "file": "libs/libjpeg-turbo/libjpeg-turbo-3.0.3-84-20260523T144717-macos-clang-arm64.tar.7z",
+      "sha256": "4c3e7c0e9abfe87d0c108ab1c9d9a084ee99b3daf8db5c52623209de60fb2ba9"
+    },
+    {
+      "name": "libs/freetype",
+      "version": "2.14.1-1",
+      "file": "libs/freetype/freetype-2.14.1-1-84-20260523T144729-macos-clang-arm64.tar.7z",
+      "sha256": "458b12097d30a36d2cc2d6126e1932a4aae6912a49393bc78e6560babac53937"
+    },
+    {
+      "name": "libs/pixman",
+      "version": "0.46.4",
+      "file": "libs/pixman/pixman-0.46.4-84-20260523T144814-macos-clang-arm64.tar.7z",
+      "sha256": "36843b4ef052eb9cc23f590173ff466e31a9a232af33b0c2e92b01b4444bd175"
+    },
+    {
+      "name": "libs/cairo",
+      "version": "1.18.4-2",
+      "file": "libs/cairo/cairo-1.18.4-2-84-20260523T144830-macos-clang-arm64.tar.7z",
+      "sha256": "6b0eb93c47631b83d6962383195d1cab541b8dce51f0ce5bed584b3a7b441743"
+    },
+    {
+      "name": "libs/harfbuzz",
+      "version": "11.2.0-2",
+      "file": "libs/harfbuzz/harfbuzz-11.2.0-2-84-20260523T144926-macos-clang-arm64.tar.7z",
+      "sha256": "5d908a8ce5fe06357035ffc9b9364702b6851001bbfd8f1d1f4307329214cf17"
+    },
+    {
+      "name": "libs/qt6/qtbase",
+      "version": "6.11.1-4",
+      "file": "libs/qt6/qtbase/qtbase-6.11.1-4-147-20261001T125013-macos-clang-arm64.tar.7z",
+      "sha256": "d24c48cb8f12b0b855590af21286068241c9bccf45cdb2022af2ff6b94c391a6"
+    },
+    {
+      "name": "libs/qt6/qtshadertools",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtshadertools/qtshadertools-6.11.1-84-20260523T145852-macos-clang-arm64.tar.7z",
+      "sha256": "d9e4be029483d552cedbaaf732f01b1a8352ba0fb7e3ed22e5ca86173ea572a1"
+    },
+    {
+      "name": "libs/qt6/qtsvg",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtsvg/qtsvg-6.11.1-84-20260523T145914-macos-clang-arm64.tar.7z",
+      "sha256": "ebaf55fb0287f575b58363cf9df6b2c3e699f114b7ecf80326ac754480147469"
+    },
+    {
+      "name": "libs/qt6/qtlanguageserver",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtlanguageserver/qtlanguageserver-6.11.1-84-20260523T145939-macos-clang-arm64.tar.7z",
+      "sha256": "8b17e7a59d4c4d0be8041b77d3bbad9bf70851e5eae71c28d6f1a95c217ac33b"
+    },
+    {
+      "name": "libs/qt6/qtdeclarative",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtdeclarative/qtdeclarative-6.11.1-84-20260523T151245-macos-clang-arm64.tar.7z",
+      "sha256": "51883af9ce867ad9f388d469b13ae7426407c212af9de3b36ee51a3869af01d5"
+    },
+    {
+      "name": "libs/qt6/qttranslations",
+      "version": "6.11.1",
+      "file": "libs/qt6/qttranslations/qttranslations-6.11.1-84-20260523T154433-macos-clang-arm64.tar.7z",
+      "sha256": "685a66efb2551c3fae09297b1938049302dfc91989aacf6f21630f1d82348ee3"
+    },
+    {
+      "name": "kde/frameworks/extra-cmake-modules",
+      "version": "6.30.0",
+      "file": "kde/frameworks/extra-cmake-modules/extra-cmake-modules-6.30.0-136-20260912T134543-macos-clang-arm64.tar.7z",
+      "sha256": "9d78cc49f3a6564d45b2939904309b45b95d9172204ddf9a02dd01d1543bb3ef"
+    },
+    {
+      "name": "kde/frameworks/tier1/kcoreaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kcoreaddons/kcoreaddons-6.30.0-136-20260912T134610-macos-clang-arm64.tar.7z",
+      "sha256": "dcae53967f66859be1c04c79641cbbf187ed59928bbc20f89b341ea6f9bf2f52"
+    },
+    {
+      "name": "kde/frameworks/tier1/attica",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/attica/attica-6.30.0-136-20260912T134637-macos-clang-arm64.tar.7z",
+      "sha256": "d66e1b04d97b2ad4fa87297ef66e77aedfa2729502cc121aee872ba489724494"
+    },
+    {
+      "name": "kde/frameworks/tier1/kguiaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kguiaddons/kguiaddons-6.30.0-136-20260912T134654-macos-clang-arm64.tar.7z",
+      "sha256": "7af45c9a8f7fa004e1bdd06b90195aa01b2e533b4a08fa95be1b2a3d5b504f66"
+    },
+    {
+      "name": "kde/frameworks/tier1/kidletime",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kidletime/kidletime-6.30.0-136-20260912T134702-macos-clang-arm64.tar.7z",
+      "sha256": "17cfc2dbf1794f9971fc26a62f2d05b8c5c7cb597f8888dafe45ccbbb0692dc9"
+    },
+    {
+      "name": "kde/frameworks/tier1/kcodecs",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kcodecs/kcodecs-6.30.0-136-20260912T134725-macos-clang-arm64.tar.7z",
+      "sha256": "9c563d6ae1dcd4f5abf9fc857453f8543b43ac05b603b7632c73fce0aa50601b"
+    },
+    {
+      "name": "libs/libxslt",
+      "version": "1.1.43",
+      "file": "libs/libxslt/libxslt-1.1.43-84-20260523T154605-macos-clang-arm64.tar.7z",
+      "sha256": "c33d7bfd2ba5f567bfd44e827d9aa058e250ed40da274ce0e1abb78f02c287d1"
+    },
+    {
+      "name": "kde/frameworks/tier1/breeze-icons",
+      "version": "6.30.0-1",
+      "file": "kde/frameworks/tier1/breeze-icons/breeze-icons-6.30.0-1-136-20260912T134809-macos-clang-arm64.tar.7z",
+      "sha256": "6e4eb9460813f120810e3bec62aa2c80c455ca5f26f1a2c9a23e6389eb7d4879"
+    },
+    {
+      "name": "kde/frameworks/tier1/kwindowsystem",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kwindowsystem/kwindowsystem-6.30.0-136-20260912T134825-macos-clang-arm64.tar.7z",
+      "sha256": "1d5ff9a01cdd9f122fda5c887d9a2815e7aa94005b94a22758f0d6e42122bedc"
+    },
+    {
+      "name": "kde/frameworks/tier1/kconfig",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kconfig/kconfig-6.30.0-136-20260912T134853-macos-clang-arm64.tar.7z",
+      "sha256": "8a26dd9093351b95ee5c0d29b1eab483aa8ce31938b857c23a2817168fa2b73d"
+    },
+    {
+      "name": "kde/frameworks/tier1/kwidgetsaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kwidgetsaddons/kwidgetsaddons-6.30.0-136-20260912T134946-macos-clang-arm64.tar.7z",
+      "sha256": "e35447afcfccf0ca8694675954729fa9a41df373af1aeec4fd331943424a65e6"
+    },
+    {
+      "name": "kde/frameworks/tier1/solid",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/solid/solid-6.30.0-136-20260912T135024-macos-clang-arm64.tar.7z",
+      "sha256": "0565322e02e030f8f7b31edc4bdabfc2f9966fbf81ae1b33c50f11ddc0a04daf"
+    },
+    {
+      "name": "libs/libarchive",
+      "version": "3.8.1",
+      "file": "libs/libarchive/libarchive-3.8.1-84-20260523T155042-macos-clang-arm64.tar.7z",
+      "sha256": "844b4f9f0aec23f8c5fc59db9bbc23c4e6a016d55e0c2a166189dcc0c14e5033"
+    },
+    {
+      "name": "kde/frameworks/tier1/karchive",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/karchive/karchive-6.30.0-136-20260912T135037-macos-clang-arm64.tar.7z",
+      "sha256": "f66807ebbc64868e48786716361e9bcf2d342d9f50314ab93b7c868b3fb49dee"
+    },
+    {
+      "name": "libs/aom",
+      "version": "3.13.3",
+      "file": "libs/aom/aom-3.13.3-84-20260523T155126-macos-clang-arm64.tar.7z",
+      "sha256": "72b3c29741d6f28ca9f194f4cce4608b01bbd3fce0cf624336f265311cdcb6c0"
+    },
+    {
+      "name": "libs/dav1d",
+      "version": "1.5.3",
+      "file": "libs/dav1d/dav1d-1.5.3-84-20260523T155143-macos-clang-arm64.tar.7z",
+      "sha256": "ad5a82165184cf0e464c53f1ba05423f365af6e1bf82557647db0c5d70168266"
+    },
+    {
+      "name": "libs/libavif",
+      "version": "1.4.1",
+      "file": "libs/libavif/libavif-1.4.1-84-20260523T155150-macos-clang-arm64.tar.7z",
+      "sha256": "44321e2d5846fdabd1606a3ec924c2f5301b7162b44db19a395f5112c154bb8e"
+    },
+    {
+      "name": "libs/lcms2",
+      "version": "2.17",
+      "file": "libs/lcms2/lcms2-2.17-84-20260523T155154-macos-clang-arm64.tar.7z",
+      "sha256": "66b146f5fda0adf360fa0a460b37159e2e34d7ad1e43aa6ae8d8364abf55e376"
+    },
+    {
+      "name": "libs/libhwy",
+      "version": "1.4.0",
+      "file": "libs/libhwy/libhwy-1.4.0-84-20260523T155159-macos-clang-arm64.tar.7z",
+      "sha256": "c38ff8d943e36b87ce33b0e7ea643941da1ba6709b56faaf5b1198ba50f641c7"
+    },
+    {
+      "name": "libs/libjxl",
+      "version": "0.11.2",
+      "file": "libs/libjxl/libjxl-0.11.2-84-20260523T155235-macos-clang-arm64.tar.7z",
+      "sha256": "eb3296ca8eee6d9680df39735a8acab368bd738e4d4afc2b39e7f8b602e7d9c5"
+    },
+    {
+      "name": "libs/giflib",
+      "version": "5.2.1",
+      "file": "libs/giflib/giflib-5.2.1-84-20260523T155241-macos-clang-arm64.tar.7z",
+      "sha256": "590ef523964f14caf1d3190e8f7d4aad0cf695d37e9ee51fc18768a74ca4b451"
+    },
+    {
+      "name": "libs/webp",
+      "version": "1.6.0",
+      "file": "libs/webp/webp-1.6.0-84-20260523T155249-macos-clang-arm64.tar.7z",
+      "sha256": "92999f63c31d8788b132a172030ffd70b4d18416a2f39a0b84e7fe1ce0e96b8c"
+    },
+    {
+      "name": "libs/tiff",
+      "version": "4.7.1",
+      "file": "libs/tiff/tiff-4.7.1-84-20260523T155303-macos-clang-arm64.tar.7z",
+      "sha256": "40733277429fdc7c10b7b39f2396f263331d00bbeb7c1fb343588e0739190ba0"
+    },
+    {
+      "name": "libs/openjpeg",
+      "version": "2.5.3-1",
+      "file": "libs/openjpeg/openjpeg-2.5.3-1-84-20260523T155312-macos-clang-arm64.tar.7z",
+      "sha256": "e7532c75a6d4917f9f49d53ea35a496f40081abb5b57c3aec03ae80e87cd7e39"
+    },
+    {
+      "name": "kde/frameworks/tier1/kimageformats",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kimageformats/kimageformats-6.30.0-136-20260912T135107-macos-clang-arm64.tar.7z",
+      "sha256": "4fc027fb935705d2d5d0d7f96426626a1cb12e73f1b9dfe55d92fc10c9519c75"
+    },
+    {
+      "name": "data/iso-codes",
+      "version": "4.20.1",
+      "file": "data/iso-codes/iso-codes-4.20.1-116-20260720T030801-macos-clang-arm64.tar.7z",
+      "sha256": "418bf8deec205dc2cbd33944e9ed21fa71fa8592e00736a4fcd704eef269d71b"
+    },
+    {
+      "name": "kde/frameworks/tier1/ki18n",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/ki18n/ki18n-6.30.0-136-20260912T135133-macos-clang-arm64.tar.7z",
+      "sha256": "584392ad43fa5dfbec854628397a7860a0ff7c92dd575147136d5ba63e6504d3"
+    },
+    {
+      "name": "kde/frameworks/tier1/kitemviews",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kitemviews/kitemviews-6.30.0-136-20260912T135151-macos-clang-arm64.tar.7z",
+      "sha256": "fa189f38a46b9d1c7d3e8feb1061537045036c9d5abf79321128df59410d0312"
+    },
+    {
+      "name": "kde/frameworks/tier1/threadweaver",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/threadweaver/threadweaver-6.30.0-136-20260912T135235-macos-clang-arm64.tar.7z",
+      "sha256": "9a843f35af0624374f25c46d82eb91da41b65286a78606ed02bef98fde0d1836"
+    },
+    {
+      "name": "kde/frameworks/tier1/sonnet",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/sonnet/sonnet-6.30.0-136-20260912T135259-macos-clang-arm64.tar.7z",
+      "sha256": "610e0bd1b97db26edec01299200bbb14679bbd1156a86d597ea06b49164c5b6e"
+    },
+    {
+      "name": "libs/liblame",
+      "version": "3.100",
+      "file": "libs/liblame/liblame-3.100-84-20260523T155612-macos-clang-arm64.tar.7z",
+      "sha256": "50d4341b3613a381d132d0684fe1143965e3dda42bde9ef6215832653160cae6"
+    },
+    {
+      "name": "libs/libopus",
+      "version": "1.5.2",
+      "file": "libs/libopus/libopus-1.5.2-84-20260523T155622-macos-clang-arm64.tar.7z",
+      "sha256": "dfb597a0eba2a04e66b939b3c63450050dbf427c2a49438a6eeba309ab6dc4b4"
+    },
+    {
+      "name": "libs/x265",
+      "version": "8f18e3a-2",
+      "file": "libs/x265/x265-8f18e3a-2-84-20260523T155649-macos-clang-arm64.tar.7z",
+      "sha256": "af65276985d310d12cd6312ee9a496443e59702dc9285ff6456c366bd54d2aa2"
+    },
+    {
+      "name": "libs/libogg",
+      "version": "1.3.3",
+      "file": "libs/libogg/libogg-1.3.3-84-20260523T155706-macos-clang-arm64.tar.7z",
+      "sha256": "b8e558bd6c571d2a351b01b52d3f52463c7144aac8e828f26fcf4de046093d4e"
+    },
+    {
+      "name": "libs/libvorbis",
+      "version": "1.3.7-2",
+      "file": "libs/libvorbis/libvorbis-1.3.7-2-84-20260523T155709-macos-clang-arm64.tar.7z",
+      "sha256": "fb1ea44ed7354320166236e232704ad14f452f76738fae9cc3029fe3c126b7a8"
+    },
+    {
+      "name": "libs/libsamplerate",
+      "version": "0.2.2",
+      "file": "libs/libsamplerate/libsamplerate-0.2.2-84-20260523T155714-macos-clang-arm64.tar.7z",
+      "sha256": "d08eb74775162ca0c493dfba5af73d9cdce5c75d337e1896c00501981a9ab245"
+    },
+    {
+      "name": "libs/libsdl2",
+      "version": "2.30.10",
+      "file": "libs/libsdl2/libsdl2-2.30.10-84-20260523T155749-macos-clang-arm64.tar.7z",
+      "sha256": "8567a234abed4031447cd6b97154eaa0cd4791b8af580d6c6a5bc197eff06e02"
+    },
+    {
+      "name": "libs/fribidi",
+      "version": "1.0.10-1",
+      "file": "libs/fribidi/fribidi-1.0.10-1-84-20260523T155815-macos-clang-arm64.tar.7z",
+      "sha256": "6fefff4d10c162e6e1d1c2315d7a05407a71bd6ba09caa09509d7e54ddfc3a42"
+    },
+    {
+      "name": "libs/libass",
+      "version": "0.17.4",
+      "file": "libs/libass/libass-0.17.4-92-20260608T215139-macos-clang-arm64.tar.7z",
+      "sha256": "b5e4b880d74d9ae68e2c8dd29f0a73f0b7713e93b9519be03d08e83b67265548"
+    },
+    {
+      "name": "libs/x264",
+      "version": "b35605a",
+      "file": "libs/x264/x264-b35605a-103-20260617T215530-macos-clang-arm64.tar.7z",
+      "sha256": "9cf04c343ad910d3a79a86bc93d1531ecce546f868f4da70856666227fd29e97"
+    },
+    {
+      "name": "libs/ffmpeg",
+      "version": "8.1.1-6",
+      "file": "libs/ffmpeg/ffmpeg-8.1.1-6-145-20260917T200902-macos-clang-arm64.tar.7z",
+      "sha256": "d8a59b5e8550e0d34437725ceb148ac63002d82d5bea76bc2d17813276af0b0f"
+    },
+    {
+      "name": "libs/qt6/qtmultimedia",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtmultimedia/qtmultimedia-6.11.1-84-20260523T160226-macos-clang-arm64.tar.7z",
+      "sha256": "cb8d343443640b52311a9e34e9ddfb2eb4f5deb97362b25ce7c5b4d436ea23c7"
+    },
+    {
+      "name": "libs/qrencode",
+      "version": "4.1.1-1",
+      "file": "libs/qrencode/qrencode-4.1.1-1-84-20260523T160248-macos-clang-arm64.tar.7z",
+      "sha256": "b52a9c90fab3f45981f640ea854292be1b76cd1f6954fdd77236bead31720673"
+    },
+    {
+      "name": "libs/zxing-cpp",
+      "version": "2.3.0",
+      "file": "libs/zxing-cpp/zxing-cpp-2.3.0-84-20260523T160309-macos-clang-arm64.tar.7z",
+      "sha256": "94b061b5f822f2f9db7d7032177916f1a9e973b9014b2c7d3dbecb223eb4dff4"
+    },
+    {
+      "name": "kde/frameworks/tier1/kitemmodels",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kitemmodels/kitemmodels-6.30.0-136-20260912T135423-macos-clang-arm64.tar.7z",
+      "sha256": "15164daf6e3d27e16bbbe9c50e9b1c70aa6146b794161bd01263486726efa008"
+    },
+    {
+      "name": "kde/frameworks/tier1/kdbusaddons",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kdbusaddons/kdbusaddons-6.30.0-136-20260912T135434-macos-clang-arm64.tar.7z",
+      "sha256": "d74d1279da7f8a59efcc310da50c3949d9e5ae85d6e73bc2814747c20e4049a6"
+    },
+    {
+      "name": "kde/frameworks/tier1/syntax-highlighting",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/syntax-highlighting/syntax-highlighting-6.30.0-136-20260912T135506-macos-clang-arm64.tar.7z",
+      "sha256": "9be93fea28dc2dad2312404e77a760c875c9df67d42b06a394cefa8189e8bd56"
+    },
+    {
+      "name": "kde/frameworks/tier1/kirigami",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier1/kirigami/kirigami-6.30.0-136-20260912T135639-macos-clang-arm64.tar.7z",
+      "sha256": "e2eeda123cfc09da493aa2540831ae7e9c941e5ab2e17798ba24dfca6cbb71e2"
+    },
+    {
+      "name": "libs/libical",
+      "version": "3.0.20",
+      "file": "libs/libical/libical-3.0.20-84-20260523T160750-macos-clang-arm64.tar.7z",
+      "sha256": "32fe1905db61f3d530f5632b3d6bc6df1fdf8c7f24f8ba9d2d087c71662a6469"
+    },
+    {
+      "name": "kde/frameworks/tier2/kcolorscheme",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kcolorscheme/kcolorscheme-6.30.0-136-20260912T135733-macos-clang-arm64.tar.7z",
+      "sha256": "c5f5767c9158084ff0124a450d04d4fca2739a6ddc014dda7cd04923c6368dcc"
+    },
+    {
+      "name": "kde/frameworks/tier2/kdoctools",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kdoctools/kdoctools-6.30.0-136-20260912T135747-macos-clang-arm64.tar.7z",
+      "sha256": "3739edb7b4302c87dfb76ae7d9bb93f99250c9b2634c0864b26ddeeddfb46460"
+    },
+    {
+      "name": "kde/frameworks/tier3/kconfigwidgets",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kconfigwidgets/kconfigwidgets-6.30.0-136-20260912T135819-macos-clang-arm64.tar.7z",
+      "sha256": "2b6a312849cbb031640170df27263d35a3145f02fb10ec3bd67be15f2f8cb88f"
+    },
+    {
+      "name": "kde/frameworks/tier3/kiconthemes",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kiconthemes/kiconthemes-6.30.0-136-20260912T135834-macos-clang-arm64.tar.7z",
+      "sha256": "632a296cdbc84d7937f021369f71bae1bfdd6e837d0986d0f56d61d4132f4a7d"
+    },
+    {
+      "name": "kde/frameworks/tier3/kxmlgui",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kxmlgui/kxmlgui-6.30.0-136-20260912T135859-macos-clang-arm64.tar.7z",
+      "sha256": "c26a66763e1a9616996d7ac35badc1ed085a5d2751867b98cb425f878b93f99e"
+    },
+    {
+      "name": "kde/frameworks/tier3/kbookmarks",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kbookmarks/kbookmarks-6.30.0-136-20260912T135914-macos-clang-arm64.tar.7z",
+      "sha256": "1e2398a9244e46f378bb38107c54dfb76103968edb175597031c4237f2b93f25"
+    },
+    {
+      "name": "kde/frameworks/tier2/kcompletion",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kcompletion/kcompletion-6.30.0-136-20260912T135927-macos-clang-arm64.tar.7z",
+      "sha256": "abb4046b7855244d5a36a9e62af45fddc0f93b50c0e32fbf2d9f4d1d3ce51a24"
+    },
+    {
+      "name": "libs/qt6/qtspeech",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtspeech/qtspeech-6.11.1-84-20260523T161029-macos-clang-arm64.tar.7z",
+      "sha256": "2f0d4ece6f00f6a07eea3e31ee686ca5d19554486233b26938fdd51336ed0cf2"
+    },
+    {
+      "name": "kde/frameworks/tier3/knotifications",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/knotifications/knotifications-6.30.0-136-20260912T135937-macos-clang-arm64.tar.7z",
+      "sha256": "7b24ea859c9dafb74189f83902e8efab2d6f17b6048da5ece10cd2d710c42d2c"
+    },
+    {
+      "name": "kde/frameworks/tier2/kjobwidgets",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kjobwidgets/kjobwidgets-6.30.0-136-20260912T135950-macos-clang-arm64.tar.7z",
+      "sha256": "8b109b5b9846a11eceed7a5f0a57522eb8b3cee515cdf010b823fc4e3ef496ed"
+    },
+    {
+      "name": "kde/frameworks/tier3/kservice",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kservice/kservice-6.30.0-136-20260912T140007-macos-clang-arm64.tar.7z",
+      "sha256": "56776212096cdd95e5abd9621e393a9195c47eba536d6302e4ecef0d80973edb"
+    },
+    {
+      "name": "kde/frameworks/tier2/kcrash",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kcrash/kcrash-6.30.0-136-20260912T140013-macos-clang-arm64.tar.7z",
+      "sha256": "1645d0f0609289b7b5fcc820b4382e5b9d8f8eafdb87582db9704ab541436061"
+    },
+    {
+      "name": "kde/frameworks/tier3/ktextwidgets",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/ktextwidgets/ktextwidgets-6.30.0-136-20260912T140023-macos-clang-arm64.tar.7z",
+      "sha256": "d4a76f96fa26a30da513527196be7297aa5c289f9a0f9d5378566558a87e90ab"
+    },
+    {
+      "name": "kde/frameworks/tier3/kio",
+      "version": "6.30.0-1",
+      "file": "kde/frameworks/tier3/kio/kio-6.30.0-1-147-20261003T065938-macos-clang-arm64.tar.7z",
+      "sha256": "15d0dfc4d70be76cc5a9b6546cb7d33325f052e9e261c09e54cdf792557091f0"
+    },
+    {
+      "name": "kde/frameworks/tier3/kparts",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kparts/kparts-6.30.0-136-20260912T140249-macos-clang-arm64.tar.7z",
+      "sha256": "40d0b64673dc25e4fb5962fa21c2a64d17cb24798e464e521f5e4a32f27a2cb0"
+    },
+    {
+      "name": "kde/frameworks/tier3/kdeclarative",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kdeclarative/kdeclarative-6.30.0-136-20260912T140309-macos-clang-arm64.tar.7z",
+      "sha256": "1942830e40689b92a0bd15ffb6d7cfc0d5a08434d826175a80ca2a2011a4a133"
+    },
+    {
+      "name": "kde/frameworks/tier3/qqc2-desktop-style",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/qqc2-desktop-style/qqc2-desktop-style-6.30.0-136-20260912T140349-macos-clang-arm64.tar.7z",
+      "sha256": "89cf12e0961547aa892874be56e65cceb69a991a70b5fefed00f657c1eebc0f7"
+    },
+    {
+      "name": "kde/frameworks/tier2/kpackage",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kpackage/kpackage-6.30.0-136-20260912T140401-macos-clang-arm64.tar.7z",
+      "sha256": "90f148bab405a5eb9e21e8ec00d1f112d8f2b9e2e94dbf62f5852952c00088c9"
+    },
+    {
+      "name": "kde/frameworks/tier2/syndication",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/syndication/syndication-6.30.0-136-20260912T140425-macos-clang-arm64.tar.7z",
+      "sha256": "b48dfa826981cd3e41fb96137593587c81d4202720db56c94f619a556894f21d"
+    },
+    {
+      "name": "kde/frameworks/tier3/knewstuff",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/knewstuff/knewstuff-6.30.0-136-20260912T140508-macos-clang-arm64.tar.7z",
+      "sha256": "438972d37f8297650a3166096104a280f6334e3cc476c039632cca7952ef1b11"
+    },
+    {
+      "name": "kde/frameworks/tier3/ksvg",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/ksvg/ksvg-6.30.0-136-20260912T140523-macos-clang-arm64.tar.7z",
+      "sha256": "f643526d3b5c671e47e9fdc6a590c036ca08a7c33f03dca76ce9610054c7c39b"
+    },
+    {
+      "name": "kde/frameworks/tier3/knotifyconfig",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/knotifyconfig/knotifyconfig-6.30.0-136-20260912T140531-macos-clang-arm64.tar.7z",
+      "sha256": "7c42ec17487642a549c0fb59851595ca8763e46e016dc38c103f0343d2b8d282"
+    },
+    {
+      "name": "kde/frameworks/tier3/kcmutils",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kcmutils/kcmutils-6.30.0-136-20260912T140612-macos-clang-arm64.tar.7z",
+      "sha256": "f38c7c234cc6151094ddf8bf9f78a1d05f5ca9068567a3442031925c32e9fb28"
+    },
+    {
+      "name": "kde/frameworks/tier3/purpose",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/purpose/purpose-6.30.0-136-20260912T140644-macos-clang-arm64.tar.7z",
+      "sha256": "0c6f496a285f8fa54a4d7cc8a2628eeb8c49f522e021150329c341f9dc0148c5"
+    },
+    {
+      "name": "libs/gpg-error",
+      "version": "1.56",
+      "file": "libs/gpg-error/gpg-error-1.56-84-20260523T161743-macos-clang-arm64.tar.7z",
+      "sha256": "3cc9dda9ecd83690276f4d267091d96c27fc42f0e53d771415190dc24a867693"
+    },
+    {
+      "name": "libs/gcrypt",
+      "version": "1.11.2",
+      "file": "libs/gcrypt/gcrypt-1.11.2-84-20260523T161818-macos-clang-arm64.tar.7z",
+      "sha256": "9ed48f05a3bae40651a90d3ba06241aae1cccb2f9edaa10f9ae088046f806e54"
+    },
+    {
+      "name": "libs/qt6/qt5compat",
+      "version": "6.11.1",
+      "file": "libs/qt6/qt5compat/qt5compat-6.11.1-84-20260523T161840-macos-clang-arm64.tar.7z",
+      "sha256": "da331d343e7990550b9f7df695b0a07febb298838c6d47a2142a8cfaebd3a26f"
+    },
+    {
+      "name": "libs/lmdb",
+      "version": "0.9.33-1",
+      "file": "libs/lmdb/lmdb-0.9.33-1-84-20260523T161845-macos-clang-arm64.tar.7z",
+      "sha256": "d3a6c4c5458841162e2f9c5cf660b9d7797806e9f8103bc88fd3226d73d523f9"
+    },
+    {
+      "name": "libs/cyrus-sasl",
+      "version": "2.1.28-3",
+      "file": "libs/cyrus-sasl/cyrus-sasl-2.1.28-3-84-20260523T161909-macos-clang-arm64.tar.7z",
+      "sha256": "a1fb534839663dc6565513c6fac2c3af8ecd33fd3d868a36037bcf6f97af75b3"
+    },
+    {
+      "name": "libs/assuan2",
+      "version": "3.0.1",
+      "file": "libs/assuan2/assuan2-3.0.1-84-20260523T161926-macos-clang-arm64.tar.7z",
+      "sha256": "0ebf6b0592f28968fd5adc3988d589b33e00d8cba1ac8fb1045ba7c5a9f59145"
+    },
+    {
+      "name": "libs/npth",
+      "version": "1.8",
+      "file": "libs/npth/npth-1.8-84-20260523T161938-macos-clang-arm64.tar.7z",
+      "sha256": "27fd38e6a690aa10c6e37ed4ff101e3c22d00cc02d68db8f784b29a6cafe7972"
+    },
+    {
+      "name": "libs/libksba",
+      "version": "1.6.7",
+      "file": "libs/libksba/libksba-1.6.7-84-20260523T161957-macos-clang-arm64.tar.7z",
+      "sha256": "b994ec1127c50bddd2fcef0cbb629a5ef6608da93b919f2532bf9dcd5806a2e1"
+    },
+    {
+      "name": "libs/ntbtls",
+      "version": "0.3.2",
+      "file": "libs/ntbtls/ntbtls-0.3.2-84-20260523T162026-macos-clang-arm64.tar.7z",
+      "sha256": "38081e8de334ce24cb49beae6041be9fdf339fdcdcb3d5babea49549c623fe44"
+    },
+    {
+      "name": "libs/gnupg",
+      "version": "2.4.8",
+      "file": "libs/gnupg/gnupg-2.4.8-84-20260523T162141-macos-clang-arm64.tar.7z",
+      "sha256": "62688a2b12a05c510ca766c3fcc488414d0bf593c3ba7acdd0674b0cc419e276"
+    },
+    {
+      "name": "kdesupport/qca",
+      "version": "2.3.10",
+      "file": "kdesupport/qca/qca-2.3.10-84-20260523T162207-macos-clang-arm64.tar.7z",
+      "sha256": "6daab3c927ae03184d221190bc11ab152caaefbff203c652e57a16a31316dfdc"
+    },
+    {
+      "name": "libs/gpgme/gpgme",
+      "version": "2.0.1",
+      "file": "libs/gpgme/gpgme/gpgme-2.0.1-84-20260523T162235-macos-clang-arm64.tar.7z",
+      "sha256": "bb3bc61e1a0a87f8295276a49fdf0da8c0175d767daff09194affc73f71b2af3"
+    },
+    {
+      "name": "libs/gpgme/gpgmepp",
+      "version": "2.0.0",
+      "file": "libs/gpgme/gpgmepp/gpgmepp-2.0.0-84-20260523T162240-macos-clang-arm64.tar.7z",
+      "sha256": "b14c080ca2cfe4bde3e533df59b311af42899b17f3513b85bde183a4869d46bc"
+    },
+    {
+      "name": "libs/gpgme/qgpgme",
+      "version": "2.0.0-1",
+      "file": "libs/gpgme/qgpgme/qgpgme-2.0.0-1-84-20260523T162303-macos-clang-arm64.tar.7z",
+      "sha256": "28431428862941d19fcedbf0c71433f93a59be6c73a43d5bbbef7c937d68e4c5"
+    },
+    {
+      "name": "kde/frameworks/tier3/kwallet",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier3/kwallet/kwallet-6.30.0-136-20260912T140809-macos-clang-arm64.tar.7z",
+      "sha256": "d97ced801d24afff6d76ed8385cded739f6e9f1bd29103646a4737483d06bd22"
+    },
+    {
+      "name": "libs/editorconfig",
+      "version": "0.12.5",
+      "file": "libs/editorconfig/editorconfig-0.12.5-84-20260523T162331-macos-clang-arm64.tar.7z",
+      "sha256": "056b91d9bf175f51a8f6230d755f73f8cb31107591e3d55724c6b876deab0ad9"
+    },
+    {
+      "name": "libs/libssh2",
+      "version": "1.11.1-1",
+      "file": "libs/libssh2/libssh2-1.11.1-1-84-20260523T162336-macos-clang-arm64.tar.7z",
+      "sha256": "66782f1f1bbf0dd4248402babfc568b74e576ad4b2a9e7c27c572035d957521d"
+    },
+    {
+      "name": "libs/libgit2",
+      "version": "1.7.1",
+      "file": "libs/libgit2/libgit2-1.7.1-84-20260523T162400-macos-clang-arm64.tar.7z",
+      "sha256": "25db913141f3a8fa026968fb91b9037cf2da4ec84fb9fea94eb4c0de286e4cda"
+    },
+    {
+      "name": "kde/frameworks/tier4/frameworkintegration",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier4/frameworkintegration/frameworkintegration-6.30.0-136-20260912T140921-macos-clang-arm64.tar.7z",
+      "sha256": "47b7c522869856c9ce8fa5db3c45c31abab9df7ca1bbec2145ec9b0987792add"
+    },
+    {
+      "name": "data/poppler-data",
+      "version": "0.4.12",
+      "file": "data/poppler-data/poppler-data-0.4.12-84-20260523T162500-macos-clang-arm64.tar.7z",
+      "sha256": "3fa2ca49c5757ba70281c6a8475ac4a2d3295eefc907be357e6c41e342918e65"
+    },
+    {
+      "name": "libs/libpsl",
+      "version": "0.21.5",
+      "file": "libs/libpsl/libpsl-0.21.5-84-20260523T162508-macos-clang-arm64.tar.7z",
+      "sha256": "07f379902bffb77d4879d01c75b1b0c1be68cf28061044b1d65c56c73d534bbf"
+    },
+    {
+      "name": "libs/libcurl",
+      "version": "8.14.1",
+      "file": "libs/libcurl/libcurl-8.14.1-84-20260523T162534-macos-clang-arm64.tar.7z",
+      "sha256": "f807f95a00fa810d4db10dc1fdcf17377435a295a60583663da6e9905da14888"
+    },
+    {
+      "name": "data/urw-base35-fonts",
+      "version": "20200910",
+      "file": "data/urw-base35-fonts/urw-base35-fonts-20200910-84-20260523T162540-macos-clang-arm64.tar.7z",
+      "sha256": "78240e5e9903c5866a4bf4a9b2dcf23cc8217af8b4901a20371163a3db7728b9"
+    },
+    {
+      "name": "qt-libs/poppler",
+      "version": "26.07.0",
+      "file": "qt-libs/poppler/poppler-26.07.0-116-20260720T031037-macos-clang-arm64.tar.7z",
+      "sha256": "faabb1fb27ab8a2a9a3a0c88f642d300bb98a7a36fd209c2cdacf2885dc1f27c"
+    },
+    {
+      "name": "libs/taglib",
+      "version": "2.1.1",
+      "file": "libs/taglib/taglib-2.1.1-84-20260523T162723-macos-clang-arm64.tar.7z",
+      "sha256": "bfc6b15e14706fe76260551e05f80064bd67e47192dd6601c3d9b13ad38cb5d5"
+    },
+    {
+      "name": "libs/inih",
+      "version": "56",
+      "file": "libs/inih/inih-56-84-20260523T162728-macos-clang-arm64.tar.7z",
+      "sha256": "4339dc45241c15b9f7352729517e11a4fd2184a77796243d2eb94f1c2b65a103"
+    },
+    {
+      "name": "libs/exiv2",
+      "version": "0.28.5",
+      "file": "libs/exiv2/exiv2-0.28.5-84-20260523T162802-macos-clang-arm64.tar.7z",
+      "sha256": "c70348360fcdd57a1021520dcc3a516f5ba3943430a3d3d9067581b0498f23ab"
+    },
+    {
+      "name": "libs/libgmp",
+      "version": "6.3.0",
+      "file": "libs/libgmp/libgmp-6.3.0-84-20260523T162855-macos-clang-arm64.tar.7z",
+      "sha256": "9524d783404d64bc3a417f9c1489d23c4a537dc423f50b0e375df00f60e87b21"
+    },
+    {
+      "name": "libs/libzip",
+      "version": "1.11.3",
+      "file": "libs/libzip/libzip-1.11.3-84-20260523T163304-macos-clang-arm64.tar.7z",
+      "sha256": "3a2663ae529f9fb595b2dc6162597be2d7e5281427f7d8eae1fdb1fcc45d9089"
+    },
+    {
+      "name": "libs/ebook-tools",
+      "version": "0.2.2",
+      "file": "libs/ebook-tools/ebook-tools-0.2.2-84-20260523T163306-macos-clang-arm64.tar.7z",
+      "sha256": "b57571a19fab81168c94b87c8531b2af74474a72e8865257aad5e1e4cae6885c"
+    },
+    {
+      "name": "kde/kdegraphics/kdegraphics-mobipocket",
+      "version": "26.08.1",
+      "file": "kde/kdegraphics/kdegraphics-mobipocket/kdegraphics-mobipocket-26.08.1-136-20260912T140944-macos-clang-arm64.tar.7z",
+      "sha256": "fd7be211a3038dcac0b4722ece0f3e4642a863ae8b4dfbff55395081b0af0ef1"
+    },
+    {
+      "name": "kde/frameworks/tier2/kstatusnotifieritem",
+      "version": "6.30.0",
+      "file": "kde/frameworks/tier2/kstatusnotifieritem/kstatusnotifieritem-6.30.0-136-20260912T141045-macos-clang-arm64.tar.7z",
+      "sha256": "1308827a512dfe5ea27cf165bf3bce757dbddc57121a7adacbfdd9a510764222"
+    },
+    {
+      "name": "qt-libs/qtkeychain",
+      "version": "0.16.0",
+      "file": "qt-libs/qtkeychain/qtkeychain-0.16.0-116-20260720T031114-macos-clang-arm64.tar.7z",
+      "sha256": "08007882aa0ec9cafd9bd88f0c2297cb3e7fd382ad2bae089c7dd763dc3c4b86"
+    },
+    {
+      "name": "libs/qt6/qtpositioning",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtpositioning/qtpositioning-6.11.1-84-20260523T164958-macos-clang-arm64.tar.7z",
+      "sha256": "012cd62d3f14d8d047df3aaf0063c6850c155a7260bdcf8b68c3be360ad92df5"
+    },
+    {
+      "name": "libs/qt6/qtwebchannel",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtwebchannel/qtwebchannel-6.11.1-84-20260523T165025-macos-clang-arm64.tar.7z",
+      "sha256": "075ea06f3edeea515180da75696319f833b7dd7af8b76c9e572a1c7f674d92ea"
+    },
+    {
+      "name": "libs/qt6/qtwebengine",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtwebengine/qtwebengine-6.11.1-92-20260609T000838-macos-clang-arm64.tar.7z",
+      "sha256": "e27f5f4e9f47a88b27fcebdbf69835a3be5f6b468f23026f00b2a9572abb7ecb"
+    },
+    {
+      "name": "qt-libs/phonon",
+      "version": "4.12.0-1",
+      "file": "qt-libs/phonon/phonon-4.12.0-1-136-20260907T031250-macos-clang-arm64.tar.7z",
+      "sha256": "2a980a5549ca9173993bcd4ba6277212d79a74758a444bc4b76266501d03decf"
+    },
+    {
+      "name": "libs/libraw",
+      "version": "0.21.4",
+      "file": "libs/libraw/libraw-0.21.4-92-20260609T002132-macos-clang-arm64.tar.7z",
+      "sha256": "db166eb9790002d02edd82f7d19cf9fa8e64093397f74b299ccb689603299336"
+    },
+    {
+      "name": "libs/ghostscript",
+      "version": "10.05.1",
+      "file": "libs/ghostscript/ghostscript-10.05.1-92-20260609T002608-macos-clang-arm64.tar.7z",
+      "sha256": "1141122bb7805bbbaf763791a6e586a3f0f86084bd4cf1fa012d4e0304513cb6"
+    },
+    {
+      "name": "libs/chm",
+      "version": "0.40-1",
+      "file": "libs/chm/chm-0.40-1-92-20260609T062300-macos-clang-arm64.tar.7z",
+      "sha256": "46f4fc9b9e17d4809dcda146657bac2232f4ec40ef99bca25123e947b4463d6d"
+    },
+    {
+      "name": "libs/discount",
+      "version": "3.0.1.2",
+      "file": "libs/discount/discount-3.0.1.2-92-20260609T062305-macos-clang-arm64.tar.7z",
+      "sha256": "08b7f48d3430da954c229125f9c972dc492565df95fa6a8c6d0499d478c0d9ec"
+    },
+    {
+      "name": "libs/djvu",
+      "version": "3.5.27",
+      "file": "libs/djvu/djvu-3.5.27-92-20260609T062344-macos-clang-arm64.tar.7z",
+      "sha256": "409849449c669ac273b15b72c9a321e1c60df05dd13cc9d05569ea0fb2cbda92"
+    },
+    {
+      "name": "libs/hunspell",
+      "version": "1.7.2",
+      "file": "libs/hunspell/hunspell-1.7.2-92-20260609T062441-macos-clang-arm64.tar.7z",
+      "sha256": "1912bc1a4605bf4eb46fff468a448dc98fad5e837d8682ba9ce4fe644da05bfb"
+    },
+    {
+      "name": "libs/imath",
+      "version": "3.1.11",
+      "file": "libs/imath/imath-3.1.11-92-20260609T120522-macos-clang-arm64.tar.7z",
+      "sha256": "822e39ecb56aa1bc928ae330d38bb6d422dcd62ae4ecfad0756a9d3b0061efff"
+    },
+    {
+      "name": "libs/openexr",
+      "version": "3.2.4-1",
+      "file": "libs/openexr/openexr-3.2.4-1-92-20260609T120627-macos-clang-arm64.tar.7z",
+      "sha256": "b8a2ab0ed1207926a16feafe9380b50abb59e3a6ea9e2c4b5eb8cb53dedebf46"
+    },
+    {
+      "name": "kde/applications/libkexiv2",
+      "version": "26.04.2",
+      "file": "kde/applications/libkexiv2/libkexiv2-26.04.2-97-20260612T223600-macos-clang-arm64.tar.7z",
+      "sha256": "83448ee3b0d41c7499e4a4c5c35ee0612218afb5da60373688124d28ad8aa290"
+    },
+    {
+      "name": "libs/qt6/qtimageformats",
+      "version": "6.11.1",
+      "file": "libs/qt6/qtimageformats/qtimageformats-6.11.1-101-20260614T125646-macos-clang-arm64.tar.7z",
+      "sha256": "d28a6ca06c6259228b60d6b9f072a43dbacfae243bc5694869e9e4d3362e571b"
+    }
+  ],
+  "schema": 1,
+  "target_arch": "arm64",
+  "craft_prefixes": [
+    "/Users/gitlab/builds/GZwHuM5xu/0/sysadmin/craft-ci/macos-arm-clang",
+    "/Users/gitlab/workspace/builds/GZwHuM5xu/0/sysadmin/craft-ci/macos-arm-clang"
+  ],
+  "host_packages": [
+    {
+      "name": "libs/libb2",
+      "version": "0.98.1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/libb2/libb2-0.98.1-97-20260611T112519-linux-gcc-x86_64.tar.7z",
+      "file": "libs/libb2/libb2-0.98.1-97-20260611T112519-linux-gcc-x86_64.tar.7z",
+      "sha256": "86bf56bbaec9f4a509312f0a38d0c609f7a346252d2f9adf339cb4495990562f",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/libbzip2",
+      "version": "1.0.8-1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/libbzip2/libbzip2-1.0.8-1-97-20260611T112522-linux-gcc-x86_64.tar.7z",
+      "file": "libs/libbzip2/libbzip2-1.0.8-1-97-20260611T112522-linux-gcc-x86_64.tar.7z",
+      "sha256": "8d73915a1d8a4618ddbcf95d22e6bbcd70be757ee6bd3977d1a485fc21a2cacf",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/expat",
+      "version": "2.7.3",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/expat/expat-2.7.3-97-20260611T112527-linux-gcc-x86_64.tar.7z",
+      "file": "libs/expat/expat-2.7.3-97-20260611T112527-linux-gcc-x86_64.tar.7z",
+      "sha256": "4c4f4337d0ff10ee70f3759ac1af7e4490b871e88f55ca0ab5c12bb6c47479ac",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/zlib",
+      "version": "1.3.1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/zlib/zlib-1.3.1-97-20260611T112529-linux-gcc-x86_64.tar.7z",
+      "file": "libs/zlib/zlib-1.3.1-97-20260611T112529-linux-gcc-x86_64.tar.7z",
+      "sha256": "75734b4a9bc569a9a2d77e70af487045480f1e2458a778fad1caeacbe8e3736e",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/openssl",
+      "version": "3.6.3",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/openssl/openssl-3.6.3-97-20260612T213730-linux-gcc-x86_64.tar.7z",
+      "file": "libs/openssl/openssl-3.6.3-97-20260612T213730-linux-gcc-x86_64.tar.7z",
+      "sha256": "43c33f0be9424467bb3422d9f0ed84e6b1e540f39a8bb37fb9a190006664c0d8",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/iconv",
+      "version": "1.18",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/iconv/iconv-1.18-97-20260611T112750-linux-gcc-x86_64.tar.7z",
+      "file": "libs/iconv/iconv-1.18-97-20260611T112750-linux-gcc-x86_64.tar.7z",
+      "sha256": "7b0b816400942910325fd431a6a3ec73fad5a8d105ee10dbbbfa90724c449b8a",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/liblzma",
+      "version": "5.2.3-1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/liblzma/liblzma-5.2.3-1-119-20260812T151313-linux-gcc-x86_64.tar.7z",
+      "file": "libs/liblzma/liblzma-5.2.3-1-119-20260812T151313-linux-gcc-x86_64.tar.7z",
+      "sha256": "641b937cd580f5c73c6980b3ced3b845b2a640646ac4724942ed10f37c637d05",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/icu",
+      "version": "78.1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/icu/icu-78.1-97-20260611T112924-linux-gcc-x86_64.tar.7z",
+      "file": "libs/icu/icu-78.1-97-20260611T112924-linux-gcc-x86_64.tar.7z",
+      "sha256": "7a1f28ae620f5ba04e797f9492926b377cd6654d6022648aa41e5fc1e01f9dbe",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/libxml2",
+      "version": "2.14.5",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/libxml2/libxml2-2.14.5-97-20260611T113004-linux-gcc-x86_64.tar.7z",
+      "file": "libs/libxml2/libxml2-2.14.5-97-20260611T113004-linux-gcc-x86_64.tar.7z",
+      "sha256": "2e0f0516c355de0fdbafc6f137c67ad9d9af36807777709643440d8c5063b80d",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/libunistring",
+      "version": "1.4.1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/libunistring/libunistring-1.4.1-97-20260611T113131-linux-gcc-x86_64.tar.7z",
+      "file": "libs/libunistring/libunistring-1.4.1-97-20260611T113131-linux-gcc-x86_64.tar.7z",
+      "sha256": "5a2421a15433fc851976a4bb4bc5d92b786c31f56a2bdaf363d6133d7fc75a63",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/libzstd",
+      "version": "1.5.7",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/libzstd/libzstd-1.5.7-97-20260611T113556-linux-gcc-x86_64.tar.7z",
+      "file": "libs/libzstd/libzstd-1.5.7-97-20260611T113556-linux-gcc-x86_64.tar.7z",
+      "sha256": "dd8fc1c21bd1021959410163c44a0dd5bb3d0ad74f8146d5c3b1aff8901cff99",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/pcre2",
+      "version": "10.44",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/pcre2/pcre2-10.44-97-20260611T113655-linux-gcc-x86_64.tar.7z",
+      "file": "libs/pcre2/pcre2-10.44-97-20260611T113655-linux-gcc-x86_64.tar.7z",
+      "sha256": "4b3a25fe7e91255ec14ac6f601596f189113b4ed9979c81ae70532bf73c3b548",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "libs/libxslt",
+      "version": "1.1.43",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/libs/libxslt/libxslt-1.1.43-97-20260611T113837-linux-gcc-x86_64.tar.7z",
+      "file": "libs/libxslt/libxslt-1.1.43-97-20260611T113837-linux-gcc-x86_64.tar.7z",
+      "sha256": "e00ca09ef61606cdbcb1b803fbbcf0afd4ca697766075ecb807022f4b38b7c5a",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "data/docbook-dtd",
+      "version": "4.5",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/data/docbook-dtd/docbook-dtd-4.5-97-20260611T113837-linux-gcc-x86_64.tar.7z",
+      "file": "data/docbook-dtd/docbook-dtd-4.5-97-20260611T113837-linux-gcc-x86_64.tar.7z",
+      "sha256": "3a0ec089ec35183b430e9afc4ceb8293496ebad167d762fc2689b03980786c7f",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "data/docbook-xsl",
+      "version": "1.78.1",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/data/docbook-xsl/docbook-xsl-1.78.1-97-20260611T113841-linux-gcc-x86_64.tar.7z",
+      "file": "data/docbook-xsl/docbook-xsl-1.78.1-97-20260611T113841-linux-gcc-x86_64.tar.7z",
+      "sha256": "89c81d8a607a3584732a83536d84ce8c9083e22209d91f0b9404576895555fcd",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "kde/frameworks/tier1/karchive",
+      "version": "6.30.0",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/kde/frameworks/tier1/karchive/karchive-6.30.0-136-20260912T110545-linux-gcc-x86_64.tar.7z",
+      "file": "kde/frameworks/tier1/karchive/karchive-6.30.0-136-20260912T110545-linux-gcc-x86_64.tar.7z",
+      "sha256": "268180580e2365e2681439947749100b7e062b120a5d13d2b864f18aed0dc180",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    },
+    {
+      "name": "kde/frameworks/tier2/kdoctools",
+      "version": "6.30.0",
+      "url": "https://files.kde.org/craft/Qt6/26.05/linux/gcc/x86_64/RelWithDebInfo/kde/frameworks/tier2/kdoctools/kdoctools-6.30.0-136-20260912T112232-linux-gcc-x86_64.tar.7z",
+      "file": "kde/frameworks/tier2/kdoctools/kdoctools-6.30.0-136-20260912T112232-linux-gcc-x86_64.tar.7z",
+      "sha256": "4c4e5fb7e8df44518f88efa81bef79a40ea50232756b1062cf653fa439921517",
+      "prefix": "/builds/sysadmin/craft-ci/linux-64-gcc"
+    }
+  ],
+  "host_sources": {
+    "qtbase": {
+      "url": "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtbase-everywhere-src-6.11.1.tar.xz",
+      "sha256": "d9594a31228aa23ad6b531719a29b45f0f3989fe6c136d45767ea179f233c1ac",
+      "directory": "qtbase-everywhere-src-6.11.1"
+    },
+    "kconfig": {
+      "url": "https://download.kde.org/stable/frameworks/6.30/kconfig-6.30.0.tar.xz",
+      "sha256": "0e98bac324cd716849202d4b246a948e363d6792a8eb09c78417cdde9559f56e",
+      "directory": "kconfig-6.30.0"
+    }
+  },
+  "tools": {
+    "cmake": {
+      "url": "https://github.com/Kitware/CMake/releases/download/v4.1.4/cmake-4.1.4-linux-x86_64.tar.gz",
+      "sha256": "af5c72ce7ce61607d70ff80445130f6278204aa46c45127edc0dc36e26a687b2",
+      "directory": "cmake-4.1.4-linux-x86_64"
+    },
+    "ninja": {
+      "url": "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip",
+      "sha256": "5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6"
+    }
+  },
+  "sdk": {
+    "url": "https://github.com/joseluisq/macosx-sdks/releases/download/26.1/MacOSX26.1.sdk.tar.xz",
+    "sha256": "beee7212d265a6d2867d0236cc069314b38d5fb3486a6515734e76fa210c784c",
+    "directory": "MacOSX26.1.sdk"
+  },
+  "spectre": {
+    "url": "https://libspectre.freedesktop.org/releases/libspectre-0.2.12.tar.gz",
+    "sha256": "55a7517cd3572bd2565df0cf450944a04d5273b279ebb369a895391957f0f960",
+    "directory": "libspectre-0.2.12"
+  }
+}

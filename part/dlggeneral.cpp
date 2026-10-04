@@ -13,10 +13,13 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QSpinBox>
 
 #include <config-okular.h>
@@ -155,6 +158,26 @@ DlgGeneral::DlgGeneral(QWidget *parent, Okular::EmbedMode embedMode)
     showBackendSelectionDialog->setText(i18nc("@option:check Config dialog, general page", "Show backend selection dialog"));
     showBackendSelectionDialog->setObjectName(QStringLiteral("kcfg_ChooseGenerators"));
     layout->addRow(programFeaturesLabel(), showBackendSelectionDialog);
+
+    QCheckBox *autoLookupSelectedWords = new QCheckBox(this);
+    autoLookupSelectedWords->setText(i18nc("@option:check Config dialog, general page", "Automatically look up selected words"));
+    autoLookupSelectedWords->setObjectName(QStringLiteral("kcfg_AutoLookupSelectedWords"));
+    layout->addRow(programFeaturesLabel(), autoLookupSelectedWords);
+
+    auto *dictionaryFile = new QLineEdit(this);
+    dictionaryFile->setObjectName(QStringLiteral("kcfg_DictionaryFile"));
+    dictionaryFile->setPlaceholderText(i18nc("@info:placeholder", "Leave empty to use Eudic"));
+    auto *browseDictionary = new QPushButton(i18nc("@action:button", "Browse…"), this);
+    connect(browseDictionary, &QPushButton::clicked, this, [this, dictionaryFile] {
+        const QString path = QFileDialog::getOpenFileName(this, i18nc("@title:window", "Select MDX dictionary"), dictionaryFile->text(), i18n("MDX dictionaries (*.mdx)"));
+        if (!path.isEmpty()) {
+            dictionaryFile->setText(path);
+        }
+    });
+    auto *dictionaryFileLayout = new QHBoxLayout();
+    dictionaryFileLayout->addWidget(dictionaryFile);
+    dictionaryFileLayout->addWidget(browseDictionary);
+    layout->addRow(i18nc("@label:textbox", "Local MDX dictionary:"), dictionaryFileLayout);
 
     if (embedMode != Okular::ViewerWidgetMode) { // TODO Makes sense?
         // Checkbox: RTL document layout

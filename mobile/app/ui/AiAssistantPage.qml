@@ -101,12 +101,13 @@ Kirigami.Page {
                         font.bold: true
                     }
                     QQC2.TextArea {
+                        objectName: "aiMessage-" + modelData.role
                         Layout.fillWidth: true
                         text: modelData.content
                         readOnly: true
                         selectByMouse: true
                         wrapMode: TextEdit.Wrap
-                        textFormat: TextEdit.PlainText
+                        textFormat: modelData.role === "assistant" ? TextEdit.MarkdownText : TextEdit.PlainText
                         background: null
                     }
                 }

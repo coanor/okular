@@ -35,6 +35,7 @@ class MobileAiServer : public QTcpServer
     Q_PROPERTY(QVariantMap lastRequest READ lastRequest NOTIFY requestReceived)
     Q_PROPERTY(bool autoRespond MEMBER m_autoRespond)
     Q_PROPERTY(bool failRequests MEMBER m_failRequests)
+    Q_PROPERTY(QString responseText MEMBER m_responseText)
 
 public:
     MobileAiServer()
@@ -70,7 +71,8 @@ public:
                 if (!m_autoRespond) {
                     return;
                 }
-                const QByteArray body = m_failRequests ? QByteArrayLiteral("{\"error\":{\"message\":\"test failure\"}}") : QByteArrayLiteral("{\"choices\":[{\"message\":{\"content\":\"test answer\"}}]}");
+                const QJsonObject choice {{QStringLiteral("message"), QJsonObject {{QStringLiteral("content"), m_responseText}}}};
+                const QByteArray body = m_failRequests ? QByteArrayLiteral("{\"error\":{\"message\":\"test failure\"}}") : QJsonDocument(QJsonObject {{QStringLiteral("choices"), QJsonArray {choice}}}).toJson(QJsonDocument::Compact);
                 socket->write((m_failRequests ? QByteArrayLiteral("HTTP/1.1 500 Error\r\n") : QByteArrayLiteral("HTTP/1.1 200 OK\r\n")) +
                               "Content-Type: application/json\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body);
                 socket->disconnectFromHost();
@@ -97,6 +99,7 @@ public:
         m_lastRequest.clear();
         m_autoRespond = true;
         m_failRequests = false;
+        m_responseText = QStringLiteral("test answer");
         Q_EMIT requestReceived();
     }
 
@@ -108,6 +111,7 @@ private:
     QVariantMap m_lastRequest;
     bool m_autoRespond = true;
     bool m_failRequests = false;
+    QString m_responseText = QStringLiteral("test answer");
 };
 
 class DocumentViewTestSetup : public QObject

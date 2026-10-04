@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 import QtQuick
+import QtQuick.Controls as QQC2
 import QtTest
 import org.kde.okular as Okular
+import "../../mobile/app/ui" as MobileUi
 
 TestCase {
     id: testCase
@@ -15,12 +17,26 @@ TestCase {
         id: documentComponent
         Okular.DocumentItem { url: testDocumentUrl }
     }
+    Component {
+        id: assistantPageComponent
+        MobileUi.AiAssistantPage { anchors.fill: parent }
+    }
+    Component {
+        id: clipboardComponent
+        QQC2.TextArea { textFormat: TextEdit.PlainText }
+    }
     property var document
     property var assistant
+    property var assistantPage: null
 
     function fields(vision) {
         return {name: "Mobile test", kind: 0, endpoint: aiTestServer.endpoint,
                 model: "test-model", apiKey: "test-key", vision: vision, extraArguments: ""};
+    }
+
+    function messageText(item) {
+        // TextEdit.getText() retains paragraph and table frame separators.
+        return item.getText(0, item.length).replace(/[\u2029\uFDD0\uFDD1]/g, "\n");
     }
 
     function init() {
@@ -35,6 +51,11 @@ TestCase {
     }
 
     function cleanup() {
+        if (assistantPage !== null) {
+            assistantPage.destroy();
+            assistantPage = null;
+            wait(0);
+        }
         assistant.cancel();
         tryCompare(assistant, "busy", false);
         assistant.clearConversation();
@@ -57,6 +78,51 @@ TestCase {
         assistant.activate();
         tryCompare(assistant, "ready", true);
         compare(assistant.messages.length, 2);
+        compare(aiTestServer.requestCount, 1);
+    }
+
+    function test_replyRendersMarkdownAndHistory() {
+        assistantPage = assistantPageComponent.createObject(testCase, {
+            assistant: assistant, document: document
+        });
+        const page = assistantPage;
+        verify(page !== null);
+        const question = "# Question\n**Keep my input literal**";
+        const answer = "# Summary\n\n**Bold** and `inline code`.\n\n- First\n- Second\n\n"
+                     + "```cpp\nreturn 42;\n```\n\n[Reference](https://example.com/)\n\n"
+                     + "| Name | Value |\n| --- | --- |\n| Answer | 42 |";
+        aiTestServer.responseText = answer;
+        assistant.question = question;
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        compare(assistant.messages[1].content, answer);
+        tryVerify(() => findChild(page, "aiMessage-assistant") !== null);
+        let reply = findChild(page, "aiMessage-assistant");
+        const rendered = messageText(reply);
+        verify(rendered.indexOf("Summary") === 0, "The reply must show the heading without Markdown markers");
+        verify(rendered.indexOf("Bold and inline code.") >= 0);
+        verify(rendered.indexOf("return 42;") >= 0);
+        verify(rendered.indexOf("```") < 0);
+        verify(rendered.indexOf("[Reference]") < 0);
+        verify(rendered.indexOf("| --- |") < 0);
+        const userMessage = findChild(page, "aiMessage-user");
+        verify(userMessage !== null);
+        compare(messageText(userMessage), question);
+
+        reply.selectAll();
+        const clipboard = createTemporaryObject(clipboardComponent, testCase);
+        reply.copy();
+        clipboard.paste();
+        compare(clipboard.text, rendered);
+
+        document.url = "";
+        document.url = testDocumentUrl;
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        compare(assistant.messages[1].content, answer);
+        tryVerify(() => findChild(page, "aiMessage-assistant") !== null);
+        reply = findChild(page, "aiMessage-assistant");
+        compare(messageText(reply), rendered);
         compare(aiTestServer.requestCount, 1);
     }
 

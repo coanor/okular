@@ -103,12 +103,17 @@ Kirigami.Page {
                     QQC2.TextArea {
                         objectName: "aiMessage-" + modelData.role
                         Layout.fillWidth: true
-                        text: modelData.content
+                        text: modelData.role === "assistant" ? root.assistant.renderMarkdown(modelData.content, font) : modelData.content
                         readOnly: true
                         selectByMouse: true
                         wrapMode: TextEdit.Wrap
-                        textFormat: modelData.role === "assistant" ? TextEdit.MarkdownText : TextEdit.PlainText
+                        textFormat: modelData.role === "assistant" ? TextEdit.RichText : TextEdit.PlainText
                         background: null
+                        onLinkActivated: link => {
+                            if (/^https?:\/\//i.test(link)) {
+                                Qt.openUrlExternally(link);
+                            }
+                        }
                     }
                 }
                 onCountChanged: Qt.callLater(() => history.positionViewAtEnd())

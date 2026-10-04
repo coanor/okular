@@ -12,11 +12,28 @@
 #include <QDesktopServices>
 #include <QFile>
 #include <QFutureWatcher>
+#include <QImage>
 #include <QJsonDocument>
 #include <QPainter>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <QTextImageFormat>
 #include <QUuid>
 #include <QtConcurrentRun>
 #include <utility>
+
+namespace
+{
+class OfflineMarkdownDocument : public QTextDocument
+{
+protected:
+    QVariant loadResource(int, const QUrl &) override
+    {
+        return QVariant::fromValue(QImage());
+    }
+};
+}
 
 AiAssistant::AiAssistant(DocumentItem *document)
     : QObject(document)
@@ -24,7 +41,9 @@ AiAssistant::AiAssistant(DocumentItem *document)
     , m_chatGpt(this)
 {
     m_document->document()->addObserver(this);
-    for (const AiProfile &profile : AiStore::loadProfiles(0)) {
+    // Preserve the desktop's profiles and their order in the shared store.
+    m_allProfiles = AiStore::loadProfiles(0);
+    for (const AiProfile &profile : std::as_const(m_allProfiles)) {
         if (profile.kind >= AiProfile::Kind::OpenAiChat && profile.kind <= AiProfile::Kind::Anthropic) {
             m_profiles.append(profile);
         }
@@ -155,6 +174,43 @@ QObject *AiAssistant::chatGpt()
     return &m_chatGpt;
 }
 
+QString AiAssistant::renderMarkdown(const QString &text, const QFont &font) const
+{
+    OfflineMarkdownDocument document;
+    document.setLayoutEnabled(false);
+    document.setUndoRedoEnabled(false);
+    document.setDefaultFont(font);
+    document.setMarkdown(text, QTextDocument::MarkdownFeatures(QTextDocument::MarkdownDialectGitHub) | QTextDocument::MarkdownNoHTML);
+
+    // QQuick's text document loads image URLs itself. Remove images before
+    // passing HTML to QML, including reference, local and data-URL images.
+    QList<QTextFragment> images;
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            if (fragment.charFormat().isImageFormat()) {
+                images.append(fragment);
+            }
+        }
+    }
+    for (auto it = images.crbegin(); it != images.crend(); ++it) {
+        const QTextImageFormat image = it->charFormat().toImageFormat();
+        const QString alt = image.stringProperty(QTextFormat::ImageAltText);
+        const QString caption = alt.isEmpty() ? i18n("Image") : i18n("Image: %1", alt);
+        const QUrl url(image.name());
+        QTextCharFormat format;
+        if (url.isValid() && !url.host().isEmpty() && (url.scheme() == QLatin1String("https") || url.scheme() == QLatin1String("http"))) {
+            format.setAnchor(true);
+            format.setAnchorHref(url.toString());
+        }
+        QTextCursor cursor(&document);
+        cursor.setPosition(it->position());
+        cursor.setPosition(it->position() + it->length(), QTextCursor::KeepAnchor);
+        cursor.insertText(caption, format);
+    }
+    return document.toHtml();
+}
+
 void AiAssistant::activate()
 {
     if (ready() || m_hashing || !m_document->isOpened()) {
@@ -164,6 +220,12 @@ void AiAssistant::activate()
     Q_EMIT busyChanged();
     const int generation = m_documentGeneration;
     const QUrl url = m_document->url();
+    const QUrl source = m_document->aiDocumentSourceUrl();
+    // Providers may return pipes, which Core consumes before activation. Use
+    // the original URI for their history; bare fd numbers can be reused.
+    const QByteArray sourceIdentity = QByteArrayLiteral("source-url:") + source.toEncoded();
+    const QString streamingKey =
+        source.isEmpty() || source.scheme() == QLatin1String("fd") ? QUuid::createUuid().toString(QUuid::WithoutBraces) : QString::fromLatin1(QCryptographicHash::hash(sourceIdentity, QCryptographicHash::Sha256).toHex());
     const auto file = m_document->aiDocumentFile();
     auto *watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, generation] {
@@ -181,9 +243,15 @@ void AiAssistant::activate()
         Q_EMIT readyChanged();
         Q_EMIT busyChanged();
     });
-    watcher->setFuture(QtConcurrent::run([url, file] {
+    watcher->setFuture(QtConcurrent::run([url, file, streamingKey]() -> QString {
         if (!file) {
+            if (url.isEmpty() || url.scheme() == QLatin1String("fd")) {
+                return streamingKey;
+            }
             return AiStore::documentKey(url);
+        }
+        if (file->isSequential()) {
+            return streamingKey;
         }
         // Core finished reading the shared descriptor before activation. Keep
         // the reader alive if the document closes while hashing in the worker.
@@ -290,11 +358,19 @@ bool AiAssistant::storeProfile(int index, AiProfile profile)
     if (index < 0) {
         index = m_profiles.size();
         m_profiles.append(profile);
+        m_allProfiles.append(profile);
     } else {
+        const QString previousId = m_profiles[index].id;
+        for (AiProfile &stored : m_allProfiles) {
+            if (stored.id == previousId) {
+                stored = profile;
+                break;
+            }
+        }
         m_profiles[index] = profile;
     }
     QString error;
-    AiStore::saveProfiles(m_profiles, 0, &error);
+    AiStore::saveProfiles(m_allProfiles, 0, &error);
     m_currentProfile = index;
     loadConversation();
     setStatus(error);
@@ -308,9 +384,10 @@ void AiAssistant::removeProfile(int index)
     if (busy() || index < 0 || index >= m_profiles.size()) {
         return;
     }
-    m_profiles.removeAt(index);
+    const QString id = m_profiles.takeAt(index).id;
+    m_allProfiles.removeIf([&id](const AiProfile &profile) { return profile.id == id; });
     QString error;
-    AiStore::saveProfiles(m_profiles, 0, &error);
+    AiStore::saveProfiles(m_allProfiles, 0, &error);
     m_currentProfile = m_profiles.isEmpty() ? -1 : qMin(index, static_cast<int>(m_profiles.size()) - 1);
     loadConversation();
     setStatus(error);

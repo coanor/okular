@@ -169,9 +169,12 @@ QQC2.Dialog {
         width: Math.min(parent.width - 24, 440)
         modal: true
         title: i18n("You're using your ChatGPT plan")
-        contentItem: QQC2.Label {
-            text: i18n("Eligible requests in Okular use your existing ChatGPT plan limits. You can manage this app's usage in ChatGPT Settings.")
-            wrapMode: Text.WordWrap
+        contentItem: ColumnLayout {
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: i18n("Eligible requests in Okular use your existing ChatGPT plan limits. You can manage this app's usage in ChatGPT Settings.")
+                wrapMode: Text.WordWrap
+            }
         }
         footer: QQC2.DialogButtonBox {
             QQC2.Button {

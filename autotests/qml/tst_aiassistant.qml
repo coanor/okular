@@ -81,7 +81,37 @@ TestCase {
         compare(aiTestServer.requestCount, 1);
     }
 
+    function test_streamingProviderHistoryIsSeparateAndPersistent() {
+        if (!aiTestFiles.supportsSourceUrls()) {
+            skip("Source URI association requires Android");
+        }
+        const source = "content://org.kde.okular.test/books/first";
+        document.url = aiTestFiles.pipeDescriptorUrl(source);
+        verify(document.opened);
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        assistant.question = "Remember the first streaming book";
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        const previousQuestion = assistant.messages[0].content;
+
+        document.url = aiTestFiles.pipeDescriptorUrl("content://org.kde.okular.test/books/second");
+        verify(document.opened);
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        compare(assistant.messages.length, 0);
+
+        document.url = aiTestFiles.pipeDescriptorUrl(source);
+        verify(document.opened);
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        compare(assistant.messages.length, 2);
+        compare(assistant.messages[0].content, previousQuestion);
+        compare(aiTestServer.requestCount, 1);
+    }
+
     function test_replyRendersMarkdownAndHistory() {
+        failOnWarning(/Binding loop/);
         assistantPage = assistantPageComponent.createObject(testCase, {
             assistant: assistant, document: document
         });
@@ -159,6 +189,92 @@ TestCase {
             descriptorAssistant.cancel();
             descriptorAssistant.removeProfile(index);
         }
+    }
+
+    function test_pipeDescriptorCanAsk() {
+        const url = aiTestFiles.pipeDescriptorUrl();
+        if (!url.toString()) {
+            skip("File descriptors are unavailable on this platform");
+        }
+        document.url = url;
+        verify(document.opened);
+        assistant.activate();
+        tryCompare(assistant, "busy", false);
+        verify(assistant.ready, "A readable streaming document must enable Ask");
+        assistant.question = "Explain the streaming document";
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        compare(assistant.messages.length, 2);
+        compare(aiTestServer.requestCount, 1);
+        assistant.clearConversation();
+        assistant.question = "History belongs only to this open descriptor";
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        document.url = aiTestFiles.pipeDescriptorUrl();
+        verify(document.opened);
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        compare(assistant.messages.length, 0, "A reopened bare descriptor must not restore another document's history");
+    }
+
+    function test_preservesDesktopProfiles() {
+        const original = aiTestFiles.storedProfiles();
+        const desktop = {id: "desktop-codex-test", name: "Desktop Codex", kind: 3,
+                         model: "desktop-model", endpoint: "", vision: false,
+                         extraArguments: "--config model_reasoning_effort=high"};
+        aiTestFiles.setStoredProfiles([desktop].concat(original));
+        try {
+            const otherDocument = createTemporaryObject(documentComponent, testCase);
+            const otherAssistant = otherDocument.aiAssistant;
+            compare(otherAssistant.profiles.length, assistant.profiles.length);
+            verify(otherAssistant.saveProfile(-1, fields(false)));
+            let saved = aiTestFiles.storedProfiles().find(profile => profile.id === desktop.id);
+            verify(saved !== undefined, "Saving a mobile model must retain desktop-only profiles");
+            compare(saved.extraArguments, desktop.extraArguments);
+            compare(aiTestFiles.storedProfiles()[0].id, desktop.id, "Saving must preserve the desktop's default model");
+            const edited = fields(false);
+            edited.name = "Edited mobile profile";
+            verify(otherAssistant.saveProfile(otherAssistant.currentProfile, edited));
+            saved = aiTestFiles.storedProfiles().find(profile => profile.id === desktop.id);
+            verify(saved !== undefined, "Editing a mobile model must retain desktop-only profiles");
+            compare(saved.name, desktop.name);
+            compare(aiTestFiles.storedProfiles()[0].id, desktop.id);
+            otherAssistant.removeProfile(otherAssistant.currentProfile);
+            saved = aiTestFiles.storedProfiles().find(profile => profile.id === desktop.id);
+            verify(saved !== undefined, "Removing a mobile model must retain desktop-only profiles");
+            compare(saved.model, desktop.model);
+            compare(aiTestFiles.storedProfiles()[0].id, desktop.id);
+        } finally {
+            aiTestFiles.setStoredProfiles(original);
+        }
+    }
+
+    function test_replyDoesNotLoadImages_data() {
+        const remote = aiTestServer.endpoint + "/image";
+        return [
+            {tag: "inline", answer: "![Preview](" + remote + ")"},
+            {tag: "reference", answer: "![Preview][image]\n\n[image]: " + remote},
+            {tag: "html", answer: '<img src="' + remote + '">'},
+            {tag: "local", answer: "![Preview](<" + testDocumentUrl.toString() + ">)"},
+            {tag: "data", answer: "![Preview](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)"}
+        ];
+    }
+
+    function test_replyDoesNotLoadImages(data) {
+        assistantPage = assistantPageComponent.createObject(testCase, {
+            assistant: assistant, document: document
+        });
+        verify(assistantPage !== null);
+        aiTestServer.responseText = data.answer;
+        assistant.question = "Explain without fetching other resources";
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        tryVerify(() => findChild(assistantPage, "aiMessage-assistant") !== null);
+        const reply = findChild(assistantPage, "aiMessage-assistant");
+        wait(300);
+        compare(aiTestServer.requestCount, 1, "Rendering a reply must not fetch remote images");
+        verify(messageText(reply).indexOf("\uFFFC") < 0, "Reply images must become text instead of loading resources");
+        compare(assistant.messages[1].content, data.answer);
     }
 
     function test_configureBeforeOpeningDocument() {

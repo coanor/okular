@@ -5,6 +5,7 @@
 #include "core/observer.h"
 #include "part/aiprovider.h"
 
+#include <QFont>
 #include <QSize>
 #include <QTimer>
 #include <QVariantList>
@@ -53,6 +54,7 @@ public:
     Q_INVOKABLE void ask();
     Q_INVOKABLE void cancel();
     Q_INVOKABLE void clearConversation();
+    Q_INVOKABLE QString renderMarkdown(const QString &text, const QFont &font) const;
 
     void resetDocument();
     void notifyPageChanged(int page, int flags) override;
@@ -80,6 +82,7 @@ private:
     AiProvider m_provider;
     ChatGptConnection m_chatGpt;
     QList<AiProfile> m_profiles;
+    QList<AiProfile> m_allProfiles;
     int m_currentProfile = -1;
     AiConversation m_conversation;
     AiConversation m_beforeRequest;

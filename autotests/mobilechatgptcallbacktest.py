@@ -24,6 +24,7 @@ import xml.etree.ElementTree as ET
 
 PACKAGE = "org.kde.okular.kirigami"
 ACTIVITY = PACKAGE + "/org.kde.something.OpenFileActivity"
+SERVICE = PACKAGE + "/org.kde.something.ChatGptSignInService"
 UI_DUMP = "/sdcard/okular-callback-test.xml"
 
 
@@ -63,6 +64,16 @@ def callback(port, query):
             return connection.recv(200).split(b"\r\n")[0].decode()
     except OSError as error:
         return type(error).__name__
+
+
+def sign_in_service():
+    services = adb("shell", "dumpsys", "activity", "services", PACKAGE)
+    # dumpsys includes the last service ANR even when it belongs to another
+    # package. Only active records, marked with '*', describe running services.
+    for record in re.split(r"(?m)^\s*\* ServiceRecord", services)[1:]:
+        if SERVICE in record.splitlines()[0]:
+            return record.split("Last ANR service:", 1)[0]
+    return ""
 
 
 def main():
@@ -109,7 +120,7 @@ def main():
             "com.android.chrome/org.chromium.chrome.browser.ChromeTabbedActivity")
         pid = adb("shell", "pidof", PACKAGE).strip()
         freeze_file = "/sys/fs/cgroup/uid_" + uid + "/pid_" + pid + "/cgroup.freeze"
-        services = adb("shell", "dumpsys", "activity", "services", PACKAGE)
+        services = sign_in_service()
         if "isForeground=true" in services:
             # A foreground service exempts the process from cached-app freezing.
             time.sleep(15)
@@ -138,11 +149,11 @@ def main():
         else:
             raise AssertionError("Chrome did not receive the callback response")
         for _ in range(20):
-            services = adb("shell", "dumpsys", "activity", "services", PACKAGE)
-            if "ServiceRecord" not in services:
+            services = sign_in_service()
+            if not services:
                 break
             time.sleep(0.1)
-        assert "ServiceRecord" not in services, "Sign-in service was not stopped after callback"
+        assert not services, "Sign-in service was not stopped after callback"
         assert callback(forwarded, "state=invalid-test") != "HTTP/1.1 400 Bad Request", "Listener remained open"
         print("PASS: background callback, Chrome response, listener and service cleanup")
     finally:

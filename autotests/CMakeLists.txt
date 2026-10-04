@@ -64,7 +64,7 @@ if(Poppler_Qt6_FOUND)
         find_package(Qt6 ${QT_REQUIRED_VERSION} REQUIRED COMPONENTS QuickTest)
         ecm_add_test(mobiledocumentviewtest.cpp
             TEST_NAME "mobiledocumentviewtest"
-            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets Qt6::Network KF6::I18n
+            LINK_LIBRARIES Qt6::QuickTest Qt6::Qml Qt6::Widgets Qt6::Network Qt6::Concurrent KF6::I18n KF6::ConfigCore
         )
         target_compile_definitions(mobiledocumentviewtest PRIVATE
             QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"

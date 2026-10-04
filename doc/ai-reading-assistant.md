@@ -75,7 +75,14 @@ image encoding are asynchronous. **Cancel** restores the question and previous
 conversation so you can retry. **Models… → Start new conversation** removes the
 local conversation for this document and model after confirmation.
 
-The first mobile version displays answers as selectable plain text, including
-any Markdown or math source. It does not yet provide the desktop assistant's
-KaTeX rendering, conversation instruction editor or save-answer-as-annotation
-action.
+Mobile conversations use the document content hash when its file descriptor can
+be rewound. For streaming Android providers, the original content URI identifies
+the book. Reopening that URI with the same model restores its local conversation.
+A bare file descriptor without a source URI starts a separate conversation each
+time it is opened, since descriptor numbers can be reused for other documents.
+
+Mobile answers render offline as selectable Markdown. Images become text or
+HTTP/HTTPS links instead of loading resources, and raw HTML is discarded.
+HTTP/HTTPS links open in the browser when tapped. Questions remain plain text.
+The mobile assistant does not yet provide the desktop assistant's KaTeX
+rendering, conversation instruction editor or save-answer-as-annotation action.

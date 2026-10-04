@@ -4,7 +4,9 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include <KConfigGroup>
 #include <KLocalizedContext>
+#include <KSharedConfig>
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -20,7 +22,12 @@
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QtConcurrentRun>
 #include <QtQuickTest/quicktest.h>
+
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#endif
 
 #ifdef Q_OS_UNIX
 #include <unistd.h>
@@ -119,6 +126,65 @@ class DocumentViewTestSetup : public QObject
     Q_OBJECT
 
 public:
+    Q_INVOKABLE QVariantList storedProfiles() const
+    {
+        const KConfigGroup group(KSharedConfig::openConfig(), QStringLiteral("AI Reading Assistant"));
+        return QJsonDocument::fromJson(group.readEntry("Profiles", QByteArray())).array().toVariantList();
+    }
+
+    Q_INVOKABLE void setStoredProfiles(const QVariantList &profiles)
+    {
+        const auto config = KSharedConfig::openConfig();
+        KConfigGroup group(config, QStringLiteral("AI Reading Assistant"));
+        group.writeEntry("Profiles", QJsonDocument::fromVariant(profiles).toJson(QJsonDocument::Compact));
+        config->sync();
+    }
+
+    Q_INVOKABLE bool supportsSourceUrls() const
+    {
+#ifdef Q_OS_ANDROID
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    Q_INVOKABLE QUrl pipeDescriptorUrl(const QUrl &source = {})
+    {
+#ifdef Q_OS_UNIX
+        QFile file(m_fixturePath);
+        int descriptors[2];
+        if (!file.open(QIODevice::ReadOnly) || pipe(descriptors) < 0) {
+            qFatal("Could not prepare the streaming document fixture");
+        }
+        const QByteArray data = file.readAll();
+        (void)QtConcurrent::run([data, writer = descriptors[1]] {
+            QFile stream;
+            if (!stream.open(writer, QIODevice::WriteOnly, QFileDevice::AutoCloseHandle) || stream.write(data) != data.size()) {
+                qFatal("Could not write the streaming document fixture");
+            }
+        });
+#ifdef Q_OS_ANDROID
+        if (!source.isEmpty()) {
+            const QJniObject parcel = QJniObject::callStaticObjectMethod("android/os/ParcelFileDescriptor", "adoptFd", "(I)Landroid/os/ParcelFileDescriptor;", descriptors[0]);
+            const QJniObject uri = QJniObject::callStaticObjectMethod("android/net/Uri", "parse", "(Ljava/lang/String;)Landroid/net/Uri;", QJniObject::fromString(source.toString()).object<jstring>());
+            const QJniObject activity(QNativeInterface::QAndroidApplication::context());
+            const QString url = activity.callObjectMethod("descriptorUrl", "(Landroid/os/ParcelFileDescriptor;Landroid/net/Uri;)Ljava/lang/String;", parcel.object(), uri.object()).toString();
+            if (url.isEmpty()) {
+                qFatal("Could not associate the streaming fixture's source URI");
+            }
+            return QUrl(url);
+        }
+#else
+        Q_UNUSED(source)
+#endif
+        return QUrl(QStringLiteral("fd:///%1").arg(descriptors[0]));
+#else
+        Q_UNUSED(source)
+        return {};
+#endif
+    }
+
     Q_INVOKABLE QUrl restrictedDescriptorUrl()
     {
 #ifdef Q_OS_UNIX
@@ -155,6 +221,10 @@ public Q_SLOTS:
     void applicationAvailable()
     {
         QStandardPaths::setTestModeEnabled(true);
+        // Tests use fake in-memory keys and must never open the user's wallet.
+        const auto walletConfig = KSharedConfig::openConfig(QStringLiteral("kwalletrc"));
+        KConfigGroup(walletConfig, QStringLiteral("Wallet")).writeEntry("Enabled", false);
+        walletConfig->sync();
         m_fixturePath = m_fixtureDir.filePath(QFileInfo(m_fixtureDir.path()).fileName() + QStringLiteral(".pdf"));
         if (!m_fixtureDir.isValid() || !QFile::copy(QStringLiteral(QUICK_TEST_SOURCE_DIR "/../data/simple-multipage.pdf"), m_fixturePath)) {
             qFatal("Could not prepare the mobile document test fixture");

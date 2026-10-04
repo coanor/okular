@@ -64,6 +64,7 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
         m_aiAssistant->resetDocument();
     }
     m_aiDocumentFile.reset();
+    m_aiDocumentSourceUrl = url;
     m_document->closeDocument();
     // TODO: password
     QMimeDatabase db;
@@ -71,8 +72,10 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
     QUrl realUrl = url; // NOLINT(performance-unnecessary-copy-initialization) because of the ifdef below this can't be const &
 
 #ifdef Q_OS_ANDROID
+    const QJniObject activity(QNativeInterface::QAndroidApplication::context());
     realUrl = /* cppcheck-suppress redundantInitialization */
-        QUrl(QJniObject(QNativeInterface::QAndroidApplication::context()).callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+        QUrl(activity.callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+    m_aiDocumentSourceUrl = QUrl(activity.callObjectMethod("takeSourceUrl", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(realUrl.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
 #endif
 
 #ifdef Q_OS_UNIX
@@ -274,6 +277,11 @@ AiAssistant *DocumentItem::aiAssistant()
 std::shared_ptr<QFile> DocumentItem::aiDocumentFile() const
 {
     return m_aiDocumentFile;
+}
+
+QUrl DocumentItem::aiDocumentSourceUrl() const
+{
+    return m_aiDocumentSourceUrl;
 }
 
 Okular::Document *DocumentItem::document()

@@ -67,7 +67,7 @@ public class ChatGptSignInService extends Service
         return START_NOT_STICKY;
     }
 
-    @Override
+    // Added in API 35. Omitting @Override also allows compilation with older SDKs.
     public void onTimeout(int startId, int foregroundServiceType)
     {
         stopSelf();

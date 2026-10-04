@@ -61,22 +61,12 @@ docker run --rm --network "$network" "${docker_mounts[@]}" \
         craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --configure okular
 
         build_dir=/home/user/CraftRoot/build/kde/applications/okular/work/build
-        ninja -C "$build_dir" install
+        ninja -C "$build_dir"
+        # Packaging reads the Craft image, not the files installed into its prefix.
+        # Stage every Okular library together to keep backends and Core ABI-compatible.
+        craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --install okular
+        craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --qmerge okular
         craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --package okular
-
-        plugin=libqml_org_kde_okular_okularplugin_arm64-v8a.so
-        archive=/home/user/CraftRoot/build/kde/applications/okular/archive/lib/qml/org/kde/okular
-        ninja -C "$build_dir" okularplugin
-        cp "$build_dir/bin/org/kde/okular/$plugin" "$archive/$plugin"
-        strip_tool=$(find /opt/android-sdk/ndk -path "*/linux-x86_64/bin/llvm-strip" -print -quit)
-        if [[ -n "$strip_tool" ]]; then
-            "$strip_tool" "$archive/$plugin"
-        fi
-        apk_dir="$build_dir/okularkirigami_build_apk"
-        cp "$archive/$plugin" "$apk_dir/libs/arm64-v8a/$plugin"
-        (cd "$apk_dir" && ./gradlew --offline assembleRelease)
-        cp "$apk_dir/build/outputs/apk/release/okularkirigami_build_apk-release-unsigned.apk" \
-            /home/user/CraftRoot/tmp/okularkirigami-arm64-v8a.apk
     '
 
 if [[ ! -f "$unsigned_apk" ]]; then

@@ -124,6 +124,10 @@ address. Gradle uses Java proxy settings from
 mobile app is in the background, including Android cached-app freezing and
 service cleanup. See its header for emulator requirements and the invocation.
 
+After installing the APK on an English-language test emulator, run
+`ANDROID_SERIAL=emulator-5554 python3 autotests/mobilepdfopentest.py` to check
+PDF opening and table of contents against the packaged libraries together.
+
 ### clang-format
 
 The Okular project uses clang-format to enforce source code formatting.

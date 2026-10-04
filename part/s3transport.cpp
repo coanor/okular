@@ -159,9 +159,9 @@ S3Response S3Transport::request(const QByteArray &method,
     if (listRequest) {
         QUrlQuery query;
         query.addQueryItem(QStringLiteral("list-type"), QStringLiteral("2"));
-        query.addQueryItem(QStringLiteral("prefix"), m_configuration.objectKey(listPrefix));
+        query.addQueryItem(QStringLiteral("prefix"), QString::fromLatin1(QUrl::toPercentEncoding(m_configuration.objectKey(listPrefix))));
         if (!continuationToken.isEmpty()) {
-            query.addQueryItem(QStringLiteral("continuation-token"), continuationToken);
+            query.addQueryItem(QStringLiteral("continuation-token"), QString::fromLatin1(QUrl::toPercentEncoding(continuationToken)));
         }
         url.setQuery(query);
     }
@@ -211,12 +211,22 @@ S3Response S3Transport::request(const QByteArray &method,
         return {0, {}, QStringLiteral("Could not load Android's trusted certificates")};
     }
     curl_blob certificateBundle {const_cast<char *>(certificates.constData()), static_cast<size_t>(certificates.size()), CURL_BLOB_COPY};
-    curl_easy_setopt(handle, CURLOPT_CAINFO_BLOB, &certificateBundle);
+    if (curl_easy_setopt(handle, CURLOPT_CAINFO_BLOB, &certificateBundle) != CURLE_OK) {
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(handle);
+        return {0, {}, QStringLiteral("Could not configure Android's trusted certificates")};
+    }
 #endif
     curl_easy_setopt(handle, CURLOPT_URL, urlBytes.constData());
+    // S3 keys are literal paths, including any dot segments in the prefix.
+    curl_easy_setopt(handle, CURLOPT_PATH_AS_IS, 1L);
     curl_easy_setopt(handle, CURLOPT_USERNAME, access.constData());
     curl_easy_setopt(handle, CURLOPT_PASSWORD, secret.constData());
-    curl_easy_setopt(handle, CURLOPT_AWS_SIGV4, signing.constData());
+    if (curl_easy_setopt(handle, CURLOPT_AWS_SIGV4, signing.constData()) != CURLE_OK) {
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(handle);
+        return {0, {}, QStringLiteral("This libcurl does not support AWS signature authentication")};
+    }
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, curlError);
     curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, 10L);

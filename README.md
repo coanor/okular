@@ -116,7 +116,7 @@ credentials encrypted with an Android Keystore key; credential storage is
 excluded from backup and device transfer. Other mobile builds keep credentials
 only for the current session. Secrets are never included in sync objects.
 
-Mobile S3 support requires libcurl. The Android APK target enables
+Mobile S3 support requires libcurl 7.77 or newer. The Android APK target enables
 `OKULAR_USE_BUNDLED_ANDROID_CURL` to build a checksum-pinned HTTP(S) curl with
 Craft's OpenSSL. HTTPS uses Android's trusted certificates.
 

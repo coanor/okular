@@ -42,7 +42,7 @@ otherwise Okular uses the regional AWS S3 endpoint. This transport currently
 supports static shared-credentials profiles, not SSO or role-based credential
 resolution. Secrets and Codex login state stay on each device.
 
-With libcurl available at build time, the desktop **File** menu offers **Add
+With libcurl 7.77 or newer available at build time, the desktop **File** menu offers **Add
 Current Book to Cloud Library**, **Open Cloud Book**, **Sync Cloud Library
 Now**, and conflict resolution actions. The first action asks for a managed
 directory and moves the current local file into it after closing the document.

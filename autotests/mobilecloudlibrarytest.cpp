@@ -56,7 +56,7 @@ public:
                 if (query.hasQueryItem(QStringLiteral("list-type"))) {
                     body = "<ListBucketResult><IsTruncated>false</IsTruncated>";
                     for (auto it = objects.cbegin(); it != objects.cend(); ++it) {
-                        if (it.key().startsWith(query.queryItemValue(QStringLiteral("prefix")))) {
+                        if (it.key().startsWith(query.queryItemValue(QStringLiteral("prefix"), QUrl::FullyDecoded))) {
                             body += "<Contents><Key>" + it.key().toHtmlEscaped().toUtf8() + "</Key></Contents>";
                         }
                     }

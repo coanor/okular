@@ -1549,7 +1549,7 @@ void Part::resolveCloudModelSettingConflict()
         }
         KMessageBox::information(widget(), message);
     });
-    watcher->setFuture(QtConcurrent::run([configuration, root, localProfiles, key = labels.at(index), expectedHeads, chosenHead = expectedHeads.at(chosenIndex)] {
+    watcher->setFuture(QtConcurrent::run([configuration, root, localProfiles, key = conflicts.at(index).toObject().value(QStringLiteral("key")).toString(), expectedHeads, chosenHead = expectedHeads.at(chosenIndex)] {
         ModelSettingsSyncResult result;
         QLockFile lock(QDir(root).filePath(QStringLiteral(".sync.lock")));
         if (!lock.tryLock(0)) {

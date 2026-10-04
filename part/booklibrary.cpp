@@ -79,11 +79,6 @@ bool BookLibrary::importFile(const QString &sourcePath, const QString &libraryRo
     if (libraryRoot.isEmpty()) {
         return fail(QStringLiteral("Choose a managed library directory first"), error);
     }
-    const QString id = hashFile(sourcePath);
-    if (id.isEmpty()) {
-        return fail(QStringLiteral("Could not hash the source file"), error);
-    }
-
     const QString booksPath = QDir(libraryRoot).filePath(QStringLiteral("books"));
     if (!QDir().mkpath(booksPath)) {
         return fail(QStringLiteral("Could not create the managed library directory"), error);
@@ -91,6 +86,11 @@ bool BookLibrary::importFile(const QString &sourcePath, const QString &libraryRo
     QLockFile libraryLock(QDir(libraryRoot).filePath(QStringLiteral(".sync.lock")));
     if (!libraryLock.tryLock(30000)) {
         return fail(QStringLiteral("The managed library is busy"), error);
+    }
+    // The source can change while waiting for another import or sync.
+    const QString id = hashFile(sourcePath);
+    if (id.isEmpty()) {
+        return fail(QStringLiteral("Could not hash the source file"), error);
     }
     QLockFile lock(QDir(booksPath).filePath(id + QStringLiteral(".lock")));
     if (!lock.tryLock(30000)) {
@@ -136,8 +136,13 @@ bool BookLibrary::importFile(const QString &sourcePath, const QString &libraryRo
     }
 
     const QString destinationPath = QDir(projectPath).filePath(storedName);
-    if (QFileInfo(sourcePath).canonicalFilePath() != QFileInfo(destinationPath).canonicalFilePath() && !QFile::remove(sourcePath)) {
-        return fail(QStringLiteral("The book was stored, but the original file could not be removed"), error);
+    if (QFileInfo(sourcePath).canonicalFilePath() != QFileInfo(destinationPath).canonicalFilePath()) {
+        if (hashFile(sourcePath) != id) {
+            return fail(QStringLiteral("The original file changed during import and was kept"), error);
+        }
+        if (!QFile::remove(sourcePath)) {
+            return fail(QStringLiteral("The book was stored, but the original file could not be removed"), error);
+        }
     }
     if (project) {
         project->id = id;

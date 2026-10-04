@@ -80,6 +80,38 @@ class AnnotationSyncTest : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void publishesRevertedValuesAndRepeatedDeletions()
+    {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const QByteArray originalDataHome = qgetenv("XDG_DATA_HOME");
+        qputenv("XDG_DATA_HOME", temp.filePath(QStringLiteral("data")).toUtf8());
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash("reverted PDF bytes", QCryptographicHash::Sha256).toHex());
+        const QString root = temp.filePath(QStringLiteral("library"));
+        QVERIFY(QDir().mkpath(QDir(root).filePath(QStringLiteral("books/") + hash)));
+        MemoryAnnotationStore store;
+        QString error;
+        const Okular::SidecarAnnotation original {QStringLiteral("note"), 0, 1, QStringLiteral("<original/>")};
+        Okular::SidecarAnnotation changed = original;
+        changed.xml = QStringLiteral("<changed/>");
+        const QList<QList<Okular::SidecarAnnotation>> states {{original}, {changed}, {original}, {}, {original}, {}};
+        for (const auto &state : states) {
+            QVERIFY2(Okular::AnnotationSidecar::save(hash, state, &error), qPrintable(error));
+            const auto result = AnnotationSync::synchronize(store, root, hash);
+            QVERIFY2(result.successful(), qPrintable(result.error));
+            QCOMPARE(result.uploaded, 1);
+            QCOMPARE(result.applied, 0);
+            QCOMPARE(result.conflicts, 0);
+            QList<Okular::SidecarAnnotation> loaded;
+            QVERIFY2(Okular::AnnotationSidecar::load(hash, &loaded, &error), qPrintable(error));
+            QCOMPARE(loaded.size(), state.size());
+            if (!state.isEmpty()) {
+                QCOMPARE(loaded.first().xml, state.first().xml);
+            }
+        }
+        qputenv("XDG_DATA_HOME", originalDataHome);
+    }
+
     void resolvesChosenHeadAndRejectsStaleSelection()
     {
         QTemporaryDir temp;

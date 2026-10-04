@@ -23,6 +23,7 @@ public:
     };
     QList<Request> requests;
     int listPages = 0;
+    QByteArray nextToken = "next token";
 
     FakeS3Server()
     {
@@ -49,7 +50,7 @@ public:
                 QByteArray body;
                 if (requestLine.value(1).contains("list-type=2")) {
                     ++listPages;
-                    body = listPages == 1 ? "<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>next token</NextContinuationToken><Contents><Key>cloud/books/a/manifest.json</Key></Contents></ListBucketResult>"
+                    body = listPages == 1 ? "<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>" + nextToken + "</NextContinuationToken><Contents><Key>cloud/books/a/manifest.json</Key></Contents></ListBucketResult>"
                                           : "<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>cloud/books/b/manifest.json</Key></Contents></ListBucketResult>";
                 } else if (requestLine.value(0) == "GET") {
                     body = requestLine.value(1).contains("source.pdf") ? QByteArray("source file contents") : QByteArray("{\"schemaVersion\":1}");
@@ -65,6 +66,37 @@ class S3TransportTest : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void preservesEncodedPrefixesAndContinuationTokens()
+    {
+        FakeS3Server server;
+        server.nextToken = "token+/%2F=";
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        S3Configuration config;
+        config.bucket = QStringLiteral("test-bucket");
+        config.prefix = QStringLiteral("cloud+/%2F/../literal");
+        config.region = QStringLiteral("us-east-1");
+        config.endpoint = QUrl(QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()));
+        config.accessKeyId = QStringLiteral("access-id");
+        config.secretAccessKey = QStringLiteral("secret-key");
+        S3Transport transport(config);
+        auto list = std::async(std::launch::async, [&] {
+            QStringList keys;
+            QString error;
+            return transport.listObjects(QStringLiteral("books/"), &keys, &error);
+        });
+        QTRY_COMPARE(server.requests.size(), 2);
+        QVERIFY(list.get());
+        const QUrl first(QStringLiteral("http://localhost") + QString::fromLatin1(server.requests.first().target));
+        const QUrl second(QStringLiteral("http://localhost") + QString::fromLatin1(server.requests.last().target));
+        QCOMPARE(QUrlQuery(first).queryItemValue(QStringLiteral("prefix"), QUrl::FullyDecoded), config.prefix + QStringLiteral("/books/"));
+        QCOMPARE(QUrlQuery(second).queryItemValue(QStringLiteral("continuation-token"), QUrl::FullyDecoded), QString::fromLatin1(server.nextToken));
+        QVERIFY(server.requests.first().target.contains("cloud%2B"));
+        auto get = std::async(std::launch::async, [&] { return transport.getObject(QStringLiteral("version.json")); });
+        QTRY_COMPARE(server.requests.size(), 3);
+        QVERIFY(get.get().successful());
+        QCOMPARE(server.requests.last().target, QByteArray("/test-bucket/cloud+/%252F/../literal/version.json"));
+    }
+
     void signsRequestsAndPaginates()
     {
         FakeS3Server server;
@@ -109,8 +141,8 @@ private Q_SLOTS:
         QCOMPARE(listed.second.first, QStringList({QStringLiteral("books/a/manifest.json"), QStringLiteral("books/b/manifest.json")}));
         const QUrl firstList(QStringLiteral("http://localhost") + QString::fromLatin1(server.requests.at(2).target));
         const QUrl secondList(QStringLiteral("http://localhost") + QString::fromLatin1(server.requests.at(3).target));
-        QCOMPARE(QUrlQuery(firstList).queryItemValue(QStringLiteral("prefix")), QStringLiteral("cloud/books/"));
-        QCOMPARE(QUrlQuery(secondList).queryItemValue(QStringLiteral("continuation-token")), QStringLiteral("next token"));
+        QCOMPARE(QUrlQuery(firstList).queryItemValue(QStringLiteral("prefix"), QUrl::FullyDecoded), QStringLiteral("cloud/books/"));
+        QCOMPARE(QUrlQuery(secondList).queryItemValue(QStringLiteral("continuation-token"), QUrl::FullyDecoded), QStringLiteral("next token"));
 
         QTemporaryDir temp;
         QVERIFY(temp.isValid());

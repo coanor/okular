@@ -288,8 +288,8 @@ AnnotationSyncResult AnnotationSync::synchronize(const BookObjectStore &store, c
             continue;
         }
         bool alreadyPublished = false;
-        for (const Event &event : std::as_const(events)) {
-            if (event.key == key && sameValue(event.value, local)) {
+        for (const QString &head : heads.value(key)) {
+            if (sameValue(events.value(head).value, local)) {
                 alreadyPublished = true;
                 break;
             }

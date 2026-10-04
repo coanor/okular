@@ -4,13 +4,56 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QLockFile>
 #include <QTemporaryDir>
 #include <QTest>
+
+#include <future>
 
 class BookLibraryTest : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void importsChangesMadeWhileWaitingForLibrary()
+    {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const QString root = temp.filePath(QStringLiteral("library"));
+        const QString original = temp.filePath(QStringLiteral("original.pdf"));
+        QFile source(original);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QCOMPARE(source.write("original"), 8);
+        source.close();
+        BookProject existing;
+        QString error;
+        QVERIFY2(BookLibrary::importFile(original, root, &existing, &error), qPrintable(error));
+        QVERIFY(QFile::copy(existing.sourcePath, original));
+        QLockFile lock(QDir(root).filePath(QStringLiteral(".sync.lock")));
+        QVERIFY(lock.tryLock());
+        std::promise<void> started;
+        auto ready = started.get_future();
+        auto imported = std::async(std::launch::async, [&] {
+            started.set_value();
+            BookProject project;
+            QString failure;
+            const bool success = BookLibrary::importFile(original, root, &project, &failure);
+            return qMakePair(success, project);
+        });
+        ready.wait();
+        // Give the importer time to reach the held library lock.
+        QTest::qWait(200);
+        QVERIFY(source.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(source.write("changed"), 7);
+        source.close();
+        lock.unlock();
+        const auto result = imported.get();
+        QVERIFY(result.first);
+        QVERIFY(result.second.id != existing.id);
+        QFile managed(result.second.sourcePath);
+        QVERIFY(managed.open(QIODevice::ReadOnly));
+        QCOMPARE(managed.readAll(), QByteArray("changed"));
+    }
+
     void importsAndDeduplicatesByContent()
     {
         QTemporaryDir temp;

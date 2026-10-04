@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "s3transport.h"
 
+#ifdef Q_OS_ANDROID
+#include <QJniEnvironment>
+#include <QJniObject>
+#endif
+
 #include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QFile>
@@ -193,6 +198,21 @@ S3Response S3Transport::request(const QByteArray &method,
             return {0, {}, QStringLiteral("Could not prepare S3 request headers")};
         }
     }
+#ifdef Q_OS_ANDROID
+    static const QByteArray certificates = [] {
+        const QJniObject pem = QJniObject::callStaticObjectMethod("org/kde/okular/CloudPlatform", "systemCertificates", "()Ljava/lang/String;");
+        QJniEnvironment environment;
+        environment.checkAndClearExceptions(QJniEnvironment::OutputMode::Silent);
+        return pem.toString().toUtf8();
+    }();
+    if (m_configuration.endpoint.scheme() == QLatin1String("https") && certificates.isEmpty()) {
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(handle);
+        return {0, {}, QStringLiteral("Could not load Android's trusted certificates")};
+    }
+    curl_blob certificateBundle {const_cast<char *>(certificates.constData()), static_cast<size_t>(certificates.size()), CURL_BLOB_COPY};
+    curl_easy_setopt(handle, CURLOPT_CAINFO_BLOB, &certificateBundle);
+#endif
     curl_easy_setopt(handle, CURLOPT_URL, urlBytes.constData());
     curl_easy_setopt(handle, CURLOPT_USERNAME, access.constData());
     curl_easy_setopt(handle, CURLOPT_PASSWORD, secret.constData());

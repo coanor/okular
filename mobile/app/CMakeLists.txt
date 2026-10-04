@@ -20,6 +20,7 @@ ecm_add_qml_module(okularkirigami
 
 ecm_target_qml_sources(okularkirigami SOURCES
     ui/Bookmarks.qml
+    ui/CloudLibraryPage.qml
     ui/CertificateViewerPage.qml
     ui/Main.qml
     ui/MainView.qml
@@ -68,6 +69,7 @@ if (ANDROID)
         bookmarks-organize
         dialog-close
         document-open
+        view-refresh
         help-about-symbolic
         okular
         view-preview

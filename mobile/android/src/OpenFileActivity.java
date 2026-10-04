@@ -42,20 +42,7 @@ public class OpenFileActivity extends QtActivity
         if (uri == null)
             return;
 
-        if (!uri.getScheme().equals("file")) {
-            try {
-                ContentResolver resolver = getBaseContext().getContentResolver();
-                ParcelFileDescriptor fdObject = resolver.openFileDescriptor(uri, "r");
-                uri = Uri.parse("fd:///" + fdObject.detachFd());
-            } catch (Exception e) {
-                e.printStackTrace();
-
-                //TODO: emit warning that couldn't be opened
-                Log.e("Okular", "failed to open");
-                return;
-            }
-        }
-
+        // DocumentItem opens the provider URI and retains it for reopening after sync.
         Log.e("Okular", "opening url: " + uri.toString());
         FileClass.openUri(uri.toString());
     }

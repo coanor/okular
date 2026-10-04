@@ -28,6 +28,13 @@ ecm_add_test(textselectiontest.cpp ../gui/textselectionutils.cpp ../part/mdxdict
 )
 target_compile_definitions(textselectiontest PRIVATE HAVE_MDICT=0)
 
+if(BUILD_MOBILE AND CURL_FOUND)
+    ecm_add_test(mobilecloudlibrarytest.cpp ../mobile/components/cloudlibrary.cpp ../mobile/components/cloudcredentials.cpp
+        TEST_NAME "mobilecloudlibrarytest"
+        LINK_LIBRARIES Qt6::Test Qt6::Qml KF6::I18n okularcloud
+    )
+endif()
+
 if(BUILD_MOBILE)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest)
     ecm_add_test(selectionmagnifiertest.cpp

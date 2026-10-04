@@ -150,6 +150,9 @@ public:
      */
     Q_INVOKABLE void setPassword(const QString &password);
 
+    // Save pending sidecar changes before closing for cloud synchronization.
+    Q_INVOKABLE bool closeForCloudSync();
+
     // Internal, not binded to qml
     Okular::Document *document();
     Observer *pageviewObserver();
@@ -199,6 +202,8 @@ private:
     void openUrl(const QUrl &url, const QString &password);
 
     Okular::Document *m_document;
+    // Keep the provider URI so closing a document does not lose its reopen path.
+    QUrl m_sourceUrl;
     TOCModel *m_tocModel;
     SignatureModel *m_signaturesModel;
     Observer *m_thumbnailObserver;

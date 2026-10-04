@@ -22,6 +22,9 @@ target_sources(okularplugin PRIVATE
     ${CMAKE_SOURCE_DIR}/gui/textselectionutils.cpp
     dictionarylookup.cpp
     dictionarylookup.h
+    cloudlibrary.cpp
+    cloudlibrary.h
+    cloudcredentials.cpp
     ${CMAKE_SOURCE_DIR}/part/mdxdictionary.cpp
     documentitem.cpp
     thumbnailitem.cpp
@@ -53,6 +56,7 @@ target_link_libraries(okularplugin PRIVATE
     KF6::I18n
     KF6::Service
     okularcore
+    okularcloud
 )
 
 okular_enable_mdict(okularplugin)

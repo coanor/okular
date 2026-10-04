@@ -54,6 +54,7 @@ void DocumentItem::setUrl(const QUrl &url)
 
 void DocumentItem::openUrl(const QUrl &url, const QString &password)
 {
+    m_sourceUrl = url;
     m_document->closeDocument();
     // TODO: password
     QMimeDatabase db;
@@ -61,13 +62,17 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
     QUrl realUrl = url; // NOLINT(performance-unnecessary-copy-initialization) because of the ifdef below this can't be const &
 
 #ifdef Q_OS_ANDROID
-    realUrl = /* cppcheck-suppress redundantInitialization */
-        QUrl(QJniObject(QNativeInterface::QAndroidApplication::context()).callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+    if (!url.isEmpty() && !url.isLocalFile()) {
+        realUrl = /* cppcheck-suppress redundantInitialization */
+            QUrl(QJniObject(QNativeInterface::QAndroidApplication::context())
+                     .callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>())
+                     .toString());
+    }
 #endif
 
     const QString path = realUrl.isLocalFile() ? realUrl.toLocalFile() : QStringLiteral("-");
 
-    const Okular::Document::OpenResult res = m_document->openDocument(path, realUrl, db.mimeTypeForUrl(realUrl), password);
+    const Okular::Document::OpenResult res = url.isEmpty() ? Okular::Document::OpenError : m_document->openDocument(path, realUrl, db.mimeTypeForUrl(realUrl), password);
 
     m_tocModel->clear();
     m_tocModel->fill(m_document->documentSynopsis());
@@ -120,7 +125,7 @@ QString DocumentItem::windowTitleForDocument() const
 
 QUrl DocumentItem::url() const
 {
-    return m_document->currentDocument();
+    return m_sourceUrl;
 }
 
 void DocumentItem::setCurrentPage(int page)
@@ -232,7 +237,20 @@ void DocumentItem::resetSearch()
 
 void DocumentItem::setPassword(const QString &password)
 {
-    openUrl(m_document->currentDocument(), password);
+    openUrl(m_sourceUrl, password);
+}
+
+bool DocumentItem::closeForCloudSync()
+{
+    if (m_document->canSaveAnnotationsToSidecar()) {
+        QString errorText;
+        if (!m_document->saveAnnotationsToSidecar(&errorText)) {
+            Q_EMIT error(errorText, -1);
+            return false;
+        }
+    }
+    setUrl(QUrl());
+    return true;
 }
 
 Okular::Document *DocumentItem::document()

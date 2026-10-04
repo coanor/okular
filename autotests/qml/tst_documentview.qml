@@ -273,6 +273,20 @@ TestCase {
         tryCompare(view, "page", null);
     }
 
+    function test_cloudSyncCloseAndReopen() {
+        view.document.currentPage = 20;
+        const url = view.document.url;
+        const page = view.document.currentPage;
+        verify(view.document.closeForCloudSync());
+        tryCompare(view.document, "opened", false);
+        compare(view.document.url.toString(), "");
+        view.document.url = url;
+        tryCompare(view.document, "opened", true);
+        compare(view.document.url, url);
+        view.document.currentPage = page;
+        tryVerify(() => view.page !== null && view.page.pageNumber === page);
+    }
+
     function test_detachedPageIgnoresPixmapUpdates() {
         const page = createTemporaryObject(pageComponent, view, {
             document: view.document,

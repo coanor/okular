@@ -118,8 +118,16 @@ else()
 endif()
 if(BUILD_DESKTOP)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network WebEngineWidgets)
-    find_package(Qt6Concurrent ${QT_REQUIRED_VERSION} CONFIG QUIET)
+endif()
+if(BUILD_DESKTOP OR BUILD_MOBILE)
+    find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network)
     find_package(CURL QUIET)
+    option(OKULAR_USE_BUNDLED_ANDROID_CURL "Build a pinned HTTP(S) curl for Android S3 support" OFF)
+    if(ANDROID AND OKULAR_USE_BUNDLED_ANDROID_CURL AND NOT CURL_FOUND)
+        include(cmake/modules/BuildAndroidCurl.cmake)
+        okular_build_android_curl()
+        set(CURL_FOUND TRUE)
+    endif()
 endif()
 
 find_path(MDICT_INCLUDE_DIR mdict_extern.h PATH_SUFFIXES mdict)
@@ -557,6 +565,22 @@ install(TARGETS okularcore EXPORT Okular6Targets ${KDE_INSTALL_TARGETS_DEFAULT_A
 install(FILES conf/okular.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
 install(FILES conf/okular_core.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
 
+if(BUILD_DESKTOP OR BUILD_MOBILE)
+    add_library(okularcloud STATIC
+        part/booklibrary.cpp
+        part/booklibrarysync.cpp
+        part/annotationsync.cpp
+        part/s3configuration.cpp
+    )
+    set_target_properties(okularcloud PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(okularcloud PUBLIC okularcore Qt6::Network Qt6::Concurrent)
+    if(CURL_FOUND)
+        target_sources(okularcloud PRIVATE part/s3transport.cpp)
+        target_link_libraries(okularcloud PUBLIC CURL::libcurl)
+        target_compile_definitions(okularcloud PUBLIC OKULAR_HAVE_S3_CURL)
+    endif()
+endif()
+
 if(BUILD_DESKTOP)
   # okularpart
   set(okularpart_SRCS
@@ -583,11 +607,7 @@ if(BUILD_DESKTOP)
     part/part.cpp
     part/aimarkdownview.cpp
     part/aistore.cpp
-    part/booklibrary.cpp
-    part/booklibrarysync.cpp
-    part/annotationsync.cpp
     part/modelsettingssync.cpp
-    part/s3configuration.cpp
     part/aiprovider.cpp
     part/aireadingassistant.cpp
     part/extensions.cpp
@@ -647,9 +667,6 @@ if(BUILD_DESKTOP)
     part/part.qrc
     part/aiassets/aiassets.qrc
   )
-  if(CURL_FOUND AND TARGET Qt6::Concurrent)
-    list(APPEND okularpart_SRCS part/s3transport.cpp)
-  endif()
   ki18n_wrap_ui(okularpart_SRCS part/selectcertificatedialog.ui)
 
 if (Qt6TextToSpeech_FOUND)
@@ -667,7 +684,7 @@ if(MDICT_FOUND)
     target_link_libraries(okularpart ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
 endif()
 
-target_link_libraries(okularpart okularcore
+target_link_libraries(okularpart okularcore okularcloud
     ${MATH_LIB}
     Qt6::Network
     Qt6::WebEngineWidgets
@@ -684,10 +701,6 @@ target_link_libraries(okularpart okularcore
     KF6::TextWidgets
     KF6::ColorScheme
 )
-if(CURL_FOUND AND TARGET Qt6::Concurrent)
-    target_link_libraries(okularpart CURL::libcurl Qt6::Concurrent)
-    target_compile_definitions(okularpart PRIVATE OKULAR_HAVE_S3_CURL)
-endif()
 if (TARGET Qt6::DBus)
     target_link_libraries(okularpart Qt6::DBus)
 endif()

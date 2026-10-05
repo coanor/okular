@@ -2,6 +2,7 @@ CMakeLists.txt.user*
 *.kdev4
 *.swp
 /build*/
+/.deps/
 .cmake/
 /cmake/__pycache__/
 /autotests/__pycache__/

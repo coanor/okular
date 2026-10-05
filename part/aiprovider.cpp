@@ -8,6 +8,7 @@
 #include <QJsonParseError>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QProcessEnvironment>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -458,6 +459,14 @@ void AiProvider::sendCodex()
     args << QStringLiteral("-");
 
     m_process = new QProcess(this);
+    QProcessEnvironment processEnvironment = QProcessEnvironment::systemEnvironment();
+    for (const QString &name : processEnvironment.keys()) {
+        const QString upperName = name.toUpper();
+        if (upperName.startsWith(QLatin1String("AWS_")) || upperName.startsWith(QLatin1String("OKULAR_S3_"))) {
+            processEnvironment.remove(name);
+        }
+    }
+    m_process->setProcessEnvironment(processEnvironment);
     m_process->setWorkingDirectory(directory);
     m_process->setProgram(executable);
     m_process->setArguments(args);

@@ -59,6 +59,7 @@ private Q_SLOTS:
         QVERIFY2(Okular::AnnotationSidecar::load(hash, &loaded, &error), qPrintable(error));
         QCOMPARE(loaded.size(), 1);
         QCOMPARE(loaded.first().xml, changed.xml);
+        QCOMPARE(loaded.first().contents, changed.contents);
 
         const QString connectionName = QUuid::createUuid().toString();
         {
@@ -111,6 +112,64 @@ private Q_SLOTS:
         second.write(" changed");
         second.close();
         QVERIFY(hash != Okular::AnnotationSidecar::pdfHash(second.fileName(), &error));
+    }
+
+    void snapshotIncludesUncheckpointedWrites()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString hash = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QString error;
+        qint64 revision = 0;
+        const QString sourcePath = Okular::AnnotationSidecar::pathForHash(hash);
+        const Okular::SidecarAnnotation first {QStringLiteral("note"), 0, 1, QStringLiteral("<annotation/>")};
+        QVERIFY2(Okular::AnnotationSidecar::save(hash, {first}, &error, 0, &revision), qPrintable(error));
+
+        const QString connectionName = QUuid::createUuid().toString();
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+            db.setDatabaseName(sourcePath);
+            QVERIFY(db.open());
+            QSqlQuery query(db);
+            QVERIFY(query.exec(QStringLiteral("PRAGMA journal_mode=WAL")));
+            QVERIFY(query.next());
+            QCOMPARE(query.value(0).toString(), QStringLiteral("wal"));
+            query.finish();
+
+            Okular::SidecarAnnotation updated = first;
+            updated.xml = QStringLiteral("<annotation revised='yes'/>");
+            QVERIFY(db.transaction());
+            QVERIFY(query.exec(QStringLiteral("UPDATE annotations SET xml = '<annotation revised=''yes''/>' WHERE annotation_id = 'note'")));
+            QVERIFY(query.exec(QStringLiteral("INSERT INTO events(annotation_id, page, subtype, xml, operation, recorded_utc) "
+                                              "VALUES ('note', 0, 1, '<annotation revised=''yes''/>', 'upsert', '2026-01-01T00:00:00Z')")));
+            QVERIFY(db.commit());
+            ++revision;
+            QVERIFY(QFile::exists(sourcePath + QStringLiteral("-wal")));
+            const QString snapshotPath = dir.filePath(QStringLiteral("snapshot.sqlite"));
+            qint64 snapshotRevision = -1;
+            QVERIFY2(Okular::AnnotationSidecar::snapshot(hash, snapshotPath, &error, &snapshotRevision), qPrintable(error));
+            QCOMPARE(snapshotRevision, revision);
+
+            const QString snapshotConnectionName = QUuid::createUuid().toString();
+            {
+                QSqlDatabase snapshot = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), snapshotConnectionName);
+                snapshot.setDatabaseName(snapshotPath);
+                QVERIFY(snapshot.open());
+                QSqlQuery snapshotQuery(snapshot);
+                QVERIFY(snapshotQuery.exec(QStringLiteral("PRAGMA integrity_check")));
+                QVERIFY(snapshotQuery.next());
+                QCOMPARE(snapshotQuery.value(0).toString(), QStringLiteral("ok"));
+                QVERIFY(snapshotQuery.exec(QStringLiteral("SELECT xml FROM annotations WHERE annotation_id = 'note'")));
+                QVERIFY(snapshotQuery.next());
+                QCOMPARE(snapshotQuery.value(0).toString(), updated.xml);
+                snapshot.close();
+            }
+            QSqlDatabase::removeDatabase(snapshotConnectionName);
+            QVERIFY(!Okular::AnnotationSidecar::snapshot(hash, snapshotPath, &error));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connectionName);
+        QVERIFY(QFile::remove(sourcePath));
     }
 
     void pdfHighlightRoundTrip()

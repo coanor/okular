@@ -24,6 +24,7 @@ ecm_target_qml_sources(okularkirigami SOURCES
     ui/AiModelDialog.qml
     ui/ChatGptModelDialog.qml
     ui/Bookmarks.qml
+    ui/CloudLibraryPage.qml
     ui/CertificateViewerPage.qml
     ui/Main.qml
     ui/MainView.qml
@@ -77,6 +78,7 @@ if (ANDROID)
         dialog-close
         dialog-messages
         document-open
+        view-refresh
         help-about-symbolic
         okular
         view-preview

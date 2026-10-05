@@ -110,12 +110,28 @@ ecm_setup_version(${PROJECT_VERSION}
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
 
 find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml Sql Concurrent Network)
+find_package(SQLite3 REQUIRED)
+if(TARGET SQLite3::SQLite3)
+    set(OKULAR_SQLITE_TARGET SQLite3::SQLite3)
+else()
+    set(OKULAR_SQLITE_TARGET SQLite::SQLite3)
+endif()
 if(BUILD_DESKTOP)
     find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS WebEngineWidgets)
 endif()
 if(BUILD_MOBILE)
     find_package(OpenSSL 1.1.1 QUIET COMPONENTS Crypto)
     set_package_properties(OpenSSL PROPERTIES TYPE OPTIONAL PURPOSE "Verify identities for ChatGPT subscription sign-in in the mobile assistant")
+endif()
+if(BUILD_DESKTOP OR BUILD_MOBILE)
+    find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Network)
+    find_package(CURL 7.77 QUIET)
+    option(OKULAR_USE_BUNDLED_ANDROID_CURL "Build a pinned HTTP(S) curl for Android S3 support" OFF)
+    if(ANDROID AND OKULAR_USE_BUNDLED_ANDROID_CURL AND NOT CURL_FOUND)
+        include(cmake/modules/BuildAndroidCurl.cmake)
+        okular_build_android_curl()
+        set(CURL_FOUND TRUE)
+    endif()
 endif()
 
 find_path(MDICT_INCLUDE_DIR mdict_extern.h PATH_SUFFIXES mdict)
@@ -500,6 +516,7 @@ endif(WIN32)
 target_link_libraries(okularcore
 PRIVATE
     Qt6::Sql
+    ${OKULAR_SQLITE_TARGET}
     ${OKULAR_IOKIT}
     ${SHLWAPI}
     KF6::Archive
@@ -552,6 +569,22 @@ install(TARGETS okularcore EXPORT Okular6Targets ${KDE_INSTALL_TARGETS_DEFAULT_A
 install(FILES conf/okular.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
 install(FILES conf/okular_core.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
 
+if(BUILD_DESKTOP OR BUILD_MOBILE)
+    add_library(okularcloud STATIC
+        part/booklibrary.cpp
+        part/booklibrarysync.cpp
+        part/annotationsync.cpp
+        part/s3configuration.cpp
+    )
+    set_target_properties(okularcloud PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(okularcloud PUBLIC okularcore Qt6::Network Qt6::Concurrent)
+    if(CURL_FOUND)
+        target_sources(okularcloud PRIVATE part/s3transport.cpp)
+        target_link_libraries(okularcloud PUBLIC CURL::libcurl)
+        target_compile_definitions(okularcloud PUBLIC OKULAR_HAVE_S3_CURL)
+    endif()
+endif()
+
 if(BUILD_DESKTOP)
   # okularpart
   set(okularpart_SRCS
@@ -578,6 +611,7 @@ if(BUILD_DESKTOP)
     part/part.cpp
     part/aimarkdownview.cpp
     part/aistore.cpp
+    part/modelsettingssync.cpp
     part/aiprovider.cpp
     part/aireadingassistant.cpp
     part/extensions.cpp
@@ -654,7 +688,7 @@ if(MDICT_FOUND)
     target_link_libraries(okularpart ${MDICT_LIBRARY} ${MDICT_MINIZ_LIBRARY} ${MDICT_BASE64_LIBRARY})
 endif()
 
-target_link_libraries(okularpart okularcore
+target_link_libraries(okularpart okularcore okularcloud
     ${MATH_LIB}
     Qt6::Network
     Qt6::WebEngineWidgets

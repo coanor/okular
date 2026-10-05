@@ -237,10 +237,23 @@ private Q_SLOTS:
         QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), script.fileName()));
         QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
         const QByteArray previousPath = qgetenv("PATH");
-        const auto restoreEnvironment = qScopeGuard([previousPath] {
+        const QByteArray previousAwsSecret = qgetenv("AWS_SECRET_ACCESS_KEY");
+        const QByteArray previousBucket = qgetenv("OKULAR_S3_BUCKET");
+        const auto restoreEnvironment = qScopeGuard([previousPath, previousAwsSecret, previousBucket] {
             qputenv("PATH", previousPath);
             qunsetenv("OKULAR_AI_TEST_ARGS");
             qunsetenv("OKULAR_AI_TEST_STDIN");
+            qunsetenv("OKULAR_AI_TEST_CLOUD_ENV");
+            if (previousAwsSecret.isNull()) {
+                qunsetenv("AWS_SECRET_ACCESS_KEY");
+            } else {
+                qputenv("AWS_SECRET_ACCESS_KEY", previousAwsSecret);
+            }
+            if (previousBucket.isNull()) {
+                qunsetenv("OKULAR_S3_BUCKET");
+            } else {
+                qputenv("OKULAR_S3_BUCKET", previousBucket);
+            }
         });
         QByteArray testPath = QFile::encodeName(directory.path());
         testPath += QDir::listSeparator().toLatin1();
@@ -248,6 +261,9 @@ private Q_SLOTS:
         qputenv("PATH", testPath);
         qputenv("OKULAR_AI_TEST_ARGS", QFile::encodeName(directory.filePath(QStringLiteral("args.txt"))));
         qputenv("OKULAR_AI_TEST_STDIN", QFile::encodeName(directory.filePath(QStringLiteral("stdin.txt"))));
+        qputenv("OKULAR_AI_TEST_CLOUD_ENV", QFile::encodeName(directory.filePath(QStringLiteral("cloud-env.txt"))));
+        qputenv("AWS_SECRET_ACCESS_KEY", "secret-must-not-reach-codex");
+        qputenv("OKULAR_S3_BUCKET", "bucket-must-not-reach-codex");
         QCOMPARE(QStandardPaths::findExecutable(QStringLiteral("codex")), script.fileName());
 
         AiProvider provider;
@@ -262,6 +278,9 @@ private Q_SLOTS:
         QVERIFY(completed.wait(5000));
         QVERIFY(failed.isEmpty());
         QCOMPARE(completed.takeFirst().at(1).toString(), QStringLiteral("test-thread"));
+        QFile cloudEnv(directory.filePath(QStringLiteral("cloud-env.txt")));
+        QVERIFY(cloudEnv.open(QIODevice::ReadOnly));
+        QVERIFY(cloudEnv.readAll().isEmpty());
         QFile args(directory.filePath(QStringLiteral("args.txt")));
         QVERIFY(args.open(QIODevice::ReadOnly));
         const QByteArray initialArgs = args.readAll();
@@ -307,13 +326,15 @@ int main(int argc, char **argv)
     if (application.applicationName() == QLatin1String("codex")) {
         QFile args(qEnvironmentVariable("OKULAR_AI_TEST_ARGS"));
         QFile input(qEnvironmentVariable("OKULAR_AI_TEST_STDIN"));
+        QFile cloudEnv(qEnvironmentVariable("OKULAR_AI_TEST_CLOUD_ENV"));
         QFile standardInput;
         QFile standardOutput;
-        if (!args.open(QIODevice::WriteOnly) || !input.open(QIODevice::WriteOnly) || !standardInput.open(stdin, QIODevice::ReadOnly) || !standardOutput.open(stdout, QIODevice::WriteOnly)) {
+        if (!args.open(QIODevice::WriteOnly) || !input.open(QIODevice::WriteOnly) || !cloudEnv.open(QIODevice::WriteOnly) || !standardInput.open(stdin, QIODevice::ReadOnly) || !standardOutput.open(stdout, QIODevice::WriteOnly)) {
             return 1;
         }
         args.write(application.arguments().mid(1).join(QLatin1Char('\n')).toUtf8());
         input.write(standardInput.readAll());
+        cloudEnv.write(qgetenv("AWS_SECRET_ACCESS_KEY") + qgetenv("OKULAR_S3_BUCKET"));
         standardOutput.write(
             "{\"type\":\"thread.started\",\"thread_id\":\"test-thread\"}\n"
             "{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"codex answer\"}}\n");

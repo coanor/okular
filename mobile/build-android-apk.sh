@@ -61,6 +61,7 @@ docker run --rm --network "$network" "${docker_mounts[@]}" \
         craft --options "okular.srcDir=$OKULAR_SOURCE_DIR" --configure okular
 
         build_dir=/home/user/CraftRoot/build/kde/applications/okular/work/build
+        cmake -S "$OKULAR_SOURCE_DIR" -B "$build_dir" -DOKULAR_USE_BUNDLED_ANDROID_CURL=ON
         ninja -C "$build_dir"
         # Packaging reads the Craft image, not the files installed into its prefix.
         # Stage every Okular library together to keep backends and Core ABI-compatible.

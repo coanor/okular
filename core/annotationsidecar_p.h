@@ -32,6 +32,9 @@ public:
     static QString pathForHash(const QString &hash);
     static bool load(const QString &hash, QList<SidecarAnnotation> *annotations, QString *error, qint64 *revision = nullptr);
     static bool save(const QString &hash, const QList<SidecarAnnotation> &annotations, QString *error, qint64 expectedRevision = -1, qint64 *newRevision = nullptr);
+    // Produces a consistent, standalone SQLite file at a new path. The caller
+    // owns the snapshot and should delete it after uploading or inspecting it.
+    static bool snapshot(const QString &hash, const QString &destination, QString *error, qint64 *revision = nullptr);
 };
 
 }

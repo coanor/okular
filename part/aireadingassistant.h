@@ -30,6 +30,8 @@ public:
     void setDocumentUrl(const QUrl &url);
     void askAboutSelection(const QString &text);
     void showStatus(const QString &text);
+    void reloadCloudSettings();
+    bool isBusy() const;
 
     void notifyPageChanged(int page, int flags) override;
     void notifySetup(const QList<Okular::Page *> &pages, int setupFlags) override;
@@ -40,6 +42,7 @@ Q_SIGNALS:
 private:
     void editProfiles();
     void editConversationInstructions();
+    void editBookDefaultPrompt();
     void loadSelectedConversation();
     void sendQuestion();
     void submitQuestion(const QString &pageImage);
@@ -68,6 +71,7 @@ private:
     QComboBox *m_profileCombo;
     QToolButton *m_modelsButton;
     QAction *m_conversationInstructionsAction;
+    QAction *m_bookDefaultPromptAction;
     QAction *m_newConversationAction;
     QLabel *m_selectionLabel;
     QLabel *m_status;

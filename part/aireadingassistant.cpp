@@ -2,10 +2,10 @@
 #include "aireadingassistant.h"
 
 #include "aimarkdownview.h"
-#include "gui/pagepainter.h"
 #include "core/document.h"
 #include "core/generator.h"
 #include "core/page.h"
+#include "gui/pagepainter.h"
 
 #include <KLocalizedString>
 
@@ -30,11 +30,12 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QSignalBlocker>
 #include <QTextEdit>
 #include <QTimer>
 #include <QToolButton>
-#include <QUuid>
 #include <QUrl>
+#include <QUuid>
 #include <QVBoxLayout>
 #include <utility>
 
@@ -119,8 +120,7 @@ bool editProfile(AiProfile &profile, QWidget *parent)
         const bool codex = kind->currentData().toInt() == static_cast<int>(AiProfile::Kind::Codex);
         endpoint->setEnabled(!codex);
         key->setEnabled(!codex);
-        extra->setPlaceholderText(codex ? i18n("Codex CLI options, e.g. -c model_reasoning_effort=medium (default: low)")
-                                        : i18n("JSON request fields, e.g. {\"temperature\":0.2}"));
+        extra->setPlaceholderText(codex ? i18n("Codex CLI options, e.g. -c model_reasoning_effort=medium (default: low)") : i18n("JSON request fields, e.g. {\"temperature\":0.2}"));
     };
     QObject::connect(kind, &QComboBox::currentIndexChanged, &dialog, updateFields);
     updateFields();
@@ -129,6 +129,11 @@ bool editProfile(AiProfile &profile, QWidget *parent)
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
         if (name->text().trimmed().isEmpty()) {
             QMessageBox::warning(&dialog, i18n("AI model"), i18n("Give this model a name."));
+            return;
+        }
+        const QUrl parsedEndpoint(endpoint->text().trimmed());
+        if (!parsedEndpoint.userName().isEmpty() || !parsedEndpoint.password().isEmpty()) {
+            QMessageBox::warning(&dialog, i18n("AI model"), i18n("Keep API credentials in the API key field, not in the endpoint URL."));
             return;
         }
         if (kind->currentData().toInt() != static_cast<int>(AiProfile::Kind::Codex) && !extra->toPlainText().trimmed().isEmpty()) {
@@ -149,8 +154,13 @@ bool editProfile(AiProfile &profile, QWidget *parent)
         profile.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     }
     profile.name = name->text().trimmed();
-    profile.kind = static_cast<AiProfile::Kind>(kind->currentData().toInt());
-    profile.endpoint = endpoint->text().trimmed();
+    const AiProfile::Kind selectedKind = static_cast<AiProfile::Kind>(kind->currentData().toInt());
+    const QString selectedEndpoint = endpoint->text().trimmed();
+    if (profile.kind != selectedKind || profile.endpoint != selectedEndpoint) {
+        profile.apiKey.clear();
+    }
+    profile.kind = selectedKind;
+    profile.endpoint = selectedEndpoint;
     profile.model = model->text().trimmed();
     profile.extraArguments = extra->toPlainText().trimmed();
     profile.vision = vision->isChecked();
@@ -181,6 +191,7 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     auto *modelsMenu = new QMenu(m_modelsButton);
     m_conversationInstructionsAction = modelsMenu->addAction(i18n("Conversation instructions…"));
     m_conversationInstructionsAction->setObjectName(QStringLiteral("aiConversationInstructions"));
+    m_bookDefaultPromptAction = modelsMenu->addAction(i18n("Book default prompt…"));
     m_newConversationAction = modelsMenu->addAction(i18n("Start new conversation"));
     m_newConversationAction->setObjectName(QStringLiteral("aiNewConversation"));
     m_modelsButton->setMenu(modelsMenu);
@@ -191,8 +202,19 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     }
     connect(m_modelsButton, &QToolButton::clicked, this, &AiReadingAssistant::editProfiles);
     connect(m_conversationInstructionsAction, &QAction::triggered, this, &AiReadingAssistant::editConversationInstructions);
+    connect(m_bookDefaultPromptAction, &QAction::triggered, this, &AiReadingAssistant::editBookDefaultPrompt);
     connect(m_newConversationAction, &QAction::triggered, this, &AiReadingAssistant::clearConversation);
     connect(m_profileCombo, &QComboBox::currentIndexChanged, this, &AiReadingAssistant::loadSelectedConversation);
+    connect(m_profileCombo, &QComboBox::activated, this, [this](int) {
+        if (!AiStore::isManagedBook(m_documentKey)) {
+            return;
+        }
+        AiBookSettings settings = AiStore::loadBookSettings(m_documentKey);
+        settings.selectedProfileId = m_profileCombo->currentData().toString();
+        if (!AiStore::saveBookSettings(m_documentKey, settings)) {
+            showStatus(i18n("Could not save this book's model selection."));
+        }
+    });
 
     m_view = new AiMarkdownView(this);
     layout->addWidget(m_view, 1);
@@ -229,7 +251,7 @@ AiReadingAssistant::AiReadingAssistant(Okular::Document *document, QWidget *pare
     connect(&m_provider, &AiProvider::completed, this, [this](const QString &answer, const QString &sessionId) {
         m_questionSubmitted = false;
         m_conversation.sessionId = sessionId;
-        m_conversation.messages.append(AiMessage{QStringLiteral("assistant"), answer, -1, {}, {}, {}});
+        m_conversation.messages.append(AiMessage {QStringLiteral("assistant"), answer, -1, {}, {}, {}});
         bool saved = false;
         if (AiProfile *profile = currentProfile()) {
             saved = AiStore::saveConversation(m_documentKey, profile->id, m_conversation);
@@ -275,9 +297,47 @@ void AiReadingAssistant::setDocumentUrl(const QUrl &url)
     m_pendingPage = -1;
     m_questionSubmitted = false;
     m_documentKey = AiStore::documentKey(url);
+    if (AiStore::isManagedBook(m_documentKey)) {
+        const QString selectedId = AiStore::loadBookSettings(m_documentKey).selectedProfileId;
+        m_profileCombo->setCurrentIndex(selectedId.isEmpty() ? -1 : m_profileCombo->findData(selectedId));
+    }
     m_selection.clear();
     m_selectionLabel->hide();
     loadSelectedConversation();
+}
+
+void AiReadingAssistant::reloadCloudSettings()
+{
+    const QString currentId = m_profileCombo->currentData().toString();
+    QList<AiProfile> refreshed = AiStore::loadProfiles(winId());
+    for (AiProfile &profile : refreshed) {
+        if (profile.apiKey.isEmpty()) {
+            for (const AiProfile &previous : std::as_const(m_profiles)) {
+                if (previous.id == profile.id && previous.kind == profile.kind && previous.endpoint == profile.endpoint) {
+                    profile.apiKey = previous.apiKey;
+                    break;
+                }
+            }
+        }
+    }
+    m_profiles = std::move(refreshed);
+    const QSignalBlocker blocked(m_profileCombo);
+    m_profileCombo->clear();
+    for (const AiProfile &profile : std::as_const(m_profiles)) {
+        m_profileCombo->addItem(profile.name, profile.id);
+    }
+    const AiBookSettings settings = AiStore::loadBookSettings(m_documentKey);
+    const QString selectedId = AiStore::isManagedBook(m_documentKey) ? settings.selectedProfileId : currentId;
+    m_profileCombo->setCurrentIndex(selectedId.isEmpty() ? -1 : m_profileCombo->findData(selectedId));
+    loadSelectedConversation();
+    if (!selectedId.isEmpty() && m_profileCombo->currentIndex() < 0) {
+        showStatus(i18n("The model selected for this book is unavailable on this device. Configure its profile before asking."));
+    }
+}
+
+bool AiReadingAssistant::isBusy() const
+{
+    return m_provider.isBusy() || m_pendingPage >= 0;
 }
 
 void AiReadingAssistant::askAboutSelection(const QString &text)
@@ -419,6 +479,32 @@ void AiReadingAssistant::editConversationInstructions()
     }
 }
 
+void AiReadingAssistant::editBookDefaultPrompt()
+{
+    if (!AiStore::isManagedBook(m_documentKey) || m_provider.isBusy()) {
+        return;
+    }
+    AiBookSettings settings = AiStore::loadBookSettings(m_documentKey);
+    QDialog dialog(this);
+    dialog.setWindowTitle(i18n("Book default prompt"));
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *description = new QLabel(i18n("New conversations for this book start with this prompt. Existing conversations keep their own instructions."), &dialog);
+    description->setWordWrap(true);
+    layout->addWidget(description);
+    auto *editor = new QPlainTextEdit(settings.defaultPrompt, &dialog);
+    layout->addWidget(editor);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    dialog.resize(420, 260);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    settings.defaultPrompt = editor->toPlainText().trimmed();
+    showStatus(AiStore::saveBookSettings(m_documentKey, settings) ? i18n("Book default prompt saved.") : i18n("Could not save this book's default prompt."));
+}
+
 void AiReadingAssistant::loadSelectedConversation()
 {
     m_cancelling = m_provider.isBusy();
@@ -486,7 +572,7 @@ void AiReadingAssistant::sendQuestion()
     if (!documentPage->hasTextPage()) {
         m_document->requestTextPage(page);
     }
-    m_pendingMessage = AiMessage{QStringLiteral("user"), question, page, documentPage->text(nullptr).left(30000), m_selection, {}};
+    m_pendingMessage = AiMessage {QStringLiteral("user"), question, page, documentPage->text(nullptr).left(30000), m_selection, {}};
     if (!profile->vision) {
         submitQuestion(QString());
         return;
@@ -577,8 +663,7 @@ void AiReadingAssistant::cancelQuestion()
 void AiReadingAssistant::clearConversation()
 {
     AiProfile *profile = currentProfile();
-    if (!profile || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty() && m_conversation.instructions.isEmpty()) || m_provider.isBusy()
-        || m_pendingPage >= 0) {
+    if (!profile || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty() && m_conversation.instructions.isEmpty()) || m_provider.isBusy() || m_pendingPage >= 0) {
         return;
     }
     if (QMessageBox::question(this, i18n("Start new conversation"), i18n("Remove the current conversation from Okular? Saved annotations will remain.")) != QMessageBox::Yes) {
@@ -589,6 +674,7 @@ void AiReadingAssistant::clearConversation()
         return;
     }
     m_conversation = {};
+    m_conversation.instructions = AiStore::loadBookSettings(m_documentKey).defaultPrompt;
     renderConversation();
     showStatus(i18n("New conversation started."));
     updateControls();
@@ -598,7 +684,7 @@ void AiReadingAssistant::renderConversation()
 {
     QJsonArray json;
     for (const AiMessage &message : std::as_const(m_conversation.messages)) {
-        json.append(QJsonObject{{QStringLiteral("role"), message.role}, {QStringLiteral("content"), message.content}});
+        json.append(QJsonObject {{QStringLiteral("role"), message.role}, {QStringLiteral("content"), message.content}});
     }
     m_view->setMessages(json);
 }
@@ -631,7 +717,7 @@ void AiReadingAssistant::updateControls()
     m_profileCombo->setEnabled(!busy);
     m_modelsButton->setEnabled(!busy);
     m_conversationInstructionsAction->setEnabled(!busy && !m_documentKey.isEmpty() && m_profileCombo->currentIndex() >= 0);
-    m_newConversationAction->setEnabled(!busy && !m_documentKey.isEmpty()
-                                        && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty() || !m_conversation.instructions.isEmpty()));
+    m_bookDefaultPromptAction->setEnabled(!busy && AiStore::isManagedBook(m_documentKey));
+    m_newConversationAction->setEnabled(!busy && !m_documentKey.isEmpty() && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty() || !m_conversation.instructions.isEmpty()));
     m_prompt->setReadOnly(busy);
 }

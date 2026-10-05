@@ -60,6 +60,7 @@ void DocumentItem::setUrl(const QUrl &url)
 
 void DocumentItem::openUrl(const QUrl &url, const QString &password)
 {
+    m_sourceUrl = url;
     if (m_aiAssistant) {
         m_aiAssistant->resetDocument();
     }
@@ -72,10 +73,13 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
     QUrl realUrl = url; // NOLINT(performance-unnecessary-copy-initialization) because of the ifdef below this can't be const &
 
 #ifdef Q_OS_ANDROID
-    const QJniObject activity(QNativeInterface::QAndroidApplication::context());
-    realUrl = /* cppcheck-suppress redundantInitialization */
-        QUrl(activity.callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
-    m_aiDocumentSourceUrl = QUrl(activity.callObjectMethod("takeSourceUrl", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(realUrl.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+    if (!url.isEmpty() && !url.isLocalFile()) {
+        const QJniObject activity(QNativeInterface::QAndroidApplication::context());
+        realUrl = /* cppcheck-suppress redundantInitialization */
+            QUrl(activity.callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+        m_aiDocumentSourceUrl = QUrl(activity.callObjectMethod("takeSourceUrl", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(realUrl.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
+        m_sourceUrl = m_aiDocumentSourceUrl;
+    }
 #endif
 
 #ifdef Q_OS_UNIX
@@ -98,7 +102,7 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
 
     const QString path = realUrl.isLocalFile() ? realUrl.toLocalFile() : QStringLiteral("-");
 
-    const Okular::Document::OpenResult res = m_document->openDocument(path, realUrl, db.mimeTypeForUrl(realUrl), password);
+    const Okular::Document::OpenResult res = url.isEmpty() ? Okular::Document::OpenError : m_document->openDocument(path, realUrl, db.mimeTypeForUrl(realUrl), password);
 
     m_tocModel->clear();
     m_tocModel->fill(m_document->documentSynopsis());
@@ -151,7 +155,7 @@ QString DocumentItem::windowTitleForDocument() const
 
 QUrl DocumentItem::url() const
 {
-    return m_document->currentDocument();
+    return m_sourceUrl;
 }
 
 void DocumentItem::setCurrentPage(int page)
@@ -263,7 +267,20 @@ void DocumentItem::resetSearch()
 
 void DocumentItem::setPassword(const QString &password)
 {
-    openUrl(m_document->currentDocument(), password);
+    openUrl(m_sourceUrl, password);
+}
+
+bool DocumentItem::closeForCloudSync()
+{
+    if (m_document->canSaveAnnotationsToSidecar()) {
+        QString errorText;
+        if (!m_document->saveAnnotationsToSidecar(&errorText)) {
+            Q_EMIT error(errorText, -1);
+            return false;
+        }
+    }
+    setUrl(QUrl());
+    return true;
 }
 
 AiAssistant *DocumentItem::aiAssistant()

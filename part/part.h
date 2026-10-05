@@ -311,6 +311,14 @@ private:
     void setViewerShortcuts();
     void setupActions();
     void showAiPanel(bool visible);
+#ifdef OKULAR_HAVE_S3_CURL
+    QString cloudLibraryRoot();
+    void addCurrentBookToCloudLibrary();
+    void openCloudBook();
+    void syncCloudBookFiles();
+    void resolveCloudAnnotationConflict();
+    void resolveCloudModelSettingConflict();
+#endif
 
     void setupPrint(QPrinter &printer);
     bool doPrint(QPrinter &printer);
@@ -366,6 +374,13 @@ private:
     QSplitter *m_aiSplitter = nullptr;
     AiReadingAssistant *m_aiPanel = nullptr;
     KToggleAction *m_aiPanelAction = nullptr;
+#ifdef OKULAR_HAVE_S3_CURL
+    QAction *m_addToCloudLibrary = nullptr;
+    QAction *m_openCloudBook = nullptr;
+    QAction *m_syncCloudLibrary = nullptr;
+    QAction *m_resolveCloudAnnotations = nullptr;
+    QAction *m_resolveCloudModelSettings = nullptr;
+#endif
     QString m_aiAnnotationQuestion;
     QString m_aiAnnotationAnswer;
     int m_aiAnnotationPage = -1;

@@ -37,23 +37,35 @@
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
+#ifdef OKULAR_HAVE_S3_CURL
+#include <QFutureWatcher>
+#include <QListWidget>
+#include <QPlainTextEdit>
+#endif
 #include <QInputDialog>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QLabel>
 #include <QLayout>
+#include <QMap>
 #include <QMenu>
 #include <QMenuBar>
-#include <QMouseEvent>
 #include <QMimeData>
 #include <QMimeDatabase>
+#include <QMouseEvent>
 #include <QPrintDialog>
 #include <QPrintPreviewDialog>
+#ifdef OKULAR_HAVE_S3_CURL
+#include <QLockFile>
+#include <QProcessEnvironment>
+#include <QProgressDialog>
+#endif
 #include <QPrinter>
 #include <QScopedValueRollback>
 #include <QScrollBar>
 #include <QSlider>
-#include <QSplitter>
 #include <QSpinBox>
+#include <QSplitter>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -67,6 +79,7 @@
 #include <KColorSchemeManager>
 #include <KColorSchemeMenu>
 #include <KCompressionDevice>
+#include <KConfigGroup>
 #include <KDirWatch>
 #include <KFilterBase>
 #include <KHamburgerMenu>
@@ -80,6 +93,7 @@
 #include <KParts/GUIActivateEvent>
 #include <KPasswordDialog>
 #include <KPluginMetaData>
+#include <KSharedConfig>
 #include <KSharedDataCache>
 #include <KStandardShortcut>
 #include <KToggleAction>
@@ -101,6 +115,13 @@
 #include "aireadingassistant.h"
 #include "annotationpopup.h"
 #include "bookmarklist.h"
+#ifdef OKULAR_HAVE_S3_CURL
+#include "annotationsync.h"
+#include "booklibrary.h"
+#include "booklibrarysync.h"
+#include "modelsettingssync.h"
+#include "s3configuration.h"
+#endif
 #include "core/action.h"
 #include "core/annotations.h"
 #include "core/bookmarkmanager.h"
@@ -124,6 +145,9 @@
 #include "presentationwidget.h"
 #include "propertiesdialog.h"
 #include "searchwidget.h"
+#ifdef OKULAR_HAVE_S3_CURL
+#include "s3transport.h"
+#endif
 #include "settings.h"
 #include "side_reviews.h"
 #include "sidebar.h"
@@ -133,6 +157,9 @@
 
 #include <memory>
 #include <type_traits>
+#ifdef OKULAR_HAVE_S3_CURL
+#include <QtConcurrent>
+#endif
 
 #ifdef OKULAR_KEEP_FILE_OPEN
 class FileKeeper
@@ -965,6 +992,31 @@ void Part::setupActions()
     importPS->setIcon(QIcon::fromTheme(QStringLiteral("document-import")));
     connect(importPS, &QAction::triggered, this, &Part::slotImportPSFile);
 
+#ifdef OKULAR_HAVE_S3_CURL
+    m_addToCloudLibrary = ac->addAction(QStringLiteral("cloud_add_book"));
+    m_addToCloudLibrary->setText(i18n("Add Current Book to Cloud Library…"));
+    m_addToCloudLibrary->setIcon(QIcon::fromTheme(QStringLiteral("document-import")));
+    connect(m_addToCloudLibrary, &QAction::triggered, this, &Part::addCurrentBookToCloudLibrary);
+
+    m_openCloudBook = ac->addAction(QStringLiteral("cloud_open_book"));
+    m_openCloudBook->setText(i18n("Open Cloud Book…"));
+    m_openCloudBook->setIcon(QIcon::fromTheme(QStringLiteral("document-open")));
+    connect(m_openCloudBook, &QAction::triggered, this, &Part::openCloudBook);
+
+    m_syncCloudLibrary = ac->addAction(QStringLiteral("cloud_sync_book_files"));
+    m_syncCloudLibrary->setText(i18n("Sync Cloud Library Now…"));
+    m_syncCloudLibrary->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
+    connect(m_syncCloudLibrary, &QAction::triggered, this, &Part::syncCloudBookFiles);
+
+    m_resolveCloudAnnotations = ac->addAction(QStringLiteral("cloud_resolve_annotation_conflicts"));
+    m_resolveCloudAnnotations->setText(i18n("Resolve Cloud Annotation Conflicts…"));
+    connect(m_resolveCloudAnnotations, &QAction::triggered, this, &Part::resolveCloudAnnotationConflict);
+
+    m_resolveCloudModelSettings = ac->addAction(QStringLiteral("cloud_resolve_model_settings"));
+    m_resolveCloudModelSettings->setText(i18n("Resolve Cloud Model Setting Conflicts…"));
+    connect(m_resolveCloudModelSettings, &QAction::triggered, this, &Part::resolveCloudModelSettingConflict);
+#endif
+
     KToggleAction *blackscreenAction = new KToggleAction(i18n("Switch Blackscreen Mode"), ac);
     ac->addAction(QStringLiteral("switch_blackscreen_mode"), blackscreenAction);
     ac->setDefaultShortcut(blackscreenAction, QKeySequence(Qt::Key_B));
@@ -987,6 +1039,528 @@ void Part::setupActions()
     ac->addAction(QStringLiteral("presentation_play_pause"), playPauseAction);
     playPauseAction->setEnabled(false);
 }
+
+#ifdef OKULAR_HAVE_S3_CURL
+QString Part::cloudLibraryRoot()
+{
+    auto config = KSharedConfig::openConfig();
+    KConfigGroup group(config, QStringLiteral("Cloud Book Library"));
+    QString root = group.readEntry("ManagedDirectory", QString());
+    if (root.isEmpty()) {
+        root = QFileDialog::getExistingDirectory(widget(), i18n("Choose Managed Book Library Directory"));
+        if (!root.isEmpty()) {
+            group.writeEntry("ManagedDirectory", root);
+            config->sync();
+        }
+    }
+    return root;
+}
+
+void Part::addCurrentBookToCloudLibrary()
+{
+    if (!m_document->isOpened() || !url().isLocalFile()) {
+        KMessageBox::error(widget(), i18n("Open a local book before adding it to the cloud library."));
+        return;
+    }
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    const QUrl originalUrl = url();
+    if (!closeUrl()) {
+        return;
+    }
+    m_addToCloudLibrary->setEnabled(false);
+    m_syncCloudLibrary->setEnabled(false);
+    m_resolveCloudAnnotations->setEnabled(false);
+    m_resolveCloudModelSettings->setEnabled(false);
+    auto *progress = new QProgressDialog(i18n("Moving book into the managed library…"), QString(), 0, 0, widget());
+    progress->setCancelButton(nullptr);
+    progress->show();
+    struct Outcome {
+        BookProject project;
+        QString error;
+        bool success = false;
+    };
+    auto *watcher = new QFutureWatcher<Outcome>(this);
+    connect(watcher, &QFutureWatcher<Outcome>::finished, this, [this, watcher, progress, originalUrl] {
+        const Outcome outcome = watcher->result();
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        m_addToCloudLibrary->setEnabled(true);
+        m_syncCloudLibrary->setEnabled(true);
+        m_resolveCloudAnnotations->setEnabled(true);
+        m_resolveCloudModelSettings->setEnabled(true);
+        if (!outcome.success) {
+            KMessageBox::error(widget(), i18n("Could not add book: %1", outcome.error));
+            if (QFile::exists(originalUrl.toLocalFile())) {
+                openUrl(originalUrl);
+            }
+            return;
+        }
+        openUrl(QUrl::fromLocalFile(outcome.project.sourcePath));
+        syncCloudBookFiles();
+    });
+    watcher->setFuture(QtConcurrent::run([sourcePath = originalUrl.toLocalFile(), root] {
+        Outcome outcome;
+        outcome.success = BookLibrary::importFile(sourcePath, root, &outcome.project, &outcome.error);
+        return outcome;
+    }));
+}
+
+void Part::openCloudBook()
+{
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    const QDir books(QDir(root).filePath(QStringLiteral("books")));
+    QMap<QString, QString> choices;
+    for (const QFileInfo &entry : books.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        if (entry.isSymLink()) {
+            continue;
+        }
+        QFile manifestFile(QDir(entry.filePath()).filePath(QStringLiteral("manifest.json")));
+        if (!manifestFile.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        const QJsonObject manifest = QJsonDocument::fromJson(manifestFile.readAll()).object();
+        const QString storedName = manifest.value(QStringLiteral("storedName")).toString();
+        const QString originalName = manifest.value(QStringLiteral("originalName")).toString();
+        const QString sourcePath = QDir(entry.filePath()).filePath(storedName);
+        if (manifest.value(QStringLiteral("sha256")).toString() != entry.fileName() || originalName.isEmpty() || storedName.isEmpty() || QFileInfo(storedName).fileName() != storedName || storedName.contains(QLatin1Char('\\')) ||
+            !QFileInfo(sourcePath).isFile() || QFileInfo(sourcePath).isSymLink()) {
+            continue;
+        }
+        choices.insert(i18n("%1 (%2)", originalName, entry.fileName().left(12)), sourcePath);
+    }
+    if (choices.isEmpty()) {
+        KMessageBox::information(widget(), i18n("No cloud books are stored on this device yet. Use Sync Cloud Library Now to download them."));
+        return;
+    }
+    bool accepted = false;
+    const QString selected = QInputDialog::getItem(widget(), i18n("Open Cloud Book"), i18n("Book:"), choices.keys(), 0, false, &accepted);
+    if (accepted && choices.contains(selected)) {
+        openUrl(QUrl::fromLocalFile(choices.value(selected)));
+    }
+}
+
+void Part::syncCloudBookFiles()
+{
+    if (m_aiPanel && m_aiPanel->isBusy()) {
+        KMessageBox::information(widget(), i18n("Finish the current AI answer before synchronizing the cloud library."));
+        return;
+    }
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    S3Configuration configuration;
+    QString error;
+    if (!S3Configuration::fromEnvironment(QProcessEnvironment::systemEnvironment(), &configuration, &error)) {
+        KMessageBox::error(widget(), i18n("Cloud library is not configured: %1", error));
+        return;
+    }
+    if (m_document->isOpened() && isModified()) {
+        if (!m_document->canSaveAnnotationsToSidecar()) {
+            KMessageBox::information(widget(), i18n("Save the open document before syncing the cloud library."));
+            return;
+        }
+        if (!saveFile()) {
+            return;
+        }
+    }
+    m_syncCloudLibrary->setEnabled(false);
+    m_addToCloudLibrary->setEnabled(false);
+    m_resolveCloudAnnotations->setEnabled(false);
+    m_resolveCloudModelSettings->setEnabled(false);
+    const QString activeDocumentPath = m_document->isOpened() && url().isLocalFile() ? url().toLocalFile() : QString();
+    const QList<AiProfile> localProfiles = AiStore::loadProfiles(widget()->winId());
+    const QByteArray profileSnapshot = KConfigGroup(KSharedConfig::openConfig(), QStringLiteral("AI Reading Assistant")).readEntry("Profiles", QByteArray());
+    if (m_aiPanel) {
+        m_aiPanel->setEnabled(false);
+    }
+    auto *progress = new QProgressDialog(i18n("Synchronizing cloud library…"), QString(), 0, 0, widget());
+    progress->setCancelButton(nullptr);
+    progress->show();
+    struct Outcome {
+        BookSyncResult books;
+        ModelSettingsSyncResult models;
+    };
+    auto *watcher = new QFutureWatcher<Outcome>(this);
+    connect(watcher, &QFutureWatcher<Outcome>::finished, this, [this, watcher, progress, localProfiles, profileSnapshot, root] {
+        const Outcome outcome = watcher->result();
+        const BookSyncResult &result = outcome.books;
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        m_syncCloudLibrary->setEnabled(true);
+        m_addToCloudLibrary->setEnabled(true);
+        m_resolveCloudAnnotations->setEnabled(true);
+        m_resolveCloudModelSettings->setEnabled(true);
+        if (m_aiPanel) {
+            m_aiPanel->setEnabled(true);
+        }
+        if (!result.successful()) {
+            KMessageBox::error(widget(), i18n("Cloud library sync failed: %1", result.error));
+        } else if (!outcome.models.successful()) {
+            KMessageBox::error(widget(), i18n("Books and annotations synchronized, but AI settings failed: %1", outcome.models.error));
+        } else {
+            if (KConfigGroup(KSharedConfig::openConfig(), QStringLiteral("AI Reading Assistant")).readEntry("Profiles", QByteArray()) != profileSnapshot) {
+                KMessageBox::error(widget(), i18n("AI models changed locally during sync. Your changes were kept; synchronize again."));
+                return;
+            }
+            QList<AiProfile> profiles = outcome.models.profiles;
+            for (AiProfile &profile : profiles) {
+                for (const AiProfile &local : localProfiles) {
+                    if (profile.id == local.id && profile.kind == local.kind && profile.endpoint == local.endpoint) {
+                        profile.apiKey = local.apiKey;
+                        break;
+                    }
+                }
+            }
+            QString settingsError;
+            const bool savedProfiles = AiStore::saveProfiles(profiles, widget()->winId(), &settingsError);
+            if (!savedProfiles) {
+                KMessageBox::error(widget(), i18n("Could not save synchronized AI profiles: %1", settingsError));
+                return;
+            }
+            if (m_aiPanel) {
+                m_aiPanel->reloadCloudSettings();
+            }
+            if (!ModelSettingsSync::commit(root, outcome.models, &settingsError)) {
+                KMessageBox::error(widget(), i18n("AI settings were saved, but the local sync checkpoint failed: %1", settingsError));
+                return;
+            }
+            QString message = i18n("Cloud library synchronized. Books: %1 uploaded, %2 downloaded. Annotation changes: %3 uploaded, %4 applied. Snapshots: %5 uploaded. Conflicts: %6.",
+                                   result.uploaded,
+                                   result.downloaded,
+                                   result.annotationsUploaded,
+                                   result.annotationsApplied,
+                                   result.snapshotsUploaded,
+                                   result.annotationConflicts);
+            message += QLatin1Char('\n') + i18n("AI settings: %1 uploaded, %2 applied, %3 conflicts.", outcome.models.uploaded, outcome.models.applied, outcome.models.conflicts);
+            if (!settingsError.isEmpty()) {
+                message += QLatin1Char('\n') + settingsError;
+            }
+            if (result.annotationsDeferred) {
+                message += QLatin1Char('\n') + i18n("%1 annotation changes for the open PDF are waiting. Close the PDF and sync again to apply them.", result.annotationsDeferred);
+            }
+            if (result.annotationConflicts) {
+                message += QLatin1Char('\n') + i18n("Choose an annotation version with File → Resolve Cloud Annotation Conflicts.");
+            }
+            if (outcome.models.conflicts) {
+                message += QLatin1Char('\n') + i18n("Choose a model setting version with File → Resolve Cloud Model Setting Conflicts.");
+            }
+            KMessageBox::information(widget(), message);
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([configuration, root, activeDocumentPath, localProfiles] {
+        S3Transport store(configuration);
+        Outcome outcome;
+        outcome.books = BookLibrarySync(store, root).synchronizeAll(activeDocumentPath);
+        if (outcome.books.successful()) {
+            QLockFile lock(QDir(root).filePath(QStringLiteral(".sync.lock")));
+            if (lock.tryLock(0)) {
+                outcome.models = ModelSettingsSync::synchronize(store, root, localProfiles);
+            } else {
+                outcome.models.error = QStringLiteral("This managed library is already syncing");
+            }
+        }
+        return outcome;
+    }));
+}
+
+static int chooseCloudVariant(QWidget *parent, const QString &title, const QString &description, const QStringList &labels, const QJsonArray &variants)
+{
+    QDialog dialog(parent);
+    dialog.setWindowTitle(title);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *intro = new QLabel(description, &dialog);
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    auto *list = new QListWidget(&dialog);
+    list->setObjectName(QStringLiteral("cloudConflictVariants"));
+    list->addItems(labels);
+    layout->addWidget(list);
+    auto *details = new QPlainTextEdit(&dialog);
+    details->setObjectName(QStringLiteral("cloudConflictDetails"));
+    details->setReadOnly(true);
+    layout->addWidget(details);
+    QObject::connect(list, &QListWidget::currentRowChanged, &dialog, [details, variants](int row) {
+        details->setPlainText(row >= 0 && row < variants.size() ? QString::fromUtf8(QJsonDocument(variants.at(row).toObject()).toJson(QJsonDocument::Indented)) : QString());
+    });
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    list->setCurrentRow(0);
+    dialog.resize(700, 500);
+    return dialog.exec() == QDialog::Accepted ? list->currentRow() : -1;
+}
+
+void Part::resolveCloudAnnotationConflict()
+{
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    S3Configuration configuration;
+    QString error;
+    if (!S3Configuration::fromEnvironment(QProcessEnvironment::systemEnvironment(), &configuration, &error)) {
+        KMessageBox::error(widget(), i18n("Cloud library is not configured: %1", error));
+        return;
+    }
+    struct Choice {
+        QString hash;
+        int page;
+        QString id;
+        QJsonArray variants;
+        QString label;
+    };
+    QList<Choice> choices;
+    const QDir books(QDir(root).filePath(QStringLiteral("books")));
+    for (const QFileInfo &project : books.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        if (project.isSymLink()) {
+            continue;
+        }
+        QFile conflictsFile(QDir(project.filePath()).filePath(QStringLiteral("annotation-conflicts.json")));
+        if (!conflictsFile.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        const QJsonObject conflicts = QJsonDocument::fromJson(conflictsFile.readAll()).object();
+        if (conflicts.value(QStringLiteral("pdfSha256")).toString() != project.fileName()) {
+            continue;
+        }
+        QFile manifestFile(QDir(project.filePath()).filePath(QStringLiteral("manifest.json")));
+        const QString bookName = manifestFile.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(manifestFile.readAll()).object().value(QStringLiteral("originalName")).toString() : project.fileName();
+        for (const QJsonValue &value : conflicts.value(QStringLiteral("conflicts")).toArray()) {
+            const QJsonObject conflict = value.toObject();
+            const int page = conflict.value(QStringLiteral("page")).toInt(-1);
+            const QString id = conflict.value(QStringLiteral("id")).toString();
+            const QJsonArray variants = conflict.value(QStringLiteral("variants")).toArray();
+            if (page < 0 || id.isEmpty() || variants.size() < 2) {
+                continue;
+            }
+            choices.append({project.fileName(), page, id, variants, i18n("%1 (%2) — page %3 — annotation %4", bookName, project.fileName().left(12), page + 1, id)});
+        }
+    }
+    if (choices.isEmpty()) {
+        KMessageBox::information(widget(), i18n("No annotation conflicts are waiting. Synchronize the cloud library to check for new changes."));
+        return;
+    }
+    QStringList conflictLabels;
+    for (const Choice &choice : std::as_const(choices)) {
+        conflictLabels.append(choice.label);
+    }
+    bool accepted = false;
+    const QString conflictLabel = QInputDialog::getItem(widget(), i18n("Resolve Annotation Conflict"), i18n("Choose an annotation:"), conflictLabels, 0, false, &accepted);
+    if (!accepted) {
+        return;
+    }
+    const int conflictIndex = conflictLabels.indexOf(conflictLabel);
+    if (conflictIndex < 0) {
+        return;
+    }
+    const Choice choice = choices.at(conflictIndex);
+    QStringList variantLabels;
+    QStringList expectedHeads;
+    for (const QJsonValue &variantValue : choice.variants) {
+        const QJsonObject variant = variantValue.toObject();
+        const QString head = variant.value(QStringLiteral("eventId")).toString();
+        expectedHeads.append(head);
+        const QJsonValue value = variant.value(QStringLiteral("value"));
+        const QString contents = value.toObject().value(QStringLiteral("contents")).toString();
+        const QString preview = value.isNull() ? i18n("Deleted annotation") : (contents.isEmpty() ? value.toObject().value(QStringLiteral("xml")).toString() : contents).simplified().left(120);
+        const QString author = value.toObject().value(QStringLiteral("author")).toString();
+        variantLabels.append(i18n("%1 — %2 — %3 (%4)", head.left(12), author, preview.isEmpty() ? i18n("No text") : preview, head));
+    }
+    const int variantIndex = chooseCloudVariant(widget(), i18n("Choose Annotation Version"), i18n("Keep this version of %1. Review the complete annotation data below:", choice.label), variantLabels, choice.variants);
+    if (variantIndex < 0) {
+        return;
+    }
+    const QString chosenHead = expectedHeads.at(variantIndex);
+    const QString projectPath = books.filePath(choice.hash);
+    const QUrl reopen = m_document->isOpened() && url().isLocalFile() && QFileInfo(url().toLocalFile()).absolutePath() == projectPath ? url() : QUrl();
+    if (!reopen.isEmpty() && !closeUrl()) {
+        return;
+    }
+    m_syncCloudLibrary->setEnabled(false);
+    m_addToCloudLibrary->setEnabled(false);
+    m_resolveCloudAnnotations->setEnabled(false);
+    m_resolveCloudModelSettings->setEnabled(false);
+    auto *progress = new QProgressDialog(i18n("Resolving annotation conflict…"), QString(), 0, 0, widget());
+    progress->setCancelButton(nullptr);
+    progress->show();
+    auto *watcher = new QFutureWatcher<AnnotationSyncResult>(this);
+    connect(watcher, &QFutureWatcher<AnnotationSyncResult>::finished, this, [this, watcher, progress, reopen] {
+        const AnnotationSyncResult result = watcher->result();
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        m_syncCloudLibrary->setEnabled(true);
+        m_addToCloudLibrary->setEnabled(true);
+        m_resolveCloudAnnotations->setEnabled(true);
+        m_resolveCloudModelSettings->setEnabled(true);
+        if (!reopen.isEmpty()) {
+            openUrl(reopen);
+        }
+        if (!result.successful()) {
+            KMessageBox::error(widget(), i18n("Could not resolve annotation conflict: %1", result.error));
+        } else {
+            KMessageBox::information(widget(), i18n("Selected annotation version published. Remaining conflicts in this book: %1.", result.conflicts));
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([configuration, root, choice, expectedHeads, chosenHead] {
+        AnnotationSyncResult result;
+        QLockFile lock(QDir(root).filePath(QStringLiteral(".sync.lock")));
+        if (!lock.tryLock(0)) {
+            result.error = QStringLiteral("This managed library is already syncing");
+            return result;
+        }
+        S3Transport store(configuration);
+        return AnnotationSync::resolveConflict(store, root, choice.hash, choice.page, choice.id, expectedHeads, chosenHead);
+    }));
+}
+
+void Part::resolveCloudModelSettingConflict()
+{
+    if (m_aiPanel && m_aiPanel->isBusy()) {
+        KMessageBox::information(widget(), i18n("Finish the current AI answer before resolving model settings."));
+        return;
+    }
+    const QString root = cloudLibraryRoot();
+    if (root.isEmpty()) {
+        return;
+    }
+    S3Configuration configuration;
+    QString error;
+    if (!S3Configuration::fromEnvironment(QProcessEnvironment::systemEnvironment(), &configuration, &error)) {
+        KMessageBox::error(widget(), i18n("Cloud library is not configured: %1", error));
+        return;
+    }
+    QFile file(QDir(root).filePath(QStringLiteral("model-settings-conflicts.json")));
+    if (!file.open(QIODevice::ReadOnly)) {
+        KMessageBox::information(widget(), i18n("No model setting conflicts are waiting. Synchronize the cloud library to check for new changes."));
+        return;
+    }
+    const QJsonArray conflicts = QJsonDocument::fromJson(file.readAll()).object().value(QStringLiteral("conflicts")).toArray();
+    if (conflicts.isEmpty()) {
+        KMessageBox::information(widget(), i18n("No model setting conflicts are waiting."));
+        return;
+    }
+    QStringList labels;
+    for (const QJsonValue &value : conflicts) {
+        const QString key = value.toObject().value(QStringLiteral("key")).toString();
+        if (key.startsWith(QLatin1String("book/"))) {
+            const QString hash = key.section(QLatin1Char('/'), 1, 1);
+            QFile manifest(QDir(root).filePath(QStringLiteral("books/%1/manifest.json").arg(hash)));
+            const QString bookName = manifest.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(manifest.readAll()).object().value(QStringLiteral("originalName")).toString() : hash.left(12);
+            const QString field = key.endsWith(QLatin1String("/defaultPrompt")) ? i18n("Default prompt") : i18n("Selected model");
+            labels.append(i18n("%1 (%2) — %3", bookName, hash.left(12), field));
+        } else {
+            labels.append(i18n("Model profile %1", key.mid(8)));
+        }
+    }
+    bool accepted = false;
+    const QString selected = QInputDialog::getItem(widget(), i18n("Resolve Model Setting Conflict"), i18n("Choose a setting:"), labels, 0, false, &accepted);
+    if (!accepted) {
+        return;
+    }
+    const int index = labels.indexOf(selected);
+    if (index < 0) {
+        return;
+    }
+    const QJsonArray variants = conflicts.at(index).toObject().value(QStringLiteral("variants")).toArray();
+    QStringList expectedHeads;
+    QStringList variantLabels;
+    for (const QJsonValue &value : variants) {
+        const QJsonObject variant = value.toObject();
+        const QString head = variant.value(QStringLiteral("eventId")).toString();
+        expectedHeads.append(head);
+        const QJsonValue setting = variant.value(QStringLiteral("value"));
+        const QString preview = setting.isNull() ? i18n("Removed profile")
+            : setting.isObject()                 ? setting.toObject().value(QStringLiteral("name")).toString() + QLatin1String(" — ") + setting.toObject().value(QStringLiteral("model")).toString()
+                                                 : setting.toString().simplified().left(160);
+        variantLabels.append(i18n("%1 — %2 (%3)", head.left(12), preview.isEmpty() ? i18n("Empty value") : preview, head));
+    }
+    const int chosenIndex = chooseCloudVariant(widget(), i18n("Choose Model Setting Version"), i18n("Keep this value. Review all setting fields below:"), variantLabels, variants);
+    if (chosenIndex < 0) {
+        return;
+    }
+    const QList<AiProfile> localProfiles = AiStore::loadProfiles(widget()->winId());
+    const QByteArray profileSnapshot = KConfigGroup(KSharedConfig::openConfig(), QStringLiteral("AI Reading Assistant")).readEntry("Profiles", QByteArray());
+    m_syncCloudLibrary->setEnabled(false);
+    m_addToCloudLibrary->setEnabled(false);
+    m_resolveCloudAnnotations->setEnabled(false);
+    m_resolveCloudModelSettings->setEnabled(false);
+    if (m_aiPanel) {
+        m_aiPanel->setEnabled(false);
+    }
+    auto *progress = new QProgressDialog(i18n("Resolving model setting conflict…"), QString(), 0, 0, widget());
+    progress->setCancelButton(nullptr);
+    progress->show();
+    auto *watcher = new QFutureWatcher<ModelSettingsSyncResult>(this);
+    connect(watcher, &QFutureWatcher<ModelSettingsSyncResult>::finished, this, [this, watcher, progress, localProfiles, profileSnapshot, root] {
+        ModelSettingsSyncResult result = watcher->result();
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        m_syncCloudLibrary->setEnabled(true);
+        m_addToCloudLibrary->setEnabled(true);
+        m_resolveCloudAnnotations->setEnabled(true);
+        m_resolveCloudModelSettings->setEnabled(true);
+        if (m_aiPanel) {
+            m_aiPanel->setEnabled(true);
+        }
+        if (!result.successful()) {
+            KMessageBox::error(widget(), i18n("Could not resolve model setting conflict: %1", result.error));
+            return;
+        }
+        if (KConfigGroup(KSharedConfig::openConfig(), QStringLiteral("AI Reading Assistant")).readEntry("Profiles", QByteArray()) != profileSnapshot) {
+            KMessageBox::error(widget(), i18n("AI models changed locally while resolving the conflict. Your changes were kept; synchronize again."));
+            return;
+        }
+        for (AiProfile &profile : result.profiles) {
+            for (const AiProfile &local : localProfiles) {
+                if (local.id == profile.id && local.kind == profile.kind && local.endpoint == profile.endpoint) {
+                    profile.apiKey = local.apiKey;
+                    break;
+                }
+            }
+        }
+        QString settingsError;
+        const bool savedProfiles = AiStore::saveProfiles(result.profiles, widget()->winId(), &settingsError);
+        if (!savedProfiles) {
+            KMessageBox::error(widget(), i18n("Could not save the selected AI profile: %1", settingsError));
+            return;
+        }
+        if (m_aiPanel) {
+            m_aiPanel->reloadCloudSettings();
+        }
+        if (!ModelSettingsSync::commit(root, result, &settingsError)) {
+            KMessageBox::error(widget(), i18n("The selected setting was saved, but the local sync checkpoint failed: %1", settingsError));
+            return;
+        }
+        QString message = i18n("Selected model setting published. Remaining conflicts: %1.", result.conflicts);
+        if (!settingsError.isEmpty()) {
+            message += QLatin1Char('\n') + settingsError;
+        }
+        KMessageBox::information(widget(), message);
+    });
+    watcher->setFuture(QtConcurrent::run([configuration, root, localProfiles, key = conflicts.at(index).toObject().value(QStringLiteral("key")).toString(), expectedHeads, chosenHead = expectedHeads.at(chosenIndex)] {
+        ModelSettingsSyncResult result;
+        QLockFile lock(QDir(root).filePath(QStringLiteral(".sync.lock")));
+        if (!lock.tryLock(0)) {
+            result.error = QStringLiteral("This managed library is already syncing");
+            return result;
+        }
+        S3Transport store(configuration);
+        return ModelSettingsSync::resolveConflict(store, root, localProfiles, key, expectedHeads, chosenHead);
+    }));
+}
+#endif
 
 Part::~Part()
 {
@@ -1918,9 +2492,8 @@ bool Part::queryClose()
     // Not all things are saveable (e.g. files opened from stdin, folders)
     if (m_save->isEnabled()) {
         const bool saveAnnotationsSeparately = m_document->canSaveAnnotationsToSidecar();
-        const QString message = saveAnnotationsSeparately
-            ? i18n("Do you want to save your annotations for \"%1\" to the separate annotation database or discard them? The PDF file will not be changed.", url().fileName())
-            : i18n("Do you want to save your changes to \"%1\" or discard them?", url().fileName());
+        const QString message = saveAnnotationsSeparately ? i18n("Do you want to save your annotations for \"%1\" to the separate annotation database or discard them? The PDF file will not be changed.", url().fileName())
+                                                          : i18n("Do you want to save your changes to \"%1\" or discard them?", url().fileName());
         const KGuiItem saveAction = saveAnnotationsSeparately ? KGuiItem(i18n("Save Annotations"), QStringLiteral("document-save")) : KStandardGuiItem::save();
         const int res = KMessageBox::warningTwoActionsCancel(widget(), message, i18n("Close Document"), saveAction, KStandardGuiItem::discard());
 

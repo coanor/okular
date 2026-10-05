@@ -101,6 +101,25 @@ offline lookup. Leave the dictionary path empty, or choose **Use Eudic** on
 mobile, to use Eudic. Dictionary data is not downloaded or embedded during the
 build. Set `-DOKULAR_USE_BUNDLED_MDICT=OFF` to use a system mdict-cpp installation.
 
+### Mobile cloud library
+
+Open **Cloud Library…** from the mobile drawer to configure an S3 bucket, region,
+optional prefix and endpoint, and access credentials. **Add book…** copies a
+document into the app's private library and keeps the original. **Sync now**
+exchanges books and PDF annotations with the desktop managed library when both
+use the same bucket and prefix. Conflicting annotations appear on this page for
+you to choose a version.
+
+Sync saves and temporarily closes the current document, then reopens it at the
+same page. Network and library work run in the background. Android can remember
+credentials encrypted with an Android Keystore key; credential storage is
+excluded from backup and device transfer. Other mobile builds keep credentials
+only for the current session. Secrets are never included in sync objects.
+
+Mobile S3 support requires libcurl 7.77 or newer. The Android APK target enables
+`OKULAR_USE_BUNDLED_ANDROID_CURL` to build a checksum-pinned HTTP(S) curl with
+Craft's OpenSSL. HTTPS uses Android's trusted certificates.
+
 ### Android APK
 
 With Docker, an initialized Android Craft root next to the main checkout (`craft-kde-android`), Android SDK build tools 36.0.0, and an Android debug keystore, build and sign the arm64 APK with:

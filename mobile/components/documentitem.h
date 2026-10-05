@@ -155,6 +155,9 @@ public:
      */
     Q_INVOKABLE void setPassword(const QString &password);
 
+    // Save pending sidecar changes before closing for cloud synchronization.
+    Q_INVOKABLE bool closeForCloudSync();
+
     // Internal, not binded to qml
     AiAssistant *aiAssistant();
     std::shared_ptr<QFile> aiDocumentFile() const;
@@ -210,6 +213,8 @@ private:
     QUrl m_aiDocumentSourceUrl;
     AiAssistant *m_aiAssistant = nullptr;
     Okular::Document *m_document;
+    // Keep the provider URI so closing a document does not lose its reopen path.
+    QUrl m_sourceUrl;
     TOCModel *m_tocModel;
     SignatureModel *m_signaturesModel;
     Observer *m_thumbnailObserver;

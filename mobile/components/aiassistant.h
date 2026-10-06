@@ -7,6 +7,7 @@
 
 #include <QFont>
 #include <QSize>
+#include <QThreadPool>
 #include <QTimer>
 #include <QVariantList>
 #include <qqmlregistration.h>
@@ -57,6 +58,7 @@ public:
     Q_INVOKABLE QString renderMarkdown(const QString &text, const QFont &font) const;
 
     void resetDocument();
+    void flushHistory();
     void notifyPageChanged(int page, int flags) override;
 
 Q_SIGNALS:
@@ -94,6 +96,10 @@ private:
     QString m_status;
     int m_documentGeneration = 0;
     int m_requestGeneration = 0;
+    int m_historyGeneration = 0;
+    bool m_loadingHistory = false;
+    bool m_historyReady = false;
+    QThreadPool m_historyPool;
     bool m_encoding = false;
     bool m_hashing = false;
     bool m_submitted = false;

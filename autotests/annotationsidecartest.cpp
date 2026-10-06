@@ -2,6 +2,7 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include <QCryptographicHash>
 #include <QFile>
 #include <QMimeDatabase>
 #include <QSqlDatabase>
@@ -26,6 +27,7 @@
 class AnnotationSidecarTest : public QObject
 {
     Q_OBJECT
+    QTemporaryDir m_storeDirectory;
 
 private Q_SLOTS:
     void initTestCase()
@@ -33,9 +35,17 @@ private Q_SLOTS:
         QStandardPaths::setTestModeEnabled(true);
     }
 
+    void init()
+    {
+        qputenv("OKULAR_READING_DATA_PATH", m_storeDirectory.filePath(QUuid::createUuid().toString() + QStringLiteral(".sqlite")).toUtf8());
+    }
+    void cleanup()
+    {
+        qunsetenv("OKULAR_READING_DATA_PATH");
+    }
     void replayAndQuery()
     {
-        const QString hash = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(QUuid::createUuid().toByteArray(), QCryptographicHash::Sha256).toHex());
         QString error;
         QList<Okular::SidecarAnnotation> loaded;
         QVERIFY2(Okular::AnnotationSidecar::load(hash, &loaded, &error), qPrintable(error));
@@ -71,7 +81,7 @@ private Q_SLOTS:
             QVERIFY(query.next());
             QCOMPARE(query.value(0).toString(), first.id);
             QVERIFY(!query.next());
-            QVERIFY(query.exec(QStringLiteral("SELECT operation FROM events ORDER BY sequence")));
+            QVERIFY(query.exec(QStringLiteral("SELECT operation FROM annotation_events ORDER BY sequence")));
             QStringList operations;
             while (query.next()) {
                 operations.append(query.value(0).toString());
@@ -81,14 +91,14 @@ private Q_SLOTS:
         }
         QSqlDatabase::removeDatabase(connectionName);
 
-        const QString differentHash = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString differentHash = QString::fromLatin1(QCryptographicHash::hash(QUuid::createUuid().toByteArray(), QCryptographicHash::Sha256).toHex());
         QVERIFY2(Okular::AnnotationSidecar::load(differentHash, &loaded, &error), qPrintable(error));
         QVERIFY(loaded.isEmpty());
-        QVERIFY(QFile::copy(Okular::AnnotationSidecar::pathForHash(hash), Okular::AnnotationSidecar::pathForHash(differentHash)));
-        QVERIFY(!Okular::AnnotationSidecar::load(differentHash, &loaded, &error));
-        QVERIFY(loaded.isEmpty());
-        QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
-        QFile::remove(Okular::AnnotationSidecar::pathForHash(differentHash));
+        QCOMPARE(Okular::AnnotationSidecar::pathForHash(hash), Okular::AnnotationSidecar::pathForHash(differentHash));
+        QVERIFY2(Okular::AnnotationSidecar::save(differentHash, {second}, &error, 0), qPrintable(error));
+        QVERIFY2(Okular::AnnotationSidecar::load(hash, &loaded, &error), qPrintable(error));
+        QCOMPARE(loaded.size(), 1);
+        QCOMPARE(loaded.first().id, first.id);
     }
 
     void hashUsesPdfBytes()
@@ -118,7 +128,7 @@ private Q_SLOTS:
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
-        const QString hash = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(QUuid::createUuid().toByteArray(), QCryptographicHash::Sha256).toHex());
         QString error;
         qint64 revision = 0;
         const QString sourcePath = Okular::AnnotationSidecar::pathForHash(hash);
@@ -140,8 +150,9 @@ private Q_SLOTS:
             updated.xml = QStringLiteral("<annotation revised='yes'/>");
             QVERIFY(db.transaction());
             QVERIFY(query.exec(QStringLiteral("UPDATE annotations SET xml = '<annotation revised=''yes''/>' WHERE annotation_id = 'note'")));
-            QVERIFY(query.exec(QStringLiteral("INSERT INTO events(annotation_id, page, subtype, xml, operation, recorded_utc) "
-                                              "VALUES ('note', 0, 1, '<annotation revised=''yes''/>', 'upsert', '2026-01-01T00:00:00Z')")));
+            QVERIFY(query.exec(QStringLiteral("INSERT INTO annotation_events(annotation_id, page, subtype, xml, operation, recorded_utc, book_hash, sequence) "
+                                              "VALUES ('note', 0, 1, '<annotation revised=''yes''/>', 'upsert', '2026-01-01T00:00:00Z', '%1', 2)")
+                                   .arg(hash)));
             QVERIFY(db.commit());
             ++revision;
             QVERIFY(QFile::exists(sourcePath + QStringLiteral("-wal")));

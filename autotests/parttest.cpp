@@ -22,6 +22,7 @@
 #include "../part/pageview.h"
 #include "../part/part.h"
 #include "../part/presentationwidget.h"
+#include "../part/readingsession.h"
 #include "../part/sidebar.h"
 #include "../part/toc.h"
 #include "../settings.h"
@@ -41,8 +42,8 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QScrollBar>
 #include <QScopeGuard>
+#include <QScrollBar>
 #include <QSemaphore>
 #include <QTabletEvent>
 #include <QTemporaryDir>
@@ -97,6 +98,7 @@ private Q_SLOTS:
     void testSaveAsToSymlink();
     void testSaveIsSymlink();
     void testSaveAnnotationsToSidecar();
+    void testReadingProgressPreservesExplicitPage();
     void testAiPanelOpens();
     void testSidebarItemAfterSaving();
     void testViewModeSavingPerFile();
@@ -1227,8 +1229,49 @@ void PartTest::testSaveAsToNonExistingPath()
     QFile::remove(saveFilePath);
 }
 
+void PartTest::testReadingProgressPreservesExplicitPage()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QByteArray previousPath = qgetenv("OKULAR_READING_DATA_PATH");
+    qputenv("OKULAR_READING_DATA_PATH", directory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    const auto restorePath = qScopeGuard([previousPath] {
+        if (previousPath.isNull()) {
+            qunsetenv("OKULAR_READING_DATA_PATH");
+        } else {
+            qputenv("OKULAR_READING_DATA_PATH", previousPath);
+        }
+    });
+    const QString path = directory.filePath(QStringLiteral("book.pdf"));
+    QVERIFY(QFile::copy(QStringLiteral(KDESRCDIR "data/simple-multipage.pdf"), path));
+    {
+        Okular::Part part(nullptr, {});
+        QVERIFY(openDocument(&part, path));
+        part.m_document->setViewportPage(20);
+        part.m_readingSession->flush();
+    }
+    Okular::Part part(nullptr, {});
+    QUrl url = QUrl::fromLocalFile(path);
+    url.setFragment(QStringLiteral("page=3"));
+    QVERIFY(part.openUrl(url));
+    QTRY_COMPARE(part.m_document->currentPage(), 2);
+    part.m_readingSession->flush();
+    QTest::qWait(100);
+    QCOMPARE(part.m_document->currentPage(), 2);
+}
+
 void PartTest::testSaveAnnotationsToSidecar()
 {
+    QTemporaryDir databaseDirectory;
+    const QByteArray previousPath = qgetenv("OKULAR_READING_DATA_PATH");
+    qputenv("OKULAR_READING_DATA_PATH", databaseDirectory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    const auto restorePath = qScopeGuard([previousPath] {
+        if (previousPath.isNull()) {
+            qunsetenv("OKULAR_READING_DATA_PATH");
+        } else {
+            qputenv("OKULAR_READING_DATA_PATH", previousPath);
+        }
+    });
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
     const QString pdfPath = dir.filePath(QStringLiteral("book.pdf"));

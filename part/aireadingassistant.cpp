@@ -30,7 +30,6 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QResizeEvent>
-#include <QSignalBlocker>
 #include <QTextEdit>
 #include <QTimer>
 #include <QToolButton>
@@ -296,7 +295,10 @@ void AiReadingAssistant::setDocumentUrl(const QUrl &url)
     m_provider.cancel();
     m_pendingPage = -1;
     m_questionSubmitted = false;
-    m_documentKey = AiStore::documentKey(url);
+    m_documentKey = m_document->contentHash();
+    if (m_documentKey.isEmpty()) {
+        m_documentKey = AiStore::documentKey(url);
+    }
     if (AiStore::isManagedBook(m_documentKey)) {
         const QString selectedId = AiStore::loadBookSettings(m_documentKey).selectedProfileId;
         m_profileCombo->setCurrentIndex(selectedId.isEmpty() ? -1 : m_profileCombo->findData(selectedId));
@@ -304,40 +306,6 @@ void AiReadingAssistant::setDocumentUrl(const QUrl &url)
     m_selection.clear();
     m_selectionLabel->hide();
     loadSelectedConversation();
-}
-
-void AiReadingAssistant::reloadCloudSettings()
-{
-    const QString currentId = m_profileCombo->currentData().toString();
-    QList<AiProfile> refreshed = AiStore::loadProfiles(winId());
-    for (AiProfile &profile : refreshed) {
-        if (profile.apiKey.isEmpty()) {
-            for (const AiProfile &previous : std::as_const(m_profiles)) {
-                if (previous.id == profile.id && previous.kind == profile.kind && previous.endpoint == profile.endpoint) {
-                    profile.apiKey = previous.apiKey;
-                    break;
-                }
-            }
-        }
-    }
-    m_profiles = std::move(refreshed);
-    const QSignalBlocker blocked(m_profileCombo);
-    m_profileCombo->clear();
-    for (const AiProfile &profile : std::as_const(m_profiles)) {
-        m_profileCombo->addItem(profile.name, profile.id);
-    }
-    const AiBookSettings settings = AiStore::loadBookSettings(m_documentKey);
-    const QString selectedId = AiStore::isManagedBook(m_documentKey) ? settings.selectedProfileId : currentId;
-    m_profileCombo->setCurrentIndex(selectedId.isEmpty() ? -1 : m_profileCombo->findData(selectedId));
-    loadSelectedConversation();
-    if (!selectedId.isEmpty() && m_profileCombo->currentIndex() < 0) {
-        showStatus(i18n("The model selected for this book is unavailable on this device. Configure its profile before asking."));
-    }
-}
-
-bool AiReadingAssistant::isBusy() const
-{
-    return m_provider.isBusy() || m_pendingPage >= 0;
 }
 
 void AiReadingAssistant::askAboutSelection(const QString &text)

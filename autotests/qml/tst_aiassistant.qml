@@ -47,7 +47,9 @@ TestCase {
         assistant.activate();
         tryCompare(assistant, "ready", true);
         verify(assistant.saveProfile(-1, fields(false)));
+        tryCompare(assistant, "busy", false);
         assistant.clearConversation();
+        tryCompare(assistant, "busy", false);
     }
 
     function cleanup() {
@@ -59,6 +61,7 @@ TestCase {
         assistant.cancel();
         tryCompare(assistant, "busy", false);
         assistant.clearConversation();
+        tryCompare(assistant, "busy", false);
         assistant.removeProfile(assistant.currentProfile);
     }
 
@@ -73,6 +76,41 @@ TestCase {
         compare(assistant.question, "");
         document.url = "";
         compare(assistant.ready, false);
+        compare(assistant.messages.length, 0);
+        document.url = testDocumentUrl;
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        compare(assistant.messages.length, 2);
+        compare(aiTestServer.requestCount, 1);
+    }
+
+    function test_clearedHistoryStaysEmptyAfterReopening() {
+        assistant.question = "Remember this question";
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        compare(assistant.messages.length, 2);
+        assistant.clearConversation();
+        tryCompare(assistant, "busy", false);
+        compare(assistant.messages.length, 0);
+        document.url = "";
+        document.url = testDocumentUrl;
+        assistant.activate();
+        tryCompare(assistant, "ready", true);
+        compare(assistant.messages.length, 0);
+        compare(aiTestServer.requestCount, 1);
+    }
+
+    function test_closeWhileRestoringHistoryIgnoresPreviousDocument() {
+        assistant.question = "Saved question";
+        assistant.ask();
+        tryCompare(assistant, "busy", false);
+        document.url = "";
+        document.url = testDocumentUrl;
+        assistant.activate();
+        document.url = "";
+        wait(100);
+        compare(assistant.ready, false);
+        compare(assistant.busy, false);
         compare(assistant.messages.length, 0);
         document.url = testDocumentUrl;
         assistant.activate();
@@ -165,6 +203,7 @@ TestCase {
         verify(descriptorDocument.opened);
         const descriptorAssistant = descriptorDocument.aiAssistant;
         verify(descriptorAssistant.saveProfile(-1, fields(false)));
+        tryCompare(descriptorAssistant, "busy", false);
         const index = descriptorAssistant.currentProfile;
         try {
             descriptorAssistant.question = "Explain the descriptor document";
@@ -185,6 +224,7 @@ TestCase {
             tryCompare(reopenedAssistant, "ready", true);
             compare(reopenedAssistant.messages.length, 2);
             descriptorAssistant.clearConversation();
+            tryCompare(descriptorAssistant, "busy", false);
         } finally {
             descriptorAssistant.cancel();
             descriptorAssistant.removeProfile(index);
@@ -207,14 +247,15 @@ TestCase {
         compare(assistant.messages.length, 2);
         compare(aiTestServer.requestCount, 1);
         assistant.clearConversation();
-        assistant.question = "History belongs only to this open descriptor";
+        tryCompare(assistant, "busy", false);
+        assistant.question = "History follows the same book bytes";
         assistant.ask();
         tryCompare(assistant, "busy", false);
         document.url = aiTestFiles.pipeDescriptorUrl();
         verify(document.opened);
         assistant.activate();
         tryCompare(assistant, "ready", true);
-        compare(assistant.messages.length, 0, "A reopened bare descriptor must not restore another document's history");
+        compare(assistant.messages.length, 2, "Identical streamed bytes must restore the same book history");
     }
 
     function test_preservesDesktopProfiles() {
@@ -228,6 +269,7 @@ TestCase {
             const otherAssistant = otherDocument.aiAssistant;
             compare(otherAssistant.profiles.length, assistant.profiles.length);
             verify(otherAssistant.saveProfile(-1, fields(false)));
+            tryCompare(otherAssistant, "busy", false);
             let saved = aiTestFiles.storedProfiles().find(profile => profile.id === desktop.id);
             verify(saved !== undefined, "Saving a mobile model must retain desktop-only profiles");
             compare(saved.extraArguments, desktop.extraArguments);
@@ -235,6 +277,7 @@ TestCase {
             const edited = fields(false);
             edited.name = "Edited mobile profile";
             verify(otherAssistant.saveProfile(otherAssistant.currentProfile, edited));
+            tryCompare(otherAssistant, "busy", false);
             saved = aiTestFiles.storedProfiles().find(profile => profile.id === desktop.id);
             verify(saved !== undefined, "Editing a mobile model must retain desktop-only profiles");
             compare(saved.name, desktop.name);
@@ -286,12 +329,14 @@ TestCase {
         compare(emptyAssistant.busy, false);
         const count = emptyAssistant.profiles.length;
         verify(emptyAssistant.saveProfile(-1, fields(false)));
+        tryCompare(emptyAssistant, "busy", false);
         const index = emptyAssistant.currentProfile;
         try {
             compare(emptyAssistant.profiles.length, count + 1);
             const edited = fields(false);
             edited.name = "Configured before opening";
             verify(emptyAssistant.saveProfile(index, edited));
+            tryCompare(emptyAssistant, "busy", false);
             compare(emptyAssistant.profile(index).name, edited.name);
             emptyAssistant.question = "Wait for a document";
             emptyAssistant.ask();
@@ -309,14 +354,17 @@ TestCase {
             compare(aiTestServer.requestCount, 1);
             compare(emptyAssistant.messages.length, 2);
             emptyAssistant.clearConversation();
+            tryCompare(emptyAssistant, "busy", false);
 
             emptyDocument.url = "";
             compare(emptyAssistant.ready, false);
             verify(emptyAssistant.saveProfile(index, fields(false)));
+            tryCompare(emptyAssistant, "busy", false);
         } finally {
             emptyAssistant.cancel();
             tryCompare(emptyAssistant, "busy", false);
             emptyAssistant.clearConversation();
+            tryCompare(emptyAssistant, "busy", false);
             emptyAssistant.removeProfile(index);
         }
         compare(emptyAssistant.profiles.length, count);
@@ -401,6 +449,7 @@ TestCase {
 
     function test_visionSendsImageOnlyOnAsk() {
         verify(assistant.saveProfile(assistant.currentProfile, fields(true)));
+        tryCompare(assistant, "busy", false);
         compare(aiTestServer.requestCount, 0);
         assistant.question = "Explain the page image";
         assistant.ask();
@@ -414,6 +463,7 @@ TestCase {
 
     function test_cancelVisionThenRetry() {
         verify(assistant.saveProfile(assistant.currentProfile, fields(true)));
+        tryCompare(assistant, "busy", false);
         assistant.question = "Retry page image";
         assistant.ask();
         verify(assistant.busy);
@@ -438,12 +488,16 @@ TestCase {
         assistant.ask();
         tryCompare(assistant, "busy", false);
         verify(assistant.saveProfile(-1, fields(false)));
+        tryCompare(assistant, "busy", false);
         const second = assistant.currentProfile;
         compare(assistant.messages.length, 0);
         assistant.currentProfile = index;
+        tryCompare(assistant, "busy", false);
         compare(assistant.messages.length, 2);
         assistant.clearConversation();
+        tryCompare(assistant, "busy", false);
         assistant.removeProfile(second);
         assistant.currentProfile = index;
+        tryCompare(assistant, "busy", false);
     }
 }

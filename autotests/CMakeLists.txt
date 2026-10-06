@@ -28,13 +28,6 @@ ecm_add_test(textselectiontest.cpp ../gui/textselectionutils.cpp ../part/mdxdict
 )
 target_compile_definitions(textselectiontest PRIVATE HAVE_MDICT=0)
 
-if(BUILD_MOBILE AND CURL_FOUND)
-    ecm_add_test(mobilecloudlibrarytest.cpp ../mobile/components/cloudlibrary.cpp ../mobile/components/cloudcredentials.cpp
-        TEST_NAME "mobilecloudlibrarytest"
-        LINK_LIBRARIES Qt6::Test Qt6::Qml KF6::I18n okularcloud
-    )
-endif()
-
 if(BUILD_MOBILE)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest)
     ecm_add_test(selectionmagnifiertest.cpp
@@ -42,6 +35,14 @@ if(BUILD_MOBILE)
         LINK_LIBRARIES Qt6::QuickTest
     )
     target_compile_definitions(selectionmagnifiertest PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mobile")
+    ecm_add_test(chatgptmodeldialogtest.cpp
+        TEST_NAME "chatgptmodeldialogtest"
+        LINK_LIBRARIES Qt6::QuickTest Qt6::Qml
+    )
+    target_compile_definitions(chatgptmodeldialogtest PRIVATE
+        QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modeldialogs"
+        OKULAR_APP_SOURCE_DIR="${CMAKE_SOURCE_DIR}/mobile/app/ui"
+    )
 endif()
 
 ecm_add_test(mdxdictionarytest.cpp ../part/mdxdictionary.cpp
@@ -76,6 +77,7 @@ if(Poppler_Qt6_FOUND)
         target_compile_definitions(mobiledocumentviewtest PRIVATE
             QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
             OKULAR_QML_IMPORT_PATH="${CMAKE_BINARY_DIR}/bin"
+            OKULAR_APP_SOURCE_DIR="${CMAKE_SOURCE_DIR}/mobile/app/ui"
         )
         add_dependencies(mobiledocumentviewtest okularplugin okularGenerator_poppler)
     endif()
@@ -123,6 +125,11 @@ ecm_add_test(documenttest.cpp
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore KF6::ThreadWeaver
 )
 
+ecm_add_test(readinghistorytest.cpp ../part/readinghistory.cpp
+    TEST_NAME "readinghistorytest"
+    LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
+)
+
 ecm_add_test(searchtest.cpp
     TEST_NAME "searchtest"
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
@@ -138,34 +145,10 @@ ecm_add_test(annotationsidecartest.cpp
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Sql okularcore
 )
 
-if(BUILD_DESKTOP)
-    ecm_add_test(annotationsynctest.cpp ../part/annotationsync.cpp
-        TEST_NAME "annotationsynctest"
-        LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
-    )
-    ecm_add_test(modelsettingssynctest.cpp ../part/modelsettingssync.cpp
-        TEST_NAME "modelsettingssynctest"
-        LINK_LIBRARIES Qt6::Test Qt6::Core
-    )
-    ecm_add_test(booklibrarysynctest.cpp ../part/booklibrarysync.cpp ../part/annotationsync.cpp ../part/booklibrary.cpp
-        TEST_NAME "booklibrarysynctest"
-        LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
-    )
-    if(CURL_FOUND)
-        ecm_add_test(s3transporttest.cpp ../part/s3transport.cpp ../part/s3configuration.cpp
-            TEST_NAME "s3transporttest"
-            LINK_LIBRARIES Qt6::Test Qt6::Network CURL::libcurl
-        )
-    endif()
-    ecm_add_test(s3configurationtest.cpp ../part/s3configuration.cpp
-        TEST_NAME "s3configurationtest"
-        LINK_LIBRARIES Qt6::Test
-    )
-    ecm_add_test(booklibrarytest.cpp ../part/booklibrary.cpp
-        TEST_NAME "booklibrarytest"
-        LINK_LIBRARIES Qt6::Test
-    )
-endif()
+ecm_add_test(aiconversationstoretest.cpp ../part/aiconversationstore.cpp
+    TEST_NAME "aiconversationstoretest"
+    LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
+)
 ecm_add_test(aiprovidertest.cpp ../part/aiprovider.cpp
     TEST_NAME "aiprovidertest"
     LINK_LIBRARIES Qt6::Test Qt6::Network
@@ -273,4 +256,9 @@ endif()
 ecm_add_test(toggleactionmenutest.cpp ../part/toggleactionmenu.cpp
     TEST_NAME "toggleactionmenutest"
     LINK_LIBRARIES Qt6::Test KF6::WidgetsAddons
+)
+
+ecm_add_test(readingdatastoretest.cpp ../part/readinghistory.cpp ../part/aiconversationstore.cpp
+    TEST_NAME "readingdatastoretest"
+    LINK_LIBRARIES Qt6::Test Qt6::Sql okularcore
 )

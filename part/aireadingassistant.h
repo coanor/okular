@@ -30,8 +30,6 @@ public:
     void setDocumentUrl(const QUrl &url);
     void askAboutSelection(const QString &text);
     void showStatus(const QString &text);
-    void reloadCloudSettings();
-    bool isBusy() const;
 
     void notifyPageChanged(int page, int flags) override;
     void notifySetup(const QList<Okular::Page *> &pages, int setupFlags) override;

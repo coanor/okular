@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
+#include "aiconversationstore.h"
+
 #include <QList>
 #include <QString>
 #include <QUrl>
@@ -20,21 +22,6 @@ struct AiProfile {
     QString chatGptAccountId; // OAuth registration; tokens are stored separately on mobile.
 };
 
-struct AiMessage {
-    QString role;
-    QString content;
-    int page = -1;
-    QString pageText;
-    QString selectedText;
-    QString pageImage; // JPEG encoded as base64; only user messages use this.
-};
-
-struct AiConversation {
-    QString sessionId;
-    QString instructions;
-    QList<AiMessage> messages;
-};
-
 struct AiBookSettings {
     QString selectedProfileId;
     QString defaultPrompt;
@@ -49,7 +36,7 @@ public:
     static AiBookSettings loadBookSettings(const QString &documentKey);
     static bool isManagedBook(const QString &documentKey);
     static bool saveBookSettings(const QString &documentKey, const AiBookSettings &settings);
-    static AiConversation loadConversation(const QString &documentKey, const QString &profileId);
+    static AiConversation loadConversation(const QString &documentKey, const QString &profileId, QString *error = nullptr);
     static bool saveConversation(const QString &documentKey, const QString &profileId, const AiConversation &conversation);
     static bool clearConversation(const QString &documentKey, const QString &profileId);
 };

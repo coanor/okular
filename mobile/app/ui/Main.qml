@@ -19,64 +19,17 @@ Kirigami.ApplicationWindow {
 
     readonly property int columnWidth: Kirigami.Units.gridUnit * 13
 
-    property url pendingCloudDocument: ""
-    property int pendingCloudPage: 0
-
-    function prepareCloudSync() {
-        if (cloudLibrary.busy || !cloudLibrary.configured) {
-            return false
-        }
-        if (documentItem.opened) {
-            const url = documentItem.url
-            const page = documentItem.currentPage
-            if (!documentItem.closeForCloudSync()) {
-                return false
-            }
-            pendingCloudDocument = url
-            pendingCloudPage = page
-        }
-        return true
-    }
-
-    function restoreCloudDocument() {
-        if (pendingCloudDocument.toString()) {
-            const url = pendingCloudDocument
-            const page = pendingCloudPage
-            pendingCloudDocument = ""
-            documentItem.url = url
-            documentItem.currentPage = page
-        }
-    }
-
-    Okular.CloudLibrary {
-        id: cloudLibrary
-        onFinished: fileBrowserRoot.restoreCloudDocument()
-        onBookImported: url => { documentItem.url = url }
-    }
-
     Component {
-        id: cloudPage
-        CloudLibraryPage {
-            library: cloudLibrary
+        id: bookshelfPage
+        BookshelfPage {
+            document: documentItem
             onOpenBook: url => {
                 documentItem.url = url
                 fileBrowserRoot.pageStack.layers.pop()
             }
-            onSynchronizeRequested: {
-                if (fileBrowserRoot.prepareCloudSync()) {
-                    cloudLibrary.synchronize()
-                    if (!cloudLibrary.busy) {
-                        fileBrowserRoot.restoreCloudDocument()
-                    }
-                }
-            }
-            onResolveRequested: (conflictIndex, variantIndex) => {
-                if (fileBrowserRoot.prepareCloudSync()) {
-                    cloudLibrary.resolveConflict(conflictIndex, variantIndex)
-                    if (!cloudLibrary.busy) {
-                        fileBrowserRoot.restoreCloudDocument()
-                    }
-                }
+            onOpenDocument: {
+                fileBrowserRoot.pageStack.layers.pop()
+                fileDialog.open()
             }
         }
     }
@@ -110,7 +63,6 @@ Kirigami.ApplicationWindow {
         actions: [
             Kirigami.Action {
                 id: openDocumentAction
-                enabled: !cloudLibrary.busy
                 text: i18n("Open…")
                 icon.name: "document-open"
                 onTriggered: {
@@ -118,10 +70,10 @@ Kirigami.ApplicationWindow {
                 }
             },
             Kirigami.Action {
-                text: i18n("Cloud Library…")
-                icon.name: "view-refresh"
+                text: i18n("Bookshelf")
+                icon.name: "bookmarks-organize"
                 enabled: fileBrowserRoot.pageStack.layers.depth === 1
-                onTriggered: fileBrowserRoot.pageStack.layers.push(cloudPage)
+                onTriggered: fileBrowserRoot.pageStack.layers.push(bookshelfPage)
             },
             Kirigami.Action {
                 text: i18n("AI Reading Assistant")
@@ -227,7 +179,7 @@ Kirigami.ApplicationWindow {
     title: documentItem.windowTitleForDocument ? documentItem.windowTitleForDocument : i18n("Okular")
     Okular.DocumentItem {
         id: documentItem
-        onUrlChanged: { currentPage = 0 }
+        objectName: "mobileDocument"
 
         onNeedsPasswordChanged: {
             if (needsPassword) {
@@ -239,7 +191,6 @@ Kirigami.ApplicationWindow {
     pageStack.initialPage: MainView {
         id: mainView
         document: documentItem
-        enabled: !cloudLibrary.busy
         Kirigami.ColumnView.preventStealing: true
     }
 

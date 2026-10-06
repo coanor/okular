@@ -20,6 +20,20 @@ QQC2.Dialog {
     height: Math.min(parent.height - 24, implicitHeight)
     standardButtons: QQC2.Dialog.Close
 
+    function restoreModel() {
+        const models = modelPicker.model;
+        let selected = savedModel ? -1 : (models.length > 0 ? 0 : -1);
+        for (let i = 0; i < models.length; ++i) {
+            if (models[i].id === savedModel) {
+                selected = i;
+                break;
+            }
+        }
+        modelPicker.currentIndex = selected;
+    }
+
+    onSavedModelChanged: Qt.callLater(root.restoreModel)
+
     function edit(index) {
         profileIndex = index;
         const fields = assistant.profile(index);
@@ -57,7 +71,12 @@ QQC2.Dialog {
                 model: root.connection.accounts
                 textRole: "label"
                 enabled: !root.connection.busy
-                onActivated: root.connection.loadModels(root.accountId)
+                onActivated: {
+                    if (root.accountId !== root.connection.modelAccountId) {
+                        root.savedModel = "";
+                    }
+                    root.connection.loadModels(root.accountId);
+                }
             }
             QQC2.Button {
                 Layout.fillWidth: true
@@ -82,18 +101,20 @@ QQC2.Dialog {
             QQC2.Label { text: i18n("Model") }
             QQC2.ComboBox {
                 id: modelPicker
+                objectName: "chatGptModelPicker"
                 Layout.fillWidth: true
                 model: root.connection.modelAccountId === root.accountId ? root.connection.models : []
                 textRole: "name"
+                valueRole: "id"
                 enabled: !root.connection.busy && count > 0
-                onCountChanged: {
-                    for (let i = 0; i < count; ++i) {
-                        if (root.connection.models[i].id === root.savedModel) {
-                            currentIndex = i;
-                            break;
-                        }
-                    }
-                }
+                onModelChanged: Qt.callLater(root.restoreModel)
+                onActivated: root.savedModel = currentValue
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: !root.connection.busy && modelPicker.count > 0 && modelPicker.currentIndex < 0 && !!root.savedModel
+                text: i18n("The previously selected model is unavailable. Choose another model.")
+                wrapMode: Text.WordWrap
             }
             QQC2.Button {
                 text: i18n("Refresh models")
@@ -124,6 +145,7 @@ QQC2.Dialog {
             }
             QQC2.Button {
                 text: i18n("Save")
+                objectName: "saveChatGptModel"
                 enabled: !root.connection.busy && modelPicker.currentIndex >= 0 && modelPicker.count > 0
                 onClicked: {
                     const model = root.connection.models[modelPicker.currentIndex];

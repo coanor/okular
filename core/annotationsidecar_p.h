@@ -24,7 +24,7 @@ struct SidecarAnnotation {
     bool hiddenNative = false;
 };
 
-/** Stores annotation changes in one SQLite file per exact PDF byte hash. */
+/** Stores annotation changes by exact PDF byte hash in the shared reading database. */
 class OKULARCORE_EXPORT AnnotationSidecar
 {
 public:
@@ -33,7 +33,7 @@ public:
     static bool load(const QString &hash, QList<SidecarAnnotation> *annotations, QString *error, qint64 *revision = nullptr);
     static bool save(const QString &hash, const QList<SidecarAnnotation> &annotations, QString *error, qint64 expectedRevision = -1, qint64 *newRevision = nullptr);
     // Produces a consistent, standalone SQLite file at a new path. The caller
-    // owns the snapshot and should delete it after uploading or inspecting it.
+    // owns the snapshot and should delete it after exporting or inspecting it.
     static bool snapshot(const QString &hash, const QString &destination, QString *error, qint64 *revision = nullptr);
 };
 

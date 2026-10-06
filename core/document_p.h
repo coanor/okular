@@ -325,6 +325,7 @@ public:
     bool m_docdataMigrationNeeded;
 
     // A PDF's local annotations can be stored outside the source file.
+    QString m_contentHash;
     QString m_annotationSidecarHash;
     qint64 m_annotationSidecarRevision = 0;
     bool m_loadingAnnotationSidecar = false;

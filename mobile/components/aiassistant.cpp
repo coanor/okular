@@ -8,10 +8,10 @@
 
 #include <KLocalizedString>
 #include <QBuffer>
-#include <QCryptographicHash>
 #include <QDesktopServices>
 #include <QFile>
 #include <QFutureWatcher>
+#include <QGuiApplication>
 #include <QImage>
 #include <QJsonDocument>
 #include <QPainter>
@@ -40,6 +40,13 @@ AiAssistant::AiAssistant(DocumentItem *document)
     , m_document(document)
     , m_chatGpt(this)
 {
+    m_historyPool.setMaxThreadCount(1);
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state != Qt::ApplicationActive) {
+            m_historyPool.waitForDone();
+        }
+    });
+    connect(qGuiApp, &QCoreApplication::aboutToQuit, this, [this] { m_historyPool.waitForDone(); });
     m_document->document()->addObserver(this);
     // Preserve the desktop's profiles and their order in the shared store.
     m_allProfiles = AiStore::loadProfiles(0);
@@ -91,6 +98,7 @@ AiAssistant::AiAssistant(DocumentItem *document)
 AiAssistant::~AiAssistant()
 {
     cancel();
+    m_historyPool.waitForDone();
     m_document->document()->removeObserver(this);
 }
 
@@ -161,12 +169,12 @@ void AiAssistant::setStatus(const QString &status)
 
 bool AiAssistant::busy() const
 {
-    return m_hashing || m_encoding || m_authPending || m_pendingPage >= 0 || m_provider.isBusy();
+    return m_hashing || m_loadingHistory || m_encoding || m_authPending || m_pendingPage >= 0 || m_provider.isBusy();
 }
 
 bool AiAssistant::ready() const
 {
-    return !m_documentKey.isEmpty();
+    return !m_documentKey.isEmpty() && (m_currentProfile < 0 || m_historyReady) && !m_loadingHistory;
 }
 
 QObject *AiAssistant::chatGpt()
@@ -211,22 +219,21 @@ QString AiAssistant::renderMarkdown(const QString &text, const QFont &font) cons
     return document.toHtml();
 }
 
+void AiAssistant::flushHistory()
+{
+    m_historyPool.waitForDone();
+}
+
 void AiAssistant::activate()
 {
-    if (ready() || m_hashing || !m_document->isOpened()) {
+    if (ready() || m_hashing || m_loadingHistory || !m_document->isOpened()) {
         return;
     }
     m_hashing = true;
     Q_EMIT busyChanged();
     const int generation = m_documentGeneration;
-    const QUrl url = m_document->url();
-    const QUrl source = m_document->aiDocumentSourceUrl();
-    // Providers may return pipes, which Core consumes before activation. Use
-    // the original URI for their history; bare fd numbers can be reused.
-    const QByteArray sourceIdentity = QByteArrayLiteral("source-url:") + source.toEncoded();
-    const QString streamingKey =
-        source.isEmpty() || source.scheme() == QLatin1String("fd") ? QUuid::createUuid().toString(QUuid::WithoutBraces) : QString::fromLatin1(QCryptographicHash::hash(sourceIdentity, QCryptographicHash::Sha256).toHex());
-    const auto file = m_document->aiDocumentFile();
+    const QUrl url = m_document->url().isLocalFile() ? m_document->url() : m_document->document()->localSource();
+    const QString cachedHash = m_document->document()->contentHash();
     auto *watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, generation] {
         const QString key = watcher->result();
@@ -243,24 +250,7 @@ void AiAssistant::activate()
         Q_EMIT readyChanged();
         Q_EMIT busyChanged();
     });
-    watcher->setFuture(QtConcurrent::run([url, file, streamingKey]() -> QString {
-        if (!file) {
-            if (url.isEmpty() || url.scheme() == QLatin1String("fd")) {
-                return streamingKey;
-            }
-            return AiStore::documentKey(url);
-        }
-        if (file->isSequential()) {
-            return streamingKey;
-        }
-        // Core finished reading the shared descriptor before activation. Keep
-        // the reader alive if the document closes while hashing in the worker.
-        QCryptographicHash hash(QCryptographicHash::Sha256);
-        if (file->seek(0) && hash.addData(file.get())) {
-            return QString::fromLatin1(hash.result().toHex());
-        }
-        return QString();
-    }));
+    watcher->setFuture(QtConcurrent::run([url, cachedHash]() -> QString { return cachedHash.isEmpty() ? AiStore::documentKey(url) : cachedHash; }));
 }
 
 QVariantMap AiAssistant::profile(int index) const
@@ -409,7 +399,10 @@ void AiAssistant::resetDocument()
 {
     cancel();
     ++m_documentGeneration;
+    ++m_historyGeneration;
     m_hashing = false;
+    m_loadingHistory = false;
+    m_historyReady = false;
     m_documentKey.clear();
     m_conversation = {};
     m_selection.clear();
@@ -424,15 +417,66 @@ void AiAssistant::resetDocument()
 
 void AiAssistant::loadConversation()
 {
-    m_conversation = m_currentProfile >= 0 ? AiStore::loadConversation(m_documentKey, m_profiles[m_currentProfile].id) : AiConversation {};
+    const int generation = ++m_historyGeneration;
+    m_conversation = {};
+    m_historyReady = false;
+    m_loadingHistory = m_currentProfile >= 0 && !m_documentKey.isEmpty();
     Q_EMIT conversationChanged();
+    Q_EMIT readyChanged();
+    Q_EMIT busyChanged();
+    if (!m_loadingHistory) {
+        return;
+    }
+    const QString key = m_documentKey;
+    const QString profile = m_profiles[m_currentProfile].id;
+    auto *watcher = new QFutureWatcher<std::pair<AiConversation, QString>>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, generation] {
+        auto result = watcher->result();
+        watcher->deleteLater();
+        if (generation != m_historyGeneration) {
+            return;
+        }
+        m_loadingHistory = false;
+        m_historyReady = result.second.isEmpty();
+        if (m_historyReady) {
+            m_conversation = std::move(result.first);
+            setStatus({});
+        } else {
+            setStatus(i18n("Could not load the local conversation: %1", result.second));
+        }
+        Q_EMIT conversationChanged();
+        Q_EMIT readyChanged();
+        Q_EMIT busyChanged();
+    });
+    watcher->setFuture(QtConcurrent::run(&m_historyPool, [key, profile] {
+        QString error;
+        AiConversation conversation = AiStore::loadConversation(key, profile, &error);
+        return std::make_pair(std::move(conversation), error);
+    }));
 }
 
 void AiAssistant::persistConversation()
 {
-    if (m_currentProfile >= 0) {
-        setStatus(AiStore::saveConversation(m_documentKey, m_profiles[m_currentProfile].id, m_conversation) ? QString() : i18n("Could not save the local conversation."));
+    if (m_currentProfile < 0 || m_documentKey.isEmpty()) {
+        return;
     }
+    const QString key = m_documentKey;
+    const QString profile = m_profiles[m_currentProfile].id;
+    const AiConversation conversation = m_conversation;
+    const int generation = m_historyGeneration;
+    auto *watcher = new QFutureWatcher<QString>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, generation] {
+        const QString error = watcher->result();
+        watcher->deleteLater();
+        if (generation == m_historyGeneration && !error.isEmpty()) {
+            setStatus(i18n("Could not save the local conversation: %1", error));
+        }
+    });
+    watcher->setFuture(QtConcurrent::run(&m_historyPool, [key, profile, conversation] {
+        QString error;
+        AiConversationStore().save(key, profile, conversation, &error);
+        return error;
+    }));
 }
 
 void AiAssistant::ask()
@@ -610,13 +654,35 @@ void AiAssistant::clearConversation()
     if (busy() || !ready() || m_currentProfile < 0) {
         return;
     }
-    if (!AiStore::clearConversation(m_documentKey, m_profiles[m_currentProfile].id)) {
-        setStatus(i18n("Could not remove the local conversation record."));
-        return;
-    }
-    m_conversation = {};
-    setStatus({});
-    Q_EMIT conversationChanged();
+    const QString key = m_documentKey;
+    const QString profile = m_profiles[m_currentProfile].id;
+    const int generation = ++m_historyGeneration;
+    m_loadingHistory = true;
+    Q_EMIT readyChanged();
+    Q_EMIT busyChanged();
+    auto *watcher = new QFutureWatcher<QString>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, generation] {
+        const QString error = watcher->result();
+        watcher->deleteLater();
+        if (generation != m_historyGeneration) {
+            return;
+        }
+        m_loadingHistory = false;
+        if (error.isEmpty()) {
+            m_conversation = {};
+            setStatus({});
+            Q_EMIT conversationChanged();
+        } else {
+            setStatus(i18n("Could not remove the local conversation record: %1", error));
+        }
+        Q_EMIT readyChanged();
+        Q_EMIT busyChanged();
+    });
+    watcher->setFuture(QtConcurrent::run(&m_historyPool, [key, profile] {
+        QString error;
+        AiConversationStore().clear(key, profile, &error);
+        return error;
+    }));
 }
 
 #include "moc_aiassistant.cpp"

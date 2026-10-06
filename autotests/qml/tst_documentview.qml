@@ -300,17 +300,18 @@ TestCase {
         tryCompare(view, "page", null);
     }
 
-    function test_cloudSyncCloseAndReopen() {
+    function test_localHistoryCloseAndReopen() {
         view.document.currentPage = 20;
         const url = view.document.url;
         const page = view.document.currentPage;
-        verify(view.document.closeForCloudSync());
+        view.document.saveReadingProgress();
+        view.document.url = "";
         tryCompare(view.document, "opened", false);
         compare(view.document.url.toString(), "");
         view.document.url = url;
         tryCompare(view.document, "opened", true);
         compare(view.document.url, url);
-        view.document.currentPage = page;
+        tryCompare(view.document, "currentPage", page);
         tryVerify(() => view.page !== null && view.page.pageNumber === page);
     }
 

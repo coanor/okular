@@ -2,10 +2,12 @@ package org.kde.something;
 
 import android.content.ContentResolver;
 import android.content.Intent;
+import android.database.Cursor;
 import android.util.Log;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.app.Activity;
 
 import java.io.FileNotFoundException;
@@ -35,6 +37,16 @@ public class OpenFileActivity extends QtActivity
     {
         String source = sourceUrls.remove(descriptorUrl);
         return source == null ? descriptorUrl : source;
+    }
+
+    public String documentName(String url)
+    {
+        try (Cursor cursor = getContentResolver().query(Uri.parse(url),
+                new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            return cursor != null && cursor.moveToFirst() ? cursor.getString(0) : "";
+        } catch (Exception error) {
+            return "";
+        }
     }
 
     public String contentUrlToFd(String url)

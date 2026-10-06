@@ -44,7 +44,6 @@ Kirigami.Page {
 
         onAskAiRequested: (text, pageNumber) => fileBrowserRoot.openAiAssistant(text, pageNumber)
         onClicked: fileBrowserRoot.controlsVisible = !fileBrowserRoot.controlsVisible
-        onUrlOpened: welcomeView.saveRecentDocument(document.url)
     }
 
     Connections {

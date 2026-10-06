@@ -211,6 +211,7 @@ public:
 
     ~DocumentViewTestSetup() override
     {
+        qunsetenv("OKULAR_READING_DATA_PATH");
         const QFileInfo fixture(m_fixturePath);
         const QString metadataPath =
             QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/docdata/") + QString::number(fixture.size()) + QLatin1Char('.') + fixture.fileName() + QStringLiteral(".xml");
@@ -221,6 +222,7 @@ public Q_SLOTS:
     void applicationAvailable()
     {
         QStandardPaths::setTestModeEnabled(true);
+        qputenv("OKULAR_READING_DATA_PATH", m_fixtureDir.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
         // Tests use fake in-memory keys and must never open the user's wallet.
         const auto walletConfig = KSharedConfig::openConfig(QStringLiteral("kwalletrc"));
         KConfigGroup(walletConfig, QStringLiteral("Wallet")).writeEntry("Enabled", false);
@@ -233,7 +235,13 @@ public Q_SLOTS:
 
     void qmlEngineAvailable(QQmlEngine *engine)
     {
+        const QDir appDirectory(QStringLiteral(OKULAR_APP_SOURCE_DIR));
+        for (const QString &file : appDirectory.entryList({QStringLiteral("*.qml")}, QDir::Files)) {
+            qmlRegisterType(QUrl::fromLocalFile(appDirectory.filePath(file)), "org.kde.okular.app", 1, 0, QFileInfo(file).baseName().toUtf8().constData());
+        }
         engine->addImportPath(QStringLiteral(OKULAR_QML_IMPORT_PATH));
+        engine->rootContext()->setContextProperty(QStringLiteral("uri"), QUrl());
+        engine->rootContext()->setContextProperty(QStringLiteral("testMainUrl"), QUrl::fromLocalFile(appDirectory.filePath(QStringLiteral("Main.qml"))));
         engine->rootContext()->setContextObject(new KLocalizedContext(engine));
         engine->rootContext()->setContextProperty(QStringLiteral("aiTestServer"), &m_aiServer);
         engine->rootContext()->setContextProperty(QStringLiteral("aiTestFiles"), this);

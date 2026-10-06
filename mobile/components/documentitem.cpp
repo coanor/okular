@@ -5,18 +5,14 @@
 */
 
 #include "documentitem.h"
+#include "part/readingsession.h"
 
-#include <QFile>
 #include <QMimeDatabase>
 #include <QQmlEngine>
 
 #ifdef Q_OS_ANDROID
 #include <QCoreApplication>
 #include <QJniObject>
-#endif
-
-#ifdef Q_OS_UNIX
-#include <unistd.h>
 #endif
 
 #include <core/bookmarkmanager.h>
@@ -35,6 +31,20 @@ DocumentItem::DocumentItem(QObject *parent)
     qmlRegisterUncreatableType<SignatureModel>("org.kde.okular.private", 1, 0, "SignatureModel", QStringLiteral("Do not create objects of this type."));
     Okular::Settings::instance(QStringLiteral("okularproviderrc"));
     m_document = new Okular::Document(nullptr);
+    m_readingSession = new ReadingSession(m_document, this);
+    m_readingHistory = new ReadingHistoryModel(this);
+    connect(m_readingHistory, &ReadingHistoryModel::exportRequested, this, [this] {
+        m_readingSession->flush();
+        if (m_aiAssistant) {
+            m_aiAssistant->flushHistory();
+        }
+    });
+    connect(m_readingSession, &ReadingSession::resumed, this, [this] {
+        m_tocModel->setCurrentViewport(m_document->viewport());
+        Q_EMIT currentPageChanged();
+    });
+    connect(m_readingSession, &ReadingSession::historyChanged, m_readingHistory, &ReadingHistoryModel::refresh);
+    connect(m_readingSession, &ReadingSession::error, this, [this](const QString &message) { Q_EMIT warning(message, -1); });
     m_tocModel = new TOCModel(m_document, this);
     m_signaturesModel = new SignatureModel(m_document, this);
 
@@ -48,6 +58,7 @@ DocumentItem::DocumentItem(QObject *parent)
 
 DocumentItem::~DocumentItem()
 {
+    delete m_readingSession;
     delete m_aiAssistant;
     delete m_signaturesModel;
     delete m_document;
@@ -60,12 +71,11 @@ void DocumentItem::setUrl(const QUrl &url)
 
 void DocumentItem::openUrl(const QUrl &url, const QString &password)
 {
+    m_readingSession->end();
     m_sourceUrl = url;
     if (m_aiAssistant) {
         m_aiAssistant->resetDocument();
     }
-    m_aiDocumentFile.reset();
-    m_aiDocumentSourceUrl = url;
     m_document->closeDocument();
     // TODO: password
     QMimeDatabase db;
@@ -77,26 +87,7 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
         const QJniObject activity(QNativeInterface::QAndroidApplication::context());
         realUrl = /* cppcheck-suppress redundantInitialization */
             QUrl(activity.callObjectMethod("contentUrlToFd", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
-        m_aiDocumentSourceUrl = QUrl(activity.callObjectMethod("takeSourceUrl", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(realUrl.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
-        m_sourceUrl = m_aiDocumentSourceUrl;
-    }
-#endif
-
-#ifdef Q_OS_UNIX
-    // Core consumes and closes content descriptors without keeping a URL.
-    // Duplicate the granted descriptor: reopening its path can be forbidden.
-    if (realUrl.scheme() == QLatin1String("fd")) {
-        bool ok;
-        const int descriptor = realUrl.path().mid(1).toInt(&ok);
-        const int reader = ok ? dup(descriptor) : -1;
-        if (reader >= 0) {
-            auto file = std::make_shared<QFile>();
-            if (file->open(reader, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle)) {
-                m_aiDocumentFile = std::move(file);
-            } else {
-                close(reader);
-            }
-        }
+        m_sourceUrl = QUrl(activity.callObjectMethod("takeSourceUrl", "(Ljava/lang/String;)Ljava/lang/String;", QJniObject::fromString(realUrl.toString(QUrl::FullyEncoded)).object<jstring>()).toString());
     }
 #endif
 
@@ -113,6 +104,9 @@ void DocumentItem::openUrl(const QUrl &url, const QString &password)
         m_matchingPages << (int)i;
     }
     m_needsPassword = res == Okular::Document::OpenNeedsPassword;
+    if (res == Okular::Document::OpenSuccess) {
+        m_readingSession->begin(m_sourceUrl, windowTitleForDocument());
+    }
     Q_EMIT matchingPagesChanged();
     Q_EMIT urlChanged();
     Q_EMIT pageCountChanged();
@@ -270,17 +264,9 @@ void DocumentItem::setPassword(const QString &password)
     openUrl(m_sourceUrl, password);
 }
 
-bool DocumentItem::closeForCloudSync()
+void DocumentItem::saveReadingProgress()
 {
-    if (m_document->canSaveAnnotationsToSidecar()) {
-        QString errorText;
-        if (!m_document->saveAnnotationsToSidecar(&errorText)) {
-            Q_EMIT error(errorText, -1);
-            return false;
-        }
-    }
-    setUrl(QUrl());
-    return true;
+    m_readingSession->flush();
 }
 
 AiAssistant *DocumentItem::aiAssistant()
@@ -291,14 +277,9 @@ AiAssistant *DocumentItem::aiAssistant()
     return m_aiAssistant;
 }
 
-std::shared_ptr<QFile> DocumentItem::aiDocumentFile() const
+ReadingHistoryModel *DocumentItem::readingHistory() const
 {
-    return m_aiDocumentFile;
-}
-
-QUrl DocumentItem::aiDocumentSourceUrl() const
-{
-    return m_aiDocumentSourceUrl;
+    return m_readingHistory;
 }
 
 Okular::Document *DocumentItem::document()

@@ -30,7 +30,6 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QResizeEvent>
-#include <QSignalBlocker>
 #include <QTextEdit>
 #include <QTimer>
 #include <QToolButton>
@@ -296,7 +295,10 @@ void AiReadingAssistant::setDocumentUrl(const QUrl &url)
     m_provider.cancel();
     m_pendingPage = -1;
     m_questionSubmitted = false;
-    m_documentKey = AiStore::documentKey(url);
+    m_documentKey = url.isEmpty() ? QString() : m_document->contentHash();
+    if (!url.isEmpty() && m_documentKey.isEmpty()) {
+        m_documentKey = AiStore::documentKey(url.isLocalFile() ? url : m_document->localSource());
+    }
     if (AiStore::isManagedBook(m_documentKey)) {
         const QString selectedId = AiStore::loadBookSettings(m_documentKey).selectedProfileId;
         m_profileCombo->setCurrentIndex(selectedId.isEmpty() ? -1 : m_profileCombo->findData(selectedId));
@@ -304,40 +306,6 @@ void AiReadingAssistant::setDocumentUrl(const QUrl &url)
     m_selection.clear();
     m_selectionLabel->hide();
     loadSelectedConversation();
-}
-
-void AiReadingAssistant::reloadCloudSettings()
-{
-    const QString currentId = m_profileCombo->currentData().toString();
-    QList<AiProfile> refreshed = AiStore::loadProfiles(winId());
-    for (AiProfile &profile : refreshed) {
-        if (profile.apiKey.isEmpty()) {
-            for (const AiProfile &previous : std::as_const(m_profiles)) {
-                if (previous.id == profile.id && previous.kind == profile.kind && previous.endpoint == profile.endpoint) {
-                    profile.apiKey = previous.apiKey;
-                    break;
-                }
-            }
-        }
-    }
-    m_profiles = std::move(refreshed);
-    const QSignalBlocker blocked(m_profileCombo);
-    m_profileCombo->clear();
-    for (const AiProfile &profile : std::as_const(m_profiles)) {
-        m_profileCombo->addItem(profile.name, profile.id);
-    }
-    const AiBookSettings settings = AiStore::loadBookSettings(m_documentKey);
-    const QString selectedId = AiStore::isManagedBook(m_documentKey) ? settings.selectedProfileId : currentId;
-    m_profileCombo->setCurrentIndex(selectedId.isEmpty() ? -1 : m_profileCombo->findData(selectedId));
-    loadSelectedConversation();
-    if (!selectedId.isEmpty() && m_profileCombo->currentIndex() < 0) {
-        showStatus(i18n("The model selected for this book is unavailable on this device. Configure its profile before asking."));
-    }
-}
-
-bool AiReadingAssistant::isBusy() const
-{
-    return m_provider.isBusy() || m_pendingPage >= 0;
 }
 
 void AiReadingAssistant::askAboutSelection(const QString &text)
@@ -447,7 +415,7 @@ void AiReadingAssistant::editProfiles()
 void AiReadingAssistant::editConversationInstructions()
 {
     AiProfile *profile = currentProfile();
-    if (!profile || m_documentKey.isEmpty() || m_provider.isBusy() || m_pendingPage >= 0) {
+    if (!profile || !m_historyReady || m_documentKey.isEmpty() || m_provider.isBusy() || m_pendingPage >= 0) {
         return;
     }
     QDialog dialog(this);
@@ -511,10 +479,15 @@ void AiReadingAssistant::loadSelectedConversation()
     m_provider.cancel();
     m_pendingPage = -1;
     m_questionSubmitted = false;
-    if (AiProfile *profile = currentProfile()) {
-        m_conversation = AiStore::loadConversation(m_documentKey, profile->id);
-    } else {
-        m_conversation = {};
+    m_historyReady = false;
+    m_conversation = {};
+    QString error;
+    if (AiProfile *profile = currentProfile(); profile && !m_documentKey.isEmpty()) {
+        m_conversation = AiStore::loadConversation(m_documentKey, profile->id, &error);
+        m_historyReady = error.isEmpty();
+    }
+    if (!error.isEmpty()) {
+        showStatus(i18n("Could not load the local conversation: %1", error));
     }
     renderConversation();
     updateControls();
@@ -523,7 +496,7 @@ void AiReadingAssistant::loadSelectedConversation()
 void AiReadingAssistant::sendQuestion()
 {
     AiProfile *profile = currentProfile();
-    if (!profile || !m_document->isOpened() || m_documentKey.isEmpty()) {
+    if (!profile || !m_historyReady || !m_document->isOpened() || m_documentKey.isEmpty()) {
         showStatus(i18n("Open a document and configure an AI model first."));
         return;
     }
@@ -663,7 +636,7 @@ void AiReadingAssistant::cancelQuestion()
 void AiReadingAssistant::clearConversation()
 {
     AiProfile *profile = currentProfile();
-    if (!profile || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty() && m_conversation.instructions.isEmpty()) || m_provider.isBusy() || m_pendingPage >= 0) {
+    if (!profile || !m_historyReady || m_documentKey.isEmpty() || (m_conversation.messages.isEmpty() && m_conversation.sessionId.isEmpty() && m_conversation.instructions.isEmpty()) || m_provider.isBusy() || m_pendingPage >= 0) {
         return;
     }
     if (QMessageBox::question(this, i18n("Start new conversation"), i18n("Remove the current conversation from Okular? Saved annotations will remain.")) != QMessageBox::Yes) {
@@ -713,11 +686,11 @@ void AiReadingAssistant::updateControls()
 {
     const bool busy = m_provider.isBusy() || m_pendingPage >= 0;
     m_prompt->setActionText(busy ? i18n("Cancel") : i18n("Ask"));
-    m_actionButton->setEnabled(busy ? !m_cancelling : m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
+    m_actionButton->setEnabled(busy ? !m_cancelling : m_historyReady && !m_documentKey.isEmpty() && m_document->isOpened() && m_profileCombo->currentIndex() >= 0);
     m_profileCombo->setEnabled(!busy);
     m_modelsButton->setEnabled(!busy);
-    m_conversationInstructionsAction->setEnabled(!busy && !m_documentKey.isEmpty() && m_profileCombo->currentIndex() >= 0);
+    m_conversationInstructionsAction->setEnabled(!busy && m_historyReady && !m_documentKey.isEmpty() && m_profileCombo->currentIndex() >= 0);
     m_bookDefaultPromptAction->setEnabled(!busy && AiStore::isManagedBook(m_documentKey));
-    m_newConversationAction->setEnabled(!busy && !m_documentKey.isEmpty() && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty() || !m_conversation.instructions.isEmpty()));
+    m_newConversationAction->setEnabled(!busy && m_historyReady && !m_documentKey.isEmpty() && (!m_conversation.messages.isEmpty() || !m_conversation.sessionId.isEmpty() || !m_conversation.instructions.isEmpty()));
     m_prompt->setReadOnly(busy);
 }

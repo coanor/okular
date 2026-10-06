@@ -3,6 +3,7 @@
 
 #include "aiprovider.h"
 #include "core/observer.h"
+#include "okularpart_export.h"
 
 #include <QPointer>
 #include <QWidget>
@@ -21,7 +22,7 @@ namespace Okular
 class Document;
 }
 
-class AiReadingAssistant : public QWidget, public Okular::DocumentObserver
+class OKULARPART_EXPORT AiReadingAssistant : public QWidget, public Okular::DocumentObserver
 {
     Q_OBJECT
 public:
@@ -30,8 +31,6 @@ public:
     void setDocumentUrl(const QUrl &url);
     void askAboutSelection(const QString &text);
     void showStatus(const QString &text);
-    void reloadCloudSettings();
-    bool isBusy() const;
 
     void notifyPageChanged(int page, int flags) override;
     void notifySetup(const QList<Okular::Page *> &pages, int setupFlags) override;
@@ -60,6 +59,7 @@ private:
     AiConversation m_conversation;
     AiConversation m_beforeRequest;
     bool m_questionSubmitted = false;
+    bool m_historyReady = false;
     bool m_cancelling = false;
     QString m_documentKey;
     QString m_selection;

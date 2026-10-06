@@ -24,7 +24,7 @@ ecm_target_qml_sources(okularkirigami SOURCES
     ui/AiModelDialog.qml
     ui/ChatGptModelDialog.qml
     ui/Bookmarks.qml
-    ui/CloudLibraryPage.qml
+    ui/BookshelfPage.qml
     ui/CertificateViewerPage.qml
     ui/Main.qml
     ui/MainView.qml

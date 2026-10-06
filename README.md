@@ -90,6 +90,8 @@ For Linux ARM64 or macOS ARM64 builds from Linux, with automatic SDK preparation
 Desktop and mobile support questions about the current page or selected text,
 HTTP model profiles and local conversation history. See
 [AI reading assistant](doc/ai-reading-assistant.md) for setup and platform details.
+AI history is stored in local SQLite. PDF highlights and
+notes also use local [annotation SQLite tables](doc/annotation-sidecars.md).
 
 ### Dictionary lookup
 
@@ -101,24 +103,20 @@ offline lookup. Leave the dictionary path empty, or choose **Use Eudic** on
 mobile, to use Eudic. Dictionary data is not downloaded or embedded during the
 build. Set `-DOKULAR_USE_BUNDLED_MDICT=OFF` to use a system mdict-cpp installation.
 
-### Mobile cloud library
+### Mobile bookshelf
 
-Open **Cloud Library…** from the mobile drawer to configure an S3 bucket, region,
-optional prefix and endpoint, and access credentials. **Add book…** copies a
-document into the app's private library and keeps the original. **Sync now**
-exchanges books and PDF annotations with the desktop managed library when both
-use the same bucket and prefix. Conflicting annotations appear on this page for
-you to choose a version.
+Open **Bookshelf** from the mobile drawer to see your reading history and
+books, including the last page and reading progress. Tap a book
+to continue reading. History is stored locally in the shared `reading-data.sqlite` in
+the app's data directory. Existing mobile recent files are imported on startup.
+Progress is saved while reading, when switching documents and when the app
+goes into the background.
 
-Sync saves and temporarily closes the current document, then reopens it at the
-same page. Network and library work run in the background. Android can remember
-credentials encrypted with an Android Keystore key; credential storage is
-excluded from backup and device transfer. Other mobile builds keep credentials
-only for the current session. Secrets are never included in sync objects.
-
-Mobile S3 support requires libcurl 7.77 or newer. The Android APK target enables
-`OKULAR_USE_BUNDLED_ANDROID_CURL` to build a checksum-pinned HTTP(S) curl with
-Craft's OpenSSL. HTTPS uses Android's trusted certificates.
+Use **Open…** to read a local document and add it to the bookshelf. Books already
+downloaded by earlier versions are imported into SQLite on startup; their local
+files and reading progress are kept. Reading data stays on this device, and
+storage runs in the background. See [local reading data](doc/local-reading-data.md)
+for the database locations and migration behavior.
 
 ### Android APK
 

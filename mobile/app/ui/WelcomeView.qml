@@ -24,14 +24,6 @@ FormCard.FormCard {
     width: Math.max(Kirigami.Units.gridUnit * 24, parent.width - Kirigami.Units.gridUnit * 24)
     height: Math.max(Math.min(parent.height * 0.9, Kirigami.Units.gridUnit * 40), parent.height - Kirigami.Units.gridUnit * 8)
 
-    function saveRecentDocument(doc) {
-        welcome.urlOpened(doc);
-    }
-
-    Okular.WelcomeItem {
-        id: welcome
-    }
-
     ColumnLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -46,7 +38,7 @@ FormCard.FormCard {
         }
 
         Kirigami.Heading {
-            text: i18nc("in welcome screen", "Recent Documents")
+            text: i18nc("in welcome screen", "Continue Reading")
             visible: recentList.count
         }
 
@@ -65,15 +57,20 @@ FormCard.FormCard {
                     }
 
                     Controls.Label {
-                        text: (typeof display !== "undefined") ? display : fileName
+                        text: (typeof modelData !== "undefined" && modelData.pageCount !== undefined) ? (modelData.pageCount > 0 ? i18n("%1 — page %2 of %3", modelData.title, modelData.page + 1, modelData.pageCount) : modelData.title) : fileName
+                        textFormat: Text.PlainText
                         elide: Text.ElideMiddle
                         Layout.fillWidth: true
                     }
                 }
                 onClicked: {
-                    if (typeof url !== "undefined") {
+                    if (typeof modelData !== "undefined" && modelData.url !== undefined) {
                         // Recent Document
-                        documentItem.url = url;
+                        if (modelData.url.toString().length === 0) {
+                            openDocumentAction.trigger();
+                        } else {
+                            documentItem.url = modelData.url;
+                        }
                     } else {
                         // File is in Documents folder
                         documentItem.url = fileUrl;
@@ -99,7 +96,7 @@ FormCard.FormCard {
                 clip: true
                 spacing: Math.round(Kirigami.Units.gridUnit * 0.2)
 
-                model: welcome.recentItemsModel
+                model: document.readingHistory.books
                 delegate: fileDelegate
             }
         }

@@ -22,6 +22,8 @@
 #include "../part/pageview.h"
 #include "../part/part.h"
 #include "../part/presentationwidget.h"
+#include "../part/readinghistory.h"
+#include "../part/readingsession.h"
 #include "../part/sidebar.h"
 #include "../part/toc.h"
 #include "../settings.h"
@@ -30,19 +32,25 @@
 #include <KActionCollection>
 #include <KActionMenu>
 #include <KConfigDialog>
+#include <KConfigGroup>
 #include <KParts/OpenUrlArguments>
+#include <KSharedConfig>
 
 #include <QAbstractItemModelTester>
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QFutureWatcher>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMimeDatabase>
 #include <QPushButton>
-#include <QScrollBar>
 #include <QScopeGuard>
+#include <QScrollBar>
 #include <QSemaphore>
 #include <QTabletEvent>
 #include <QTemporaryDir>
@@ -97,7 +105,10 @@ private Q_SLOTS:
     void testSaveAsToSymlink();
     void testSaveIsSymlink();
     void testSaveAnnotationsToSidecar();
+    void testReadingProgressPreservesExplicitPage();
+    void testFirstOpenIsRecordedBeforeResumeCallback();
     void testAiPanelOpens();
+    void testAiHistoryReadFailureAndDocumentIdentity();
     void testSidebarItemAfterSaving();
     void testViewModeSavingPerFile();
     void testSaveAsUndoStackAnnotations();
@@ -1227,8 +1238,77 @@ void PartTest::testSaveAsToNonExistingPath()
     QFile::remove(saveFilePath);
 }
 
+void PartTest::testReadingProgressPreservesExplicitPage()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QByteArray previousPath = qgetenv("OKULAR_READING_DATA_PATH");
+    qputenv("OKULAR_READING_DATA_PATH", directory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    const auto restorePath = qScopeGuard([previousPath] {
+        if (previousPath.isNull()) {
+            qunsetenv("OKULAR_READING_DATA_PATH");
+        } else {
+            qputenv("OKULAR_READING_DATA_PATH", previousPath);
+        }
+    });
+    const QString path = directory.filePath(QStringLiteral("book.pdf"));
+    QVERIFY(QFile::copy(QStringLiteral(KDESRCDIR "data/simple-multipage.pdf"), path));
+    {
+        Okular::Part part(nullptr, {});
+        QVERIFY(openDocument(&part, path));
+        part.m_document->setViewportPage(20);
+        part.m_readingSession->flush();
+    }
+    Okular::Part part(nullptr, {});
+    QUrl url = QUrl::fromLocalFile(path);
+    url.setFragment(QStringLiteral("page=3"));
+    QVERIFY(part.openUrl(url));
+    QTRY_COMPARE(part.m_document->currentPage(), 2);
+    part.m_readingSession->flush();
+    QTest::qWait(100);
+    QCOMPARE(part.m_document->currentPage(), 2);
+}
+
+void PartTest::testFirstOpenIsRecordedBeforeResumeCallback()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QByteArray previousPath = qgetenv("OKULAR_READING_DATA_PATH");
+    qputenv("OKULAR_READING_DATA_PATH", directory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    const auto restorePath = qScopeGuard([previousPath] {
+        if (previousPath.isNull()) {
+            qunsetenv("OKULAR_READING_DATA_PATH");
+        } else {
+            qputenv("OKULAR_READING_DATA_PATH", previousPath);
+        }
+    });
+    Okular::Part part(nullptr, {});
+    const QString source = QStringLiteral(KDESRCDIR "data/file1.pdf");
+    QVERIFY(openDocument(&part, source));
+    const QString hash = part.m_document->contentHash();
+    QVERIFY(part.closeUrl());
+    // Do not process events: the queued resume callback must not be required
+    // to register a first open. Wait only for the ordered database worker.
+    part.m_readingSession->flush();
+    ReadingRecord record;
+    QString error;
+    QVERIFY2(ReadingHistory().read(hash, QUrl::fromLocalFile(source), &record, &error), qPrintable(error));
+    QCOMPARE(record.bookId, hash);
+    QCOMPARE(record.url, QUrl::fromLocalFile(source));
+}
+
 void PartTest::testSaveAnnotationsToSidecar()
 {
+    QTemporaryDir databaseDirectory;
+    const QByteArray previousPath = qgetenv("OKULAR_READING_DATA_PATH");
+    qputenv("OKULAR_READING_DATA_PATH", databaseDirectory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    const auto restorePath = qScopeGuard([previousPath] {
+        if (previousPath.isNull()) {
+            qunsetenv("OKULAR_READING_DATA_PATH");
+        } else {
+            qputenv("OKULAR_READING_DATA_PATH", previousPath);
+        }
+    });
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
     const QString pdfPath = dir.filePath(QStringLiteral("book.pdf"));
@@ -1269,6 +1349,61 @@ void PartTest::testSaveAnnotationsToSidecar()
         QVERIFY(part.m_document->page(0)->annotation(annotationId));
     }
     QFile::remove(Okular::AnnotationSidecar::pathForHash(hash));
+}
+
+void PartTest::testAiHistoryReadFailureAndDocumentIdentity()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QByteArray previousPath = qgetenv("OKULAR_READING_DATA_PATH");
+    const auto config = KSharedConfig::openConfig();
+    KConfigGroup profiles(config, QStringLiteral("AI Reading Assistant"));
+    const QByteArray previousProfiles = profiles.readEntry("Profiles", QByteArray());
+    const auto walletConfig = KSharedConfig::openConfig(QStringLiteral("kwalletrc"));
+    KConfigGroup wallet(walletConfig, QStringLiteral("Wallet"));
+    const bool previousWallet = wallet.readEntry("Enabled", true);
+    wallet.writeEntry("Enabled", false);
+    walletConfig->sync();
+    profiles.writeEntry("Profiles",
+                        QJsonDocument(QJsonArray {QJsonObject {{QStringLiteral("id"), QStringLiteral("review-profile")}, {QStringLiteral("name"), QStringLiteral("Review")}, {QStringLiteral("kind"), 3}}}).toJson(QJsonDocument::Compact));
+    config->sync();
+    const auto restore = qScopeGuard([previousPath, profiles, previousProfiles, wallet, previousWallet, config, walletConfig]() mutable {
+        if (previousPath.isNull()) {
+            qunsetenv("OKULAR_READING_DATA_PATH");
+        } else {
+            qputenv("OKULAR_READING_DATA_PATH", previousPath);
+        }
+        profiles.writeEntry("Profiles", previousProfiles);
+        wallet.writeEntry("Enabled", previousWallet);
+        config->sync();
+        walletConfig->sync();
+    });
+    qputenv("OKULAR_READING_DATA_PATH", directory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    Okular::Part part(nullptr, {});
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file1.pdf")));
+    part.actionCollection()->action(QStringLiteral("show_ai_assistant"))->trigger();
+    QVERIFY(part.m_aiPanel);
+    auto *button = part.m_aiPanel->findChild<QPushButton *>(QStringLiteral("aiPromptAction"));
+    QVERIFY(button);
+    QVERIFY(button->isEnabled());
+    // Part clears the assistant before Core closes and clears its cached hash.
+    part.m_aiPanel->setDocumentUrl({});
+    QVERIFY(!button->isEnabled());
+    part.m_aiPanel->setDocumentUrl(part.m_document->currentDocument());
+    QVERIFY(button->isEnabled());
+    qputenv("OKULAR_READING_DATA_PATH", directory.path().toUtf8());
+    part.m_aiPanel->setDocumentUrl(part.m_document->currentDocument());
+    QVERIFY(!button->isEnabled());
+    QVERIFY(!part.m_aiPanel->findChild<QAction *>(QStringLiteral("aiConversationInstructions"))->isEnabled());
+    qputenv("OKULAR_READING_DATA_PATH", directory.filePath(QStringLiteral("reading-data.sqlite")).toUtf8());
+    Okular::Document remote(nullptr);
+    const QString source = QStringLiteral(KDESRCDIR "data/file1.pdf");
+    const QUrl remoteUrl(QStringLiteral("https://example.invalid/book.pdf"));
+    QCOMPARE(remote.openDocument(source, remoteUrl, QMimeDatabase().mimeTypeForFile(source)), Okular::Document::OpenSuccess);
+    QCOMPARE(remote.localSource(), QUrl::fromLocalFile(source));
+    AiReadingAssistant assistant(&remote);
+    assistant.setDocumentUrl(remoteUrl);
+    QVERIFY(assistant.findChild<QPushButton *>(QStringLiteral("aiPromptAction"))->isEnabled());
 }
 
 void PartTest::testAiPanelOpens()

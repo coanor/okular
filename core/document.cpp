@@ -2399,6 +2399,7 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
         }
 
         filedata = qstdin.readAll();
+        d->m_contentHash = QString::fromLatin1(QCryptographicHash::hash(filedata, QCryptographicHash::Sha256).toHex());
         mime = db.mimeTypeForData(filedata);
         if (!mime.isValid() || mime.isDefault()) {
             return OpenError;
@@ -2530,7 +2531,8 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
 
     if (mime.inherits(QStringLiteral("application/pdf")) && (d->m_url.isLocalFile() || fromFileDescriptor) && !d->m_archiveData && !d->m_docdataMigrationNeeded) {
         QString sidecarError;
-        const QString hash = fromFileDescriptor ? QString::fromLatin1(QCryptographicHash::hash(filedata, QCryptographicHash::Sha256).toHex()) : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
+        const QString hash = fromFileDescriptor ? d->m_contentHash : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
+        d->m_contentHash = hash;
         if (!hash.isEmpty()) {
             QList<SidecarAnnotation> savedAnnotations;
             qint64 revision = 0;
@@ -2826,6 +2828,7 @@ void Document::closeDocument()
 
     d->m_undoStack->clear();
     d->m_docdataMigrationNeeded = false;
+    d->m_contentHash.clear();
     d->m_annotationSidecarHash.clear();
     d->m_annotationSidecarRevision = 0;
     d->m_loadingAnnotationSidecar = false;
@@ -5083,6 +5086,7 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
         d->m_url = url;
         d->m_docFileName = newFileName;
         d->updateMetadataXmlNameAndDocSize();
+        d->m_contentHash.clear();
         d->m_annotationSidecarHash.clear();
         d->m_annotationSidecarRevision = 0;
         d->m_localAnnotationChanges = false;
@@ -5101,6 +5105,7 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
         if (url.isLocalFile() && newMime.inherits(QStringLiteral("application/pdf"))) {
             QString hashError;
             d->m_annotationSidecarHash = AnnotationSidecar::pdfHash(newFileName, &hashError);
+            d->m_contentHash = d->m_annotationSidecarHash;
             if (!hashError.isEmpty()) {
                 qCWarning(OkularCoreDebug) << "Could not hash PDF for annotations:" << hashError;
             }
@@ -5227,6 +5232,16 @@ bool Document::saveChanges(const QString &fileName, QString *errorText)
         }
     }
     return success;
+}
+
+QUrl Document::localSource() const
+{
+    return d->m_docFileName.isEmpty() ? QUrl() : QUrl::fromLocalFile(d->m_docFileName);
+}
+
+QString Document::contentHash() const
+{
+    return d->m_contentHash;
 }
 
 bool Document::canSaveAnnotationsToSidecar() const

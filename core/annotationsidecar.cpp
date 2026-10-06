@@ -3,6 +3,7 @@
 */
 
 #include "annotationsidecar_p.h"
+#include "readingdatastore_p.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -16,8 +17,6 @@
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QUuid>
-
-#include <sqlite3.h>
 
 using namespace Okular;
 
@@ -69,61 +68,26 @@ bool exec(QSqlQuery &query, QString *error)
     return false;
 }
 
-bool execSql(QSqlDatabase &db, const QString &sql, QString *error)
+bool prepareBookQuery(QSqlQuery &query, const QString &sql, const QString &hash, QString *error)
 {
-    QSqlQuery query(db);
-    if (query.exec(sql)) {
-        return true;
-    }
-    *error = query.lastError().text();
-    return false;
-}
-
-bool verifyMetadata(QSqlDatabase &db, const QString &hash, QString *error)
-{
-    QSqlQuery query(db);
-    if (!execSql(db, QStringLiteral("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"), error)
-        || !query.prepare(QStringLiteral("INSERT OR IGNORE INTO metadata(key, value) VALUES ('schema_version', '2'), ('pdf_sha256', ?)"))) {
-        if (error->isEmpty()) {
-            *error = query.lastError().text();
-        }
-        return false;
-    }
+    query.prepare(sql);
     query.addBindValue(hash);
-    if (!exec(query, error)) {
-        return false;
-    }
-    if (!query.exec(QStringLiteral("SELECT key, value FROM metadata"))) {
-        *error = query.lastError().text();
-        return false;
-    }
-    QMap<QString, QString> metadata;
-    while (query.next()) {
-        metadata.insert(query.value(0).toString(), query.value(1).toString());
-    }
-    if (metadata.value(QStringLiteral("schema_version")) != QLatin1String("2") || metadata.value(QStringLiteral("pdf_sha256")) != hash) {
-        *error = QStringLiteral("Annotation database schema or PDF hash does not match");
-        return false;
-    }
-    return true;
+    return exec(query, error);
 }
 
-bool checkMetadata(QSqlDatabase &db, const QString &hash, QString *error)
+bool openStore(Connection &connection, const QString &hash, QString *error)
 {
-    QSqlQuery query(db);
-    if (!query.exec(QStringLiteral("SELECT key, value FROM metadata"))) {
-        *error = query.lastError().text();
+    if (!ReadingDataStore::isBookHash(hash)) {
+        *error = QStringLiteral("Invalid book content hash");
         return false;
     }
-    QMap<QString, QString> metadata;
-    while (query.next()) {
-        metadata.insert(query.value(0).toString(), query.value(1).toString());
-    }
-    if (metadata.value(QStringLiteral("schema_version")) != QLatin1String("2") || metadata.value(QStringLiteral("pdf_sha256")) != hash) {
-        *error = QStringLiteral("Annotation database schema or PDF hash does not match");
+    const QString path = ReadingDataStore::defaultPath();
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
+        *error = QStringLiteral("Could not create reading database directory");
         return false;
     }
-    return true;
+    return connection.open(error) && ReadingDataStore::initialize(connection.db(), error) &&
+        ReadingDataStore::importAnnotations(connection.db(), QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/annotations"), error, hash);
 }
 
 QString annotationKey(int page, const QString &id)
@@ -150,7 +114,8 @@ QString AnnotationSidecar::pdfHash(const QString &pdfPath, QString *error)
 
 QString AnnotationSidecar::pathForHash(const QString &hash)
 {
-    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/annotations/") + hash + QStringLiteral(".sqlite");
+    Q_UNUSED(hash)
+    return ReadingDataStore::defaultPath();
 }
 
 bool AnnotationSidecar::load(const QString &hash, QList<SidecarAnnotation> *annotations, QString *error, qint64 *revision)
@@ -161,18 +126,19 @@ bool AnnotationSidecar::load(const QString &hash, QList<SidecarAnnotation> *anno
         *revision = 0;
     }
     const QString path = pathForHash(hash);
-    if (!QFileInfo::exists(path)) {
-        return true;
+    Connection connection(path);
+    if (!openStore(connection, hash, error)) {
+        return false;
     }
 
-    Connection connection(path);
-    if (!connection.open(error) || !checkMetadata(connection.db(), hash, error)) {
+    if (!connection.db().transaction()) {
+        *error = connection.db().lastError().text();
         return false;
     }
 
     // The event stream is authoritative. The annotations table is a query index.
     QSqlQuery query(connection.db());
-    if (!query.exec(QStringLiteral("SELECT annotation_id, page, subtype, xml, operation, sequence FROM events ORDER BY sequence"))) {
+    if (!prepareBookQuery(query, QStringLiteral("SELECT annotation_id, page, subtype, xml, operation, sequence FROM annotation_events WHERE book_hash = ? ORDER BY sequence"), hash, error)) {
         *error = query.lastError().text();
         return false;
     }
@@ -204,7 +170,7 @@ bool AnnotationSidecar::load(const QString &hash, QList<SidecarAnnotation> *anno
             return false;
         }
     }
-    if (!query.exec(QStringLiteral("SELECT annotation_id, page, subtype, xml, hidden_native, contents, author, color FROM annotations"))) {
+    if (!prepareBookQuery(query, QStringLiteral("SELECT annotation_id, page, subtype, xml, hidden_native, contents, author, color FROM annotations WHERE book_hash = ?"), hash, error)) {
         *error = query.lastError().text();
         return false;
     }
@@ -218,6 +184,11 @@ bool AnnotationSidecar::load(const QString &hash, QList<SidecarAnnotation> *anno
             entry->author = query.value(6).toString();
             entry->color = query.value(7).toString();
         }
+    }
+    query.finish();
+    if (!connection.db().commit()) {
+        *error = connection.db().lastError().text();
+        return false;
     }
     *annotations = state.values();
     return true;
@@ -242,21 +213,19 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
         return false;
     }
     Connection connection(path);
-    if (!connection.open(error) || !connection.db().transaction()) {
+    if (!openStore(connection, hash, error) || !connection.db().transaction()) {
         if (error->isEmpty()) {
             *error = connection.db().lastError().text();
         }
         return false;
     }
     QSqlDatabase &db = connection.db();
-    if (!verifyMetadata(db, hash, error)
-        || !execSql(db, QStringLiteral("CREATE TABLE IF NOT EXISTS annotations (page INTEGER NOT NULL, annotation_id TEXT NOT NULL, subtype INTEGER NOT NULL, contents TEXT, author TEXT, color TEXT, hidden_native INTEGER NOT NULL DEFAULT 0, xml TEXT, PRIMARY KEY(page, annotation_id))"), error)
-        || !execSql(db, QStringLiteral("CREATE INDEX IF NOT EXISTS annotations_by_page ON annotations(page, subtype)"), error)
-        || !execSql(db, QStringLiteral("CREATE INDEX IF NOT EXISTS annotations_by_contents ON annotations(contents)"), error)
-        || !execSql(db,
-                    QStringLiteral("CREATE TABLE IF NOT EXISTS events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, annotation_id TEXT NOT NULL, page INTEGER NOT NULL, subtype INTEGER NOT NULL, xml TEXT, operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete', 'hide')), recorded_utc TEXT NOT NULL)"),
-                    error)
-        || !execSql(db, QStringLiteral("CREATE INDEX IF NOT EXISTS events_by_annotation ON events(page, annotation_id, sequence)"), error)) {
+    if (!ReadingDataStore::ensureBook(db, hash, {}, error)) {
+        db.rollback();
+        return false;
+    }
+    QSqlQuery marker(db);
+    if (!prepareBookQuery(marker, QStringLiteral("INSERT OR IGNORE INTO annotation_documents VALUES (?)"), hash, error)) {
         db.rollback();
         return false;
     }
@@ -264,7 +233,7 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
     qint64 revision = 0;
     {
         QSqlQuery query(db);
-        if (!query.exec(QStringLiteral("SELECT COALESCE(MAX(sequence), 0) FROM events")) || !query.next()) {
+        if (!prepareBookQuery(query, QStringLiteral("SELECT COALESCE(MAX(sequence), 0) FROM annotation_events WHERE book_hash = ?"), hash, error) || !query.next()) {
             *error = query.lastError().text();
             db.rollback();
             return false;
@@ -280,7 +249,7 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
     QMap<QString, SidecarAnnotation> oldState;
     {
         QSqlQuery query(db);
-        if (!query.exec(QStringLiteral("SELECT annotation_id, page, subtype, xml, hidden_native FROM annotations"))) {
+        if (!prepareBookQuery(query, QStringLiteral("SELECT annotation_id, page, subtype, xml, hidden_native FROM annotations WHERE book_hash = ?"), hash, error)) {
             *error = query.lastError().text();
             db.rollback();
             return false;
@@ -296,17 +265,17 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
     QSqlQuery event(db);
     QSqlQuery upsert(db);
     QSqlQuery remove(db);
-    if (!event.prepare(QStringLiteral("INSERT INTO events(annotation_id, page, subtype, xml, operation, recorded_utc) VALUES (?, ?, ?, ?, ?, ?)"))) {
+    if (!event.prepare(QStringLiteral("INSERT INTO annotation_events(annotation_id, page, subtype, xml, operation, recorded_utc, book_hash, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"))) {
         *error = event.lastError().text();
         db.rollback();
         return false;
     }
-    if (!upsert.prepare(QStringLiteral("INSERT OR REPLACE INTO annotations(page, annotation_id, subtype, contents, author, color, hidden_native, xml) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"))) {
+    if (!upsert.prepare(QStringLiteral("INSERT OR REPLACE INTO annotations(page, annotation_id, subtype, contents, author, color, hidden_native, xml, book_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"))) {
         *error = upsert.lastError().text();
         db.rollback();
         return false;
     }
-    if (!remove.prepare(QStringLiteral("DELETE FROM annotations WHERE page = ? AND annotation_id = ?"))) {
+    if (!remove.prepare(QStringLiteral("DELETE FROM annotations WHERE page = ? AND annotation_id = ? AND book_hash = ?"))) {
         *error = remove.lastError().text();
         db.rollback();
         return false;
@@ -322,8 +291,11 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
         event.bindValue(3, QVariant());
         event.bindValue(4, QStringLiteral("delete"));
         event.bindValue(5, now);
+        event.bindValue(6, hash);
+        event.bindValue(7, revision + 1);
         remove.bindValue(0, it->page);
         remove.bindValue(1, it->id);
+        remove.bindValue(2, hash);
         if (!exec(event, error) || !exec(remove, error)) {
             db.rollback();
             return false;
@@ -341,6 +313,8 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
         event.bindValue(3, it->hiddenNative ? QVariant() : QVariant(it->xml));
         event.bindValue(4, it->hiddenNative ? QStringLiteral("hide") : QStringLiteral("upsert"));
         event.bindValue(5, now);
+        event.bindValue(6, hash);
+        event.bindValue(7, revision + 1);
         upsert.bindValue(0, it->page);
         upsert.bindValue(1, it->id);
         upsert.bindValue(2, it->subtype);
@@ -349,6 +323,7 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
         upsert.bindValue(5, it->color);
         upsert.bindValue(6, it->hiddenNative);
         upsert.bindValue(7, it->hiddenNative ? QVariant() : QVariant(it->xml));
+        upsert.bindValue(8, hash);
         if (!exec(event, error) || !exec(upsert, error)) {
             db.rollback();
             return false;
@@ -367,83 +342,20 @@ bool AnnotationSidecar::save(const QString &hash, const QList<SidecarAnnotation>
 
 bool AnnotationSidecar::snapshot(const QString &hash, const QString &destination, QString *error, qint64 *revision)
 {
-    error->clear();
+    if (!ReadingDataStore::snapshot(pathForHash(hash), destination, error)) {
+        return false;
+    }
+    Connection connection(destination);
+    if (!connection.open(error)) {
+        return false;
+    }
+    QSqlQuery query(connection.db());
+    if (!prepareBookQuery(query, QStringLiteral("SELECT COALESCE(MAX(sequence), 0) FROM annotation_events WHERE book_hash = ?"), hash, error) || !query.next()) {
+        QFile::remove(destination);
+        return false;
+    }
     if (revision) {
-        *revision = 0;
-    }
-    const QString sourcePath = pathForHash(hash);
-    if (!QFileInfo::exists(sourcePath) || QFileInfo::exists(destination) || !QDir().mkpath(QFileInfo(destination).absolutePath())) {
-        *error = QStringLiteral("Annotation source is missing or snapshot destination is unavailable");
-        return false;
-    }
-
-    QTemporaryFile staging(QFileInfo(destination).absolutePath() + QStringLiteral("/.annotation-snapshot-XXXXXX"));
-    if (!staging.open()) {
-        *error = staging.errorString();
-        return false;
-    }
-    staging.close();
-
-    sqlite3 *source = nullptr;
-    sqlite3 *target = nullptr;
-    const QByteArray sourceName = QFile::encodeName(sourcePath);
-    const QByteArray targetName = QFile::encodeName(staging.fileName());
-    int code = sqlite3_open_v2(sourceName.constData(), &source, SQLITE_OPEN_READONLY, nullptr);
-    if (code == SQLITE_OK) {
-        code = sqlite3_open_v2(targetName.constData(), &target, SQLITE_OPEN_READWRITE, nullptr);
-    }
-    if (code == SQLITE_OK) {
-        sqlite3_busy_timeout(source, 5000);
-        sqlite3_busy_timeout(target, 5000);
-        sqlite3_backup *backup = sqlite3_backup_init(target, "main", source, "main");
-        if (backup) {
-            code = sqlite3_backup_step(backup, -1);
-            const int finishCode = sqlite3_backup_finish(backup);
-            if (code == SQLITE_DONE) {
-                code = finishCode;
-            }
-        } else {
-            code = sqlite3_errcode(target);
-        }
-    }
-    if (code != SQLITE_OK) {
-        *error = target || source ? QString::fromUtf8(sqlite3_errmsg(target ? target : source)) : QStringLiteral("Could not open annotation database");
-    }
-    if (target) {
-        sqlite3_close(target);
-    }
-    if (source) {
-        sqlite3_close(source);
-    }
-    if (code != SQLITE_OK) {
-        return false;
-    }
-
-    qint64 snapshotRevision = 0;
-    {
-        Connection check(staging.fileName());
-        if (!check.open(error) || !checkMetadata(check.db(), hash, error)) {
-            return false;
-        }
-        QSqlQuery query(check.db());
-        if (!query.exec(QStringLiteral("PRAGMA quick_check")) || !query.next() || query.value(0).toString() != QLatin1String("ok")) {
-            *error = QStringLiteral("Annotation snapshot failed SQLite integrity check");
-            return false;
-        }
-        if (!query.exec(QStringLiteral("SELECT COALESCE(MAX(sequence), 0) FROM events")) || !query.next()) {
-            *error = query.lastError().text();
-            return false;
-        }
-        snapshotRevision = query.value(0).toLongLong();
-    }
-    // Close the connection before renaming, as Windows cannot rename an open DB.
-    if (!QFile::rename(staging.fileName(), destination)) {
-        *error = QStringLiteral("Could not install annotation snapshot");
-        return false;
-    }
-    staging.setAutoRemove(false);
-    if (revision) {
-        *revision = snapshotRevision;
+        *revision = query.value(0).toLongLong();
     }
     return true;
 }

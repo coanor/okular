@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "aistore.h"
+#include "core/readingdatastore_p.h"
 #include <config-okular.h>
 
 #include <QCryptographicHash>
@@ -13,7 +14,6 @@
 #include <QMap>
 #include <QSaveFile>
 #include <QSet>
-#include <QStandardPaths>
 #include <QUrl>
 #include <algorithm>
 #include <utility>
@@ -27,18 +27,12 @@
 
 namespace
 {
-QString conversationPath(const QString &documentKey, const QString &profileId)
-{
-    const QByteArray profileHash = QCryptographicHash::hash(profileId.toUtf8(), QCryptographicHash::Sha256).toHex();
-    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/ai-conversations");
-    return directory + QLatin1Char('/') + documentKey + QLatin1Char('-') + QString::fromLatin1(profileHash) + QStringLiteral(".json");
-}
-
 QString bookSettingsPath(const QString &documentKey)
 {
     if (documentKey.size() != 64 || !std::all_of(documentKey.cbegin(), documentKey.cend(), [](QChar c) { return c.isDigit() || (c >= QLatin1Char('a') && c <= QLatin1Char('f')); })) {
         return {};
     }
+    // Keep local settings for books imported by earlier releases.
     const KConfigGroup group(KSharedConfig::openConfig(), QStringLiteral("Cloud Book Library"));
     const QString root = group.readEntry("ManagedDirectory", QString());
     const QString project = QDir(root).filePath(QStringLiteral("books/") + documentKey);
@@ -56,29 +50,6 @@ QString credentialScope(int kind, const QString &endpoint)
     return QString::fromLatin1(QCryptographicHash::hash(scope, QCryptographicHash::Sha256).toHex());
 }
 
-QJsonObject messageToJson(const AiMessage &message)
-{
-    QJsonObject json;
-    json.insert(QStringLiteral("role"), message.role);
-    json.insert(QStringLiteral("content"), message.content);
-    json.insert(QStringLiteral("page"), message.page);
-    json.insert(QStringLiteral("pageText"), message.pageText);
-    json.insert(QStringLiteral("selectedText"), message.selectedText);
-    json.insert(QStringLiteral("pageImage"), message.pageImage);
-    return json;
-}
-
-AiMessage messageFromJson(const QJsonObject &json)
-{
-    AiMessage message;
-    message.role = json.value(QStringLiteral("role")).toString();
-    message.content = json.value(QStringLiteral("content")).toString();
-    message.page = json.value(QStringLiteral("page")).toInt(-1);
-    message.pageText = json.value(QStringLiteral("pageText")).toString();
-    message.selectedText = json.value(QStringLiteral("selectedText")).toString();
-    message.pageImage = json.value(QStringLiteral("pageImage")).toString();
-    return message;
-}
 }
 
 QList<AiProfile> AiStore::loadProfiles(WId windowId)
@@ -234,19 +205,8 @@ bool AiStore::saveProfiles(const QList<AiProfile> &profiles, WId windowId, QStri
 
 QString AiStore::documentKey(const QUrl &url)
 {
-    if (!url.isValid() || url.isEmpty()) {
-        return {};
-    }
-    if (url.isLocalFile()) {
-        QFile file(url.toLocalFile());
-        if (file.open(QIODevice::ReadOnly)) {
-            QCryptographicHash hash(QCryptographicHash::Sha256);
-            if (hash.addData(&file)) {
-                return QString::fromLatin1(hash.result().toHex());
-            }
-        }
-    }
-    return QString::fromLatin1(QCryptographicHash::hash(url.toString(QUrl::FullyEncoded).toUtf8(), QCryptographicHash::Sha256).toHex());
+    QString error;
+    return Okular::ReadingDataStore::fileHash(url, &error);
 }
 
 AiBookSettings AiStore::loadBookSettings(const QString &documentKey)
@@ -274,8 +234,7 @@ bool AiStore::saveBookSettings(const QString &documentKey, const AiBookSettings 
     if (path.isEmpty()) {
         return false;
     }
-    const KConfigGroup group(KSharedConfig::openConfig(), QStringLiteral("Cloud Book Library"));
-    QLockFile lock(QDir(group.readEntry("ManagedDirectory", QString())).filePath(QStringLiteral(".sync.lock")));
+    QLockFile lock(path + QStringLiteral(".lock"));
     if (!lock.tryLock(0)) {
         return false;
     }
@@ -288,59 +247,25 @@ bool AiStore::saveBookSettings(const QString &documentKey, const AiBookSettings 
     return file.write(bytes) == bytes.size() && file.commit();
 }
 
-AiConversation AiStore::loadConversation(const QString &documentKey, const QString &profileId)
+AiConversation AiStore::loadConversation(const QString &documentKey, const QString &profileId, QString *error)
 {
     AiConversation conversation;
     conversation.instructions = loadBookSettings(documentKey).defaultPrompt;
-    if (documentKey.isEmpty() || profileId.isEmpty()) {
-        return conversation;
-    }
-    QFile file(conversationPath(documentKey, profileId));
-    if (!file.open(QIODevice::ReadOnly)) {
-        return conversation;
-    }
-    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
-    conversation.sessionId = root.value(QStringLiteral("sessionId")).toString();
-    conversation.instructions = root.value(QStringLiteral("instructions")).toString(conversation.instructions);
-    for (const QJsonValue &value : root.value(QStringLiteral("messages")).toArray()) {
-        AiMessage message = messageFromJson(value.toObject());
-        if (message.role == QLatin1String("user") || message.role == QLatin1String("assistant")) {
-            conversation.messages.append(std::move(message));
-        }
+    if (!documentKey.isEmpty() && !profileId.isEmpty()) {
+        QString storageError;
+        AiConversationStore().load(documentKey, profileId, &conversation, error ? error : &storageError);
     }
     return conversation;
 }
 
 bool AiStore::saveConversation(const QString &documentKey, const QString &profileId, const AiConversation &conversation)
 {
-    if (documentKey.isEmpty() || profileId.isEmpty()) {
-        return false;
-    }
-    const QString path = conversationPath(documentKey, profileId);
-    if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
-        return false;
-    }
-    QJsonObject root;
-    root.insert(QStringLiteral("version"), 1);
-    root.insert(QStringLiteral("sessionId"), conversation.sessionId);
-    root.insert(QStringLiteral("instructions"), conversation.instructions);
-    QJsonArray messages;
-    for (const AiMessage &message : conversation.messages) {
-        messages.append(messageToJson(message));
-    }
-    root.insert(QStringLiteral("messages"), messages);
-    QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly)) {
-        return false;
-    }
-    if (file.write(QJsonDocument(root).toJson(QJsonDocument::Compact)) < 0) {
-        return false;
-    }
-    return file.commit();
+    QString error;
+    return AiConversationStore().save(documentKey, profileId, conversation, &error);
 }
 
 bool AiStore::clearConversation(const QString &documentKey, const QString &profileId)
 {
-    const QString path = conversationPath(documentKey, profileId);
-    return !QFile::exists(path) || QFile::remove(path);
+    QString error;
+    return AiConversationStore().clear(documentKey, profileId, &error);
 }

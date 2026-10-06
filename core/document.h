@@ -940,9 +940,11 @@ public:
      */
     bool saveChanges(const QString &fileName, QString *errorText);
 
-    /** Save locally created PDF annotations by exact PDF hash, leaving the PDF unchanged. */
     /** Cached SHA-256 of the opened bytes, when already read for PDF annotations or a file descriptor. */
     QString contentHash() const;
+    /** Local backing file, including the downloaded cache for a remote URL. */
+    QUrl localSource() const;
+    /** Save locally created PDF annotations by exact PDF hash, leaving the PDF unchanged. */
     bool canSaveAnnotationsToSidecar() const;
     bool supportsAnnotationSidecar() const;
     bool hasSeparatePdfAnnotations() const;

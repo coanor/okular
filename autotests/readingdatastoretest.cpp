@@ -7,12 +7,15 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QScopeGuard>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QThread>
 #include <QUuid>
+#include <atomic>
 
 class ReadingDataStoreTest : public QObject
 {
@@ -231,6 +234,205 @@ private Q_SLOTS:
         QVERIFY(Okular::ReadingDataStore::isBookHash(loaded.bookId));
         QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM legacy_reading_history")), QStringLiteral("0"));
         QVERIFY(QFile::exists(legacy));
+    }
+    void stagedUrlsNeverBindAnotherDeviceBook()
+    {
+        ReadingHistory history(m_path);
+        const QString path = m_directory.filePath(QStringLiteral("unavailable.pdf"));
+        QFile::remove(path);
+        auto original = ReadingHistory::record(QUrl::fromLocalFile(path), {}, 9, 30);
+        QString error;
+        QVERIFY(history.save(original, &error));
+        QVERIFY(sql(QStringLiteral("UPDATE legacy_reading_history SET device_id = 'original-device'")));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.write("a different device's book") > 0);
+        file.close();
+        ReadingRecord loaded;
+        QVERIFY(history.read(original.url, &loaded, &error));
+        QVERIFY(loaded.url.isEmpty());
+        QList<ReadingRecord> books;
+        QVERIFY(history.entries(&books, &error));
+        QCOMPARE(books.size(), 1);
+        QVERIFY(books.first().url.isEmpty());
+        QCOMPARE(books.first().page, 9);
+        QVERIFY(history.save(ReadingHistory::record(original.url, {}, 0, 10), &error));
+        QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM legacy_reading_history")), QStringLiteral("1"));
+    }
+    void upgradesSchemaOneWithoutChangingProgress()
+    {
+        QVERIFY(sql(QStringLiteral("DROP TABLE legacy_reading_history")));
+        QVERIFY(sql(
+            QStringLiteral("CREATE TABLE legacy_reading_history(url TEXT PRIMARY KEY, title TEXT NOT NULL, book_id TEXT NOT NULL, page INTEGER NOT NULL, page_count INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision TEXT NOT NULL)")));
+        QVERIFY(sql(QStringLiteral("INSERT INTO legacy_reading_history VALUES ('file:///old.pdf', 'old.pdf', '', 5, 20, 1, 'revision')")));
+        QVERIFY(sql(QStringLiteral("INSERT INTO book_locations VALUES ('source-device', 'file:///known.pdf', '%1')").arg(m_hash)));
+        QVERIFY(sql(QStringLiteral("UPDATE reading_data_metadata SET value = '1' WHERE key = 'schema_version'")));
+        QString error;
+        QVERIFY2(Okular::ReadingDataStore::initialize(m_database, &error), qPrintable(error));
+        QCOMPARE(scalar(QStringLiteral("SELECT value FROM reading_data_metadata WHERE key = 'schema_version'")), QStringLiteral("2"));
+        QCOMPARE(scalar(QStringLiteral("SELECT device_id FROM legacy_reading_history")), QStringLiteral("source-device"));
+        QCOMPARE(scalar(QStringLiteral("SELECT page FROM legacy_reading_history")), QStringLiteral("5"));
+    }
+    void annotationOnlyRecordsDoNotCreateBlankBookshelfRows()
+    {
+        QString error;
+        QVERIFY(Okular::AnnotationSidecar::save(m_hash, {{QStringLiteral("note"), 0, 1, QStringLiteral("<annotation/>")}}, &error));
+        QList<ReadingRecord> books;
+        QVERIFY(ReadingHistory(m_path).entries(&books, &error));
+        QVERIFY(books.isEmpty());
+    }
+    void corruptUnrelatedAnnotationsDoNotBlockMigration()
+    {
+        const QString root = m_directory.filePath(QStringLiteral("corrupt-annotations"));
+        QVERIFY(QDir().mkpath(root));
+        QFile file(QDir(root).filePath(m_hash + QStringLiteral(".sqlite")));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.write("corrupt database") > 0);
+        file.close();
+        QString error;
+        QVERIFY(Okular::ReadingDataStore::importAnnotations(m_database, root, &error));
+        QVERIFY(!Okular::ReadingDataStore::importAnnotations(m_database, root, &error, m_hash));
+        QVERIFY(!error.isEmpty());
+    }
+    void migrationDomainsFailIndependently()
+    {
+        const QString previousName = QCoreApplication::applicationName();
+        QCoreApplication::setApplicationName(QUuid::createUuid().toString());
+        const QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QVERIFY(QDir().mkpath(root));
+        const QString source = QDir(root).filePath(QStringLiteral("ai-history.sqlite"));
+        const auto cleanup = qScopeGuard([previousName, source, root] {
+            QFile::remove(source);
+            QDir().rmdir(root);
+            QCoreApplication::setApplicationName(previousName);
+        });
+        QFile file(source);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.write("corrupt AI database") > 0);
+        file.close();
+        QString error;
+        QVERIFY2(Okular::ReadingDataStore::importLegacyData(m_database, Okular::ReadingDataStore::LegacyData::ReadingHistory, &error), qPrintable(error));
+        QVERIFY(!Okular::ReadingDataStore::importLegacyData(m_database, Okular::ReadingDataStore::LegacyData::AiHistory, &error));
+        QVERIFY(!error.isEmpty());
+    }
+    void aiMigrationReadsOneSourceSnapshot()
+    {
+        const QString legacy =
+            createLegacy(QStringLiteral("concurrent-ai.sqlite"),
+                         {QStringLiteral("PRAGMA journal_mode=WAL"),
+                          QStringLiteral("CREATE TABLE ai_conversations(document_key, profile_id, session_id, instructions)"),
+                          QStringLiteral("CREATE TABLE ai_messages(document_key, profile_id, ordinal, role, content, page, page_text, selected_text, page_image)"),
+                          QStringLiteral("INSERT INTO ai_conversations VALUES ('%1', 'profile', '0', '')").arg(m_hash),
+                          QStringLiteral("WITH RECURSIVE rows(n) AS (VALUES(0) UNION ALL SELECT n + 1 FROM rows WHERE n < 500) INSERT INTO ai_messages SELECT '%1', 'profile', n, 'user', '0', 0, '', '', '' FROM rows").arg(m_hash)});
+        QVERIFY(!legacy.isEmpty());
+        std::atomic<bool> stop = false;
+        std::atomic<int> completedWrites = 0;
+        auto *writer = QThread::create([&stop, &completedWrites, legacy] {
+            const QString name = QUuid::createUuid().toString();
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+                database.setDatabaseName(legacy);
+                database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
+                if (database.open()) {
+                    int version = 0;
+                    while (!stop) {
+                        QSqlQuery query(database);
+                        if (!database.transaction()) {
+                            break;
+                        }
+                        const QString value = QString::number(++version);
+                        if (!query.exec(QStringLiteral("UPDATE ai_conversations SET session_id = '%1'").arg(value)) || !query.exec(QStringLiteral("UPDATE ai_messages SET content = '%1'").arg(value)) || !database.commit()) {
+                            database.rollback();
+                            break;
+                        }
+                        ++completedWrites;
+                    }
+                }
+            }
+            QSqlDatabase::removeDatabase(name);
+        });
+        const auto cleanup = qScopeGuard([&stop, writer] {
+            stop = true;
+            writer->wait();
+            delete writer;
+        });
+        writer->start();
+        QTRY_VERIFY_WITH_TIMEOUT(completedWrites > 0, 5000);
+        for (int i = 0; i < 5; ++i) {
+            QVERIFY(sql(QStringLiteral("DELETE FROM ai_messages")));
+            QVERIFY(sql(QStringLiteral("DELETE FROM ai_conversations")));
+            QString error;
+            QVERIFY2(Okular::ReadingDataStore::importAiHistory(m_database, legacy, &error), qPrintable(error));
+            const QString version = scalar(QStringLiteral("SELECT session_id FROM ai_conversations"));
+            QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM ai_messages WHERE content <> '%1'").arg(version)), QStringLiteral("0"));
+            QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM ai_messages")), QStringLiteral("501"));
+        }
+    }
+    void exportRejectsSymlinkToActiveDatabase()
+    {
+#ifdef Q_OS_UNIX
+        const QString alias = m_directory.filePath(QStringLiteral("database-link.sqlite"));
+        QVERIFY(QFile::link(m_path, alias));
+        qputenv("OKULAR_READING_DATA_PATH", alias.toUtf8());
+        QString error;
+        QVERIFY(!Okular::ReadingDataStore::exportDatabase(QUrl::fromLocalFile(alias), &error));
+        QVERIFY(!error.isEmpty());
+        QCOMPARE(scalar(QStringLiteral("PRAGMA integrity_check")), QStringLiteral("ok"));
+#else
+        QSKIP("This case requires Unix symlinks");
+#endif
+    }
+    void exportAtomicallyReplacesDestination()
+    {
+        const QString destination = m_directory.filePath(QStringLiteral("replace.sqlite"));
+        QFile old(destination);
+        QVERIFY(old.open(QIODevice::WriteOnly));
+        QVERIFY(old.write("old backup") > 0);
+        old.close();
+        QString error;
+        QVERIFY(Okular::ReadingDataStore::ensureBook(m_database, m_hash, QStringLiteral("book.pdf"), &error));
+        QVERIFY2(Okular::ReadingDataStore::exportDatabase(QUrl::fromLocalFile(destination), &error), qPrintable(error));
+        m_database.close();
+        m_database.setDatabaseName(destination);
+        QVERIFY(m_database.open());
+        QCOMPARE(scalar(QStringLiteral("SELECT file_name FROM books")), QStringLiteral("book.pdf"));
+        QCOMPARE(scalar(QStringLiteral("PRAGMA integrity_check")), QStringLiteral("ok"));
+    }
+    void exportRejectsActiveDatabaseAndSidecars()
+    {
+        QStringList paths {m_path, m_path + QStringLiteral("-wal"), m_path + QStringLiteral("-shm"), m_path + QStringLiteral("-journal")};
+#ifdef Q_OS_WIN
+        const QStringList originals = paths;
+        for (const QString &path : originals) {
+            paths.append(path.toUpper());
+        }
+#endif
+        QString error;
+        for (const QString &path : paths) {
+            QVERIFY(!Okular::ReadingDataStore::exportDatabase(QUrl::fromLocalFile(path), &error));
+            QVERIFY(!error.isEmpty());
+        }
+        QCOMPARE(scalar(QStringLiteral("PRAGMA integrity_check")), QStringLiteral("ok"));
+    }
+    void exportHandlesUnicodePaths()
+    {
+        m_database.close();
+        const QString unicodePath = m_directory.filePath(QStringLiteral("阅读记录.sqlite"));
+        QVERIFY(QFile::rename(m_path, unicodePath));
+        m_path = unicodePath;
+        m_database.setDatabaseName(m_path);
+        QVERIFY(m_database.open());
+        qputenv("OKULAR_READING_DATA_PATH", m_path.toUtf8());
+        QString error;
+        QVERIFY(Okular::ReadingDataStore::ensureBook(m_database, m_hash, QStringLiteral("book.pdf"), &error));
+        const QString destination = m_directory.filePath(QStringLiteral("导出/书架.sqlite"));
+        QVERIFY(QDir().mkpath(QFileInfo(destination).absolutePath()));
+        QVERIFY2(Okular::ReadingDataStore::exportDatabase(QUrl::fromLocalFile(destination), &error), qPrintable(error));
+        m_database.close();
+        m_database.setDatabaseName(destination);
+        QVERIFY(m_database.open());
+        QCOMPARE(scalar(QStringLiteral("SELECT file_name FROM books")), QStringLiteral("book.pdf"));
+        QCOMPARE(scalar(QStringLiteral("PRAGMA integrity_check")), QStringLiteral("ok"));
     }
     void snapshotIncludesWalAndAllTables()
     {

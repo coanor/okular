@@ -77,7 +77,7 @@ bool AiConversationStore::open(QString *error)
         *error = m_database->lastError().text();
         return false;
     }
-    if (!Okular::ReadingDataStore::initialize(*m_database, error) || (m_path == defaultPath() && !Okular::ReadingDataStore::importLegacyData(*m_database, error))) {
+    if (!Okular::ReadingDataStore::initialize(*m_database, error) || (m_path == defaultPath() && !Okular::ReadingDataStore::importLegacyData(*m_database, Okular::ReadingDataStore::LegacyData::AiHistory, error))) {
         m_database->close();
         return false;
     }

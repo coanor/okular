@@ -23,7 +23,9 @@ public:
     static bool importAiHistory(QSqlDatabase &database, const QString &source, QString *error);
     static bool importAnnotations(QSqlDatabase &database, const QString &directory, QString *error, const QString &onlyHash = {});
     static bool importReadingHistory(QSqlDatabase &database, const QString &source, QString *error);
-    static bool importLegacyData(QSqlDatabase &database, QString *error);
+    enum class LegacyData { ReadingHistory, AiHistory };
+    static bool importLegacyData(QSqlDatabase &database, LegacyData kind, QString *error);
+    static bool exportDatabase(const QUrl &destination, QString *error);
     static bool snapshot(const QString &source, const QString &destination, QString *error);
 };
 }

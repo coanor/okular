@@ -2,18 +2,21 @@
 #include "readingdatastore_p.h"
 
 #include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLockFile>
 #include <QMap>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QSettings>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QUuid>
 
@@ -96,13 +99,13 @@ bool ReadingDataStore::initialize(QSqlDatabase &database, QString *error)
     }
     const QStringList schema {
         QStringLiteral("CREATE TABLE IF NOT EXISTS reading_data_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
-        QStringLiteral("INSERT OR IGNORE INTO reading_data_metadata VALUES ('schema_version', '1')"),
+        QStringLiteral("INSERT OR IGNORE INTO reading_data_metadata VALUES ('schema_version', '2')"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS books (hash TEXT PRIMARY KEY, file_name TEXT NOT NULL DEFAULT '')"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS reading_progress (book_hash TEXT PRIMARY KEY, page INTEGER NOT NULL, page_count INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision TEXT NOT NULL)"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS book_locations (device_id TEXT NOT NULL, url TEXT NOT NULL, book_hash TEXT NOT NULL, PRIMARY KEY(device_id, url))"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS book_locations_by_hash ON book_locations(book_hash, device_id)"),
-        QStringLiteral(
-            "CREATE TABLE IF NOT EXISTS legacy_reading_history (url TEXT PRIMARY KEY, title TEXT NOT NULL, book_id TEXT NOT NULL, page INTEGER NOT NULL, page_count INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision TEXT NOT NULL)"),
+        QStringLiteral("CREATE TABLE IF NOT EXISTS legacy_reading_history (url TEXT NOT NULL, title TEXT NOT NULL, book_id TEXT NOT NULL, page INTEGER NOT NULL, page_count INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision TEXT NOT "
+                       "NULL, device_id TEXT NOT NULL, PRIMARY KEY(device_id, url))"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS ai_conversations (document_key TEXT NOT NULL, profile_id TEXT NOT NULL, session_id TEXT NOT NULL, instructions TEXT NOT NULL, PRIMARY KEY(document_key, profile_id))"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS ai_messages (document_key TEXT NOT NULL, profile_id TEXT NOT NULL, ordinal INTEGER NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, page INTEGER NOT NULL, page_text TEXT NOT NULL, "
                        "selected_text TEXT NOT NULL, page_image BLOB NOT NULL, PRIMARY KEY(document_key, profile_id, ordinal))"),
@@ -121,7 +124,31 @@ bool ReadingDataStore::initialize(QSqlDatabase &database, QString *error)
             return false;
         }
         if (sql.startsWith(QLatin1String("INSERT OR IGNORE INTO reading_data_metadata"))) {
-            if (!query.exec(QStringLiteral("SELECT value FROM reading_data_metadata WHERE key = 'schema_version'")) || !query.next() || query.value(0).toString() != QLatin1String("1")) {
+            if (!query.exec(QStringLiteral("SELECT value FROM reading_data_metadata WHERE key = 'schema_version'")) || !query.next()) {
+                *error = query.lastError().text();
+                database.rollback();
+                return false;
+            }
+            const QString version = query.value(0).toString();
+            query.finish();
+            if (version == QLatin1String("1")) {
+                // Schema 1 staged URLs came from one device. Infer its owner
+                // only when the database's existing locations agree.
+                const QStringList upgrade {
+                    QStringLiteral("ALTER TABLE legacy_reading_history RENAME TO legacy_reading_history_v1"),
+                    QStringLiteral("CREATE TABLE legacy_reading_history (url TEXT NOT NULL, title TEXT NOT NULL, book_id TEXT NOT NULL, page INTEGER NOT NULL, page_count INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision TEXT NOT "
+                                   "NULL, device_id TEXT NOT NULL, PRIMARY KEY(device_id, url))"),
+                    QStringLiteral("INSERT INTO legacy_reading_history SELECT *, COALESCE((SELECT CASE WHEN COUNT(DISTINCT device_id) = 1 THEN MIN(device_id) ELSE '' END FROM book_locations), '') FROM legacy_reading_history_v1"),
+                    QStringLiteral("DROP TABLE legacy_reading_history_v1"),
+                    QStringLiteral("UPDATE reading_data_metadata SET value = '2' WHERE key = 'schema_version'")};
+                for (const QString &statement : upgrade) {
+                    if (!query.exec(statement)) {
+                        *error = query.lastError().text();
+                        database.rollback();
+                        return false;
+                    }
+                }
+            } else if (version != QLatin1String("2")) {
                 *error = QStringLiteral("Unsupported reading database schema");
                 database.rollback();
                 return false;
@@ -228,8 +255,12 @@ bool ReadingDataStore::importAiHistory(QSqlDatabase &database, const QString &so
         return true;
     }
     LegacyDatabase legacy(source);
-    if (!legacy.database.open() || !database.transaction()) {
-        *error = legacy.database.isOpen() ? database.lastError().text() : legacy.database.lastError().text();
+    if (!legacy.database.open() || !legacy.database.transaction()) {
+        *error = legacy.database.lastError().text();
+        return false;
+    }
+    if (!database.transaction()) {
+        *error = database.lastError().text();
         return false;
     }
     // Record which conversations are already present, including cleared ones.
@@ -255,6 +286,10 @@ bool ReadingDataStore::importAiHistory(QSqlDatabase &database, const QString &so
             ok = execute(query, error);
         }
     }
+    if (ok && conversations.lastError().isValid()) {
+        *error = conversations.lastError().text();
+        ok = false;
+    }
     if (ok) {
         // Each insert is guarded by the temporary list of newly imported rows.
         ok = copyRows(legacy.database,
@@ -278,23 +313,46 @@ bool ReadingDataStore::importReadingHistory(QSqlDatabase &database, const QStrin
     if (!QFileInfo::exists(source) || QFileInfo(source).absoluteFilePath() == QFileInfo(database.databaseName()).absoluteFilePath()) {
         return true;
     }
+    const QString owner = deviceId();
+    if (owner.isEmpty()) {
+        *error = QStringLiteral("Could not prepare the local device identity");
+        return false;
+    }
     LegacyDatabase legacy(source);
-    if (!legacy.database.open() || !database.transaction()) {
-        *error = legacy.database.isOpen() ? database.lastError().text() : legacy.database.lastError().text();
+    if (!legacy.database.open() || !legacy.database.transaction()) {
+        *error = legacy.database.lastError().text();
+        return false;
+    }
+    if (!database.transaction()) {
+        *error = database.lastError().text();
         return false;
     }
     return finishImport(database,
                         copyRows(legacy.database,
                                  database,
                                  QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM reading_history"),
-                                 QStringLiteral("INSERT OR IGNORE INTO legacy_reading_history VALUES (?, ?, ?, ?, ?, ?, ?)"),
-                                 error),
+                                 QStringLiteral("INSERT OR IGNORE INTO legacy_reading_history(device_id, url, title, book_id, page, page_count, updated_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+                                 error,
+                                 owner),
                         error);
 }
 
 bool ReadingDataStore::importAnnotations(QSqlDatabase &database, const QString &directory, QString *error, const QString &onlyHash)
 {
     const QDir root(directory);
+    if (onlyHash.isEmpty()) {
+        for (const QString &file : root.entryList({QStringLiteral("*.sqlite")}, QDir::Files)) {
+            const QString hash = QFileInfo(file).completeBaseName();
+            if (!isBookHash(hash)) {
+                continue;
+            }
+            QString importError;
+            if (!importAnnotations(database, directory, &importError, hash)) {
+                qWarning() << "Could not import annotations for" << hash << importError;
+            }
+        }
+        return true;
+    }
     const QStringList files = onlyHash.isEmpty() ? root.entryList({QStringLiteral("*.sqlite")}, QDir::Files) : QStringList {onlyHash + QStringLiteral(".sqlite")};
     for (const QString &file : files) {
         const QString hash = QFileInfo(file).completeBaseName();
@@ -312,7 +370,7 @@ bool ReadingDataStore::importAnnotations(QSqlDatabase &database, const QString &
         }
         existing.finish();
         LegacyDatabase legacy(root.filePath(file));
-        if (!legacy.database.open()) {
+        if (!legacy.database.open() || !legacy.database.transaction()) {
             *error = legacy.database.lastError().text();
             return false;
         }
@@ -324,6 +382,10 @@ bool ReadingDataStore::importAnnotations(QSqlDatabase &database, const QString &
         QMap<QString, QString> values;
         while (metadata.next()) {
             values.insert(metadata.value(0).toString(), metadata.value(1).toString());
+        }
+        if (metadata.lastError().isValid()) {
+            *error = metadata.lastError().text();
+            return false;
         }
         if (values.value(QStringLiteral("schema_version")) != QLatin1String("2") || values.value(QStringLiteral("pdf_sha256")) != hash) {
             *error = QStringLiteral("Legacy annotation database schema or PDF hash does not match");
@@ -359,11 +421,13 @@ bool ReadingDataStore::importAnnotations(QSqlDatabase &database, const QString &
     return true;
 }
 
-bool ReadingDataStore::importLegacyData(QSqlDatabase &database, QString *error)
+bool ReadingDataStore::importLegacyData(QSqlDatabase &database, LegacyData kind, QString *error)
 {
+    const QString marker = kind == LegacyData::AiHistory ? QStringLiteral("legacy_ai_import_complete") : QStringLiteral("legacy_reading_import_complete");
     QSqlQuery query(database);
-    if (!query.exec(QStringLiteral("SELECT value FROM reading_data_metadata WHERE key = 'legacy_import_complete'"))) {
-        *error = query.lastError().text();
+    query.prepare(QStringLiteral("SELECT value FROM reading_data_metadata WHERE key = ? OR key = 'legacy_import_complete'"));
+    query.addBindValue(marker);
+    if (!execute(query, error)) {
         return false;
     }
     if (query.next()) {
@@ -371,15 +435,80 @@ bool ReadingDataStore::importLegacyData(QSqlDatabase &database, QString *error)
     }
     query.finish();
     const QString app = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (!importAiHistory(database, app + QStringLiteral("/ai-history.sqlite"), error) || !importReadingHistory(database, app + QStringLiteral("/reading-history.sqlite"), error) ||
-        !importAnnotations(database, QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/annotations"), error)) {
+    if (kind == LegacyData::AiHistory) {
+        if (!importAiHistory(database, app + QStringLiteral("/ai-history.sqlite"), error)) {
+            return false;
+        }
+    } else {
+        if (!importReadingHistory(database, app + QStringLiteral("/reading-history.sqlite"), error) ||
+            !importAnnotations(database, QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/annotations"), error)) {
+            return false;
+        }
+    }
+    query.prepare(QStringLiteral("INSERT OR IGNORE INTO reading_data_metadata VALUES (?, '1')"));
+    query.addBindValue(marker);
+    return execute(query, error);
+}
+
+bool ReadingDataStore::exportDatabase(const QUrl &destination, QString *error)
+{
+    error->clear();
+    if (!destination.isLocalFile() && destination.scheme() != QLatin1String("content")) {
+        *error = QStringLiteral("Choose a local export destination");
         return false;
     }
-    if (!query.exec(QStringLiteral("INSERT OR IGNORE INTO reading_data_metadata VALUES ('legacy_import_complete', '1')"))) {
-        *error = query.lastError().text();
+    if (destination.isLocalFile()) {
+        const QFileInfo database(defaultPath());
+        const QFileInfo target(destination.toLocalFile());
+        const QString canonicalDatabase = database.canonicalFilePath();
+        const QString canonicalTarget = target.exists() ? target.canonicalFilePath() : QFileInfo(target.dir().canonicalPath(), target.fileName()).absoluteFilePath();
+#ifdef Q_OS_WIN
+        constexpr Qt::CaseSensitivity sensitivity = Qt::CaseInsensitive;
+#else
+        constexpr Qt::CaseSensitivity sensitivity = Qt::CaseSensitive;
+#endif
+        if (database == target || canonicalTarget.compare(canonicalDatabase, sensitivity) == 0 || canonicalTarget.startsWith(canonicalDatabase + QLatin1Char('-'), sensitivity)) {
+            *error = QStringLiteral("Choose a destination outside the active reading database");
+            return false;
+        }
+    }
+    QTemporaryDir directory;
+    const QString path = directory.filePath(QStringLiteral("reading-data.sqlite"));
+    if (!directory.isValid() || !snapshot(defaultPath(), path, error)) {
+        if (error->isEmpty()) {
+            *error = QStringLiteral("Could not create export snapshot");
+        }
         return false;
     }
-    return true;
+    QFile source(path);
+    QSaveFile localTarget(destination.toLocalFile());
+    QFile contentTarget(destination.toString(QUrl::FullyEncoded));
+    QFileDevice &target = destination.isLocalFile() ? static_cast<QFileDevice &>(localTarget) : static_cast<QFileDevice &>(contentTarget);
+    if (!source.open(QIODevice::ReadOnly) || !target.open(QIODevice::WriteOnly)) {
+        *error = target.isOpen() ? source.errorString() : target.errorString();
+        return false;
+    }
+    while (!source.atEnd()) {
+        const QByteArray chunk = source.read(1024 * 1024);
+        if (chunk.isEmpty() && source.error() != QFileDevice::NoError) {
+            *error = source.errorString();
+            return false;
+        }
+        qint64 written = 0;
+        while (written < chunk.size()) {
+            const qint64 count = target.write(chunk.constData() + written, chunk.size() - written);
+            if (count <= 0) {
+                *error = target.errorString();
+                return false;
+            }
+            written += count;
+        }
+    }
+    const bool ok = destination.isLocalFile() ? localTarget.commit() : contentTarget.flush();
+    if (!ok) {
+        *error = target.errorString();
+    }
+    return ok;
 }
 
 bool ReadingDataStore::snapshot(const QString &sourcePath, const QString &destination, QString *error)
@@ -397,9 +526,9 @@ bool ReadingDataStore::snapshot(const QString &sourcePath, const QString &destin
     staging.close();
     sqlite3 *source = nullptr;
     sqlite3 *target = nullptr;
-    int code = sqlite3_open_v2(QFile::encodeName(sourcePath).constData(), &source, SQLITE_OPEN_READONLY, nullptr);
+    int code = sqlite3_open_v2(sourcePath.toUtf8().constData(), &source, SQLITE_OPEN_READONLY, nullptr);
     if (code == SQLITE_OK) {
-        code = sqlite3_open_v2(QFile::encodeName(staging.fileName()).constData(), &target, SQLITE_OPEN_READWRITE, nullptr);
+        code = sqlite3_open_v2(staging.fileName().toUtf8().constData(), &target, SQLITE_OPEN_READWRITE, nullptr);
     }
     if (code == SQLITE_OK) {
         sqlite3_busy_timeout(source, 5000);

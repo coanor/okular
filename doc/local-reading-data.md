@@ -18,6 +18,8 @@ history, even after renaming or moving them. Changing the bytes produces a new
 identity. `book_locations` records a device ID and URL separately from progress.
 The device ID lives in `okular/device.ini`, outside the portable database.
 
+The shared schema is version 2. Earlier version 1 databases upgrade transactionally.
+
 The tables are `books`, `reading_progress`, `book_locations`,
 `ai_conversations`, `ai_messages`, `annotation_documents`, `annotation_events`
 and `annotations`. AI history is additionally separated by model profile ID.
@@ -35,11 +37,14 @@ Desktop local documents also use SQLite progress.
 
 Earlier `reading-history.sqlite`, `ai-history.sqlite` and
 `okular/annotations/<hash>.sqlite` files are imported into the shared database.
-Original files are retained. Import does not replace newer shared records or
-revive cleared AI histories or deleted annotations. Inaccessible URL-based
-history stays in `legacy_reading_history` until the file becomes available and
-its bytes can be hashed. Earlier recent files and downloaded local books are
-also retained. Unknown progress is displayed as **Ready to read**.
+Original files are retained. A corrupt legacy annotation database is reported
+without disabling unrelated books or AI history. Import does not replace newer
+shared records or revive cleared AI histories or deleted annotations.
+Inaccessible URL-based history stays in `legacy_reading_history` until the file
+becomes available on its original device and its bytes can be hashed. Unhashed
+URL records from another device are never automatically applied to local files
+with the same path. Earlier recent files and downloaded local books are also
+retained. Unknown progress is displayed as **Ready to read**.
 
 ## Moving to another device
 

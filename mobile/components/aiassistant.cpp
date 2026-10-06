@@ -232,7 +232,7 @@ void AiAssistant::activate()
     m_hashing = true;
     Q_EMIT busyChanged();
     const int generation = m_documentGeneration;
-    const QUrl url = m_document->url();
+    const QUrl url = m_document->url().isLocalFile() ? m_document->url() : m_document->document()->localSource();
     const QString cachedHash = m_document->document()->contentHash();
     auto *watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, generation] {

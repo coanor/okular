@@ -66,7 +66,11 @@ FormCard.FormCard {
                 onClicked: {
                     if (typeof modelData !== "undefined" && modelData.url !== undefined) {
                         // Recent Document
-                        documentItem.url = modelData.url;
+                        if (modelData.url.toString().length === 0) {
+                            openDocumentAction.trigger();
+                        } else {
+                            documentItem.url = modelData.url;
+                        }
                     } else {
                         // File is in Documents folder
                         documentItem.url = fileUrl;

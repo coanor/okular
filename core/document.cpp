@@ -2531,7 +2531,7 @@ Document::OpenResult Document::openDocument(const QString &docFile, const QUrl &
 
     if (mime.inherits(QStringLiteral("application/pdf")) && (d->m_url.isLocalFile() || fromFileDescriptor) && !d->m_archiveData && !d->m_docdataMigrationNeeded) {
         QString sidecarError;
-        const QString hash = fromFileDescriptor ? QString::fromLatin1(QCryptographicHash::hash(filedata, QCryptographicHash::Sha256).toHex()) : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
+        const QString hash = fromFileDescriptor ? d->m_contentHash : AnnotationSidecar::pdfHash(d->m_docFileName, &sidecarError);
         d->m_contentHash = hash;
         if (!hash.isEmpty()) {
             QList<SidecarAnnotation> savedAnnotations;
@@ -5232,6 +5232,11 @@ bool Document::saveChanges(const QString &fileName, QString *errorText)
         }
     }
     return success;
+}
+
+QUrl Document::localSource() const
+{
+    return d->m_docFileName.isEmpty() ? QUrl() : QUrl::fromLocalFile(d->m_docFileName);
 }
 
 QString Document::contentHash() const

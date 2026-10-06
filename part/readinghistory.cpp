@@ -101,7 +101,7 @@ bool ReadingHistory::open(QString *error)
         *error = m_database.lastError().text();
         return false;
     }
-    if (!Okular::ReadingDataStore::initialize(m_database, error) || (m_path == defaultPath() && !Okular::ReadingDataStore::importLegacyData(m_database, error))) {
+    if (!Okular::ReadingDataStore::initialize(m_database, error) || (m_path == defaultPath() && !Okular::ReadingDataStore::importLegacyData(m_database, Okular::ReadingDataStore::LegacyData::ReadingHistory, error))) {
         m_database.close();
         return false;
     }
@@ -133,8 +133,9 @@ bool ReadingHistory::read(const QUrl &url, ReadingRecord *record, QString *error
         return read(storedHash, url, record, error);
     }
     query.finish();
-    query.prepare(QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history WHERE url = ?"));
+    query.prepare(QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history WHERE url = ? AND device_id = ?"));
     query.addBindValue(url.toString(QUrl::FullyEncoded));
+    query.addBindValue(Okular::ReadingDataStore::deviceId());
     if (!query.exec()) {
         *error = query.lastError().text();
         return false;
@@ -154,8 +155,9 @@ bool ReadingHistory::read(const QString &hash, const QUrl &url, ReadingRecord *r
     }
     // Adopt an old URL record once the actual file bytes are available.
     QSqlQuery query(m_database);
-    query.prepare(QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history WHERE url = ?"));
+    query.prepare(QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history WHERE url = ? AND device_id = ?"));
     query.addBindValue(url.toString(QUrl::FullyEncoded));
+    query.addBindValue(Okular::ReadingDataStore::deviceId());
     if (!query.exec()) {
         *error = query.lastError().text();
         return false;
@@ -190,7 +192,9 @@ bool ReadingHistory::entries(QList<ReadingRecord> *records, QString *error)
     // Resolve accessible legacy files on this worker; unavailable ones remain
     // in the staging table until the user grants access or locates the book.
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history"))) {
+    query.prepare(QStringLiteral("SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history WHERE device_id = ?"));
+    query.addBindValue(Okular::ReadingDataStore::deviceId());
+    if (!query.exec()) {
         *error = query.lastError().text();
         return false;
     }
@@ -208,8 +212,9 @@ bool ReadingHistory::entries(QList<ReadingRecord> *records, QString *error)
     }
     query.prepare(
         QStringLiteral("SELECT COALESCE((SELECT url FROM book_locations l WHERE l.book_hash = b.hash AND l.device_id = ? ORDER BY rowid DESC LIMIT 1), ''), b.file_name, b.hash, "
-                       "COALESCE(p.page, 0), COALESCE(p.page_count, 0), COALESCE(p.updated_at, 0), COALESCE(p.revision, '') FROM books b LEFT JOIN reading_progress p ON p.book_hash = b.hash "
-                       "UNION ALL SELECT url, title, book_id, page, page_count, updated_at, revision FROM legacy_reading_history ORDER BY 6 DESC, 7 DESC"));
+                       "COALESCE(p.page, 0), COALESCE(p.page_count, 0), COALESCE(p.updated_at, 0), COALESCE(p.revision, '') FROM books b JOIN reading_progress p ON p.book_hash = b.hash "
+                       "UNION ALL SELECT CASE WHEN device_id = ? THEN url ELSE '' END, title, '', page, page_count, updated_at, revision FROM legacy_reading_history ORDER BY 6 DESC, 7 DESC"));
+    query.addBindValue(Okular::ReadingDataStore::deviceId());
     query.addBindValue(Okular::ReadingDataStore::deviceId());
     if (!query.exec()) {
         *error = query.lastError().text();
@@ -233,9 +238,10 @@ bool ReadingHistory::entries(QList<ReadingRecord> *records, QString *error)
             rename.addBindValue(name);
             rename.addBindValue(record.bookId);
         } else {
-            rename.prepare(QStringLiteral("UPDATE legacy_reading_history SET title = ? WHERE url = ? AND title = ?"));
+            rename.prepare(QStringLiteral("UPDATE legacy_reading_history SET title = ? WHERE url = ? AND device_id = ? AND title = ?"));
             rename.addBindValue(name);
             rename.addBindValue(record.url.toString(QUrl::FullyEncoded));
+            rename.addBindValue(Okular::ReadingDataStore::deviceId());
         }
         rename.addBindValue(record.title);
         if (!rename.exec()) {
@@ -258,6 +264,10 @@ bool ReadingHistory::save(const ReadingRecord &input, QString *error)
     if (!open(error)) {
         return false;
     }
+    if (Okular::ReadingDataStore::deviceId().isEmpty()) {
+        *error = QStringLiteral("Could not prepare the local device identity");
+        return false;
+    }
     ReadingRecord record = input;
     if (!Okular::ReadingDataStore::isBookHash(record.bookId)) {
         QString ignored;
@@ -266,16 +276,17 @@ bool ReadingHistory::save(const ReadingRecord &input, QString *error)
     QSqlQuery query(m_database);
     if (record.bookId.isEmpty()) {
         // Preserve inaccessible legacy entries without inventing a path hash.
-        query.prepare(
-            QStringLiteral("INSERT INTO legacy_reading_history VALUES (?, ?, '', ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET title=excluded.title, page=excluded.page, page_count=excluded.page_count, updated_at=excluded.updated_at, "
-                           "revision=excluded.revision "
-                           "WHERE excluded.updated_at > legacy_reading_history.updated_at OR (excluded.updated_at = legacy_reading_history.updated_at AND excluded.revision > legacy_reading_history.revision)"));
+        query.prepare(QStringLiteral(
+            "INSERT INTO legacy_reading_history VALUES (?, ?, '', ?, ?, ?, ?, ?) ON CONFLICT(device_id, url) DO UPDATE SET title=excluded.title, page=excluded.page, page_count=excluded.page_count, updated_at=excluded.updated_at, "
+            "revision=excluded.revision "
+            "WHERE excluded.updated_at > legacy_reading_history.updated_at OR (excluded.updated_at = legacy_reading_history.updated_at AND excluded.revision > legacy_reading_history.revision)"));
         query.addBindValue(record.url.toString(QUrl::FullyEncoded));
         query.addBindValue(record.title.isNull() ? QStringLiteral("") : record.title);
         query.addBindValue(record.page);
         query.addBindValue(record.pageCount);
         query.addBindValue(record.updatedAt);
         query.addBindValue(record.revision);
+        query.addBindValue(Okular::ReadingDataStore::deviceId());
         if (!query.exec()) {
             *error = query.lastError().text();
             return false;
@@ -322,8 +333,9 @@ bool ReadingHistory::save(const ReadingRecord &input, QString *error)
     if (!execute()) {
         return false;
     }
-    query.prepare(QStringLiteral("DELETE FROM legacy_reading_history WHERE url = ?"));
+    query.prepare(QStringLiteral("DELETE FROM legacy_reading_history WHERE url = ? AND device_id = ?"));
     query.addBindValue(record.url.toString(QUrl::FullyEncoded));
+    query.addBindValue(Okular::ReadingDataStore::deviceId());
     if (!execute()) {
         return false;
     }

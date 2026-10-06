@@ -102,13 +102,25 @@ void ReadingSession::reload()
         }
         save();
     });
-    watcher->setFuture(QtConcurrent::run(&m_pool, [url = m_url, hash = m_hash] {
+    const int page = m_document->currentPage();
+    const int pageCount = m_document->pages();
+    const qint64 openedAt = QDateTime::currentMSecsSinceEpoch();
+    watcher->setFuture(QtConcurrent::run(&m_pool, [url = m_url, title = m_title, hash = m_hash, page, pageCount, openedAt] {
         Outcome outcome;
         if (hash->isEmpty()) {
             *hash = Okular::ReadingDataStore::fileHash(url, &outcome.error);
         }
         if (!hash->isEmpty()) {
-            ReadingHistory().read(*hash, url, &outcome.record, &outcome.error);
+            ReadingHistory history;
+            if (history.read(*hash, url, &outcome.record, &outcome.error) && outcome.record.url.isEmpty()) {
+                // Register first opens even if the view closes before the
+                // queued resume callback can run. Existing progress is kept.
+                auto initial = ReadingHistory::record(url, title, page, pageCount);
+                initial.bookId = *hash;
+                initial.updatedAt = openedAt;
+                history.save(initial, &outcome.error);
+                outcome.record = initial;
+            }
         }
         return outcome;
     }));

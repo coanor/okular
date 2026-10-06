@@ -3,10 +3,6 @@
 #include "core/readingdatastore_p.h"
 #include "part/readinghistory.h"
 
-#include <QFile>
-#include <QFileInfo>
-#include <QTemporaryDir>
-
 #include <KConfigGroup>
 #include <KSharedConfig>
 
@@ -116,21 +112,6 @@ void ReadingHistoryModel::refresh()
 
 void ReadingHistoryModel::exportDatabase(const QUrl &destination)
 {
-    if (destination.isLocalFile()) {
-        const QFileInfo destinationInfo(destination.toLocalFile());
-        const QString path = destinationInfo.exists() ? destinationInfo.canonicalFilePath() : destinationInfo.absoluteFilePath();
-        const QString database = QFileInfo(ReadingHistory::defaultPath()).absoluteFilePath();
-        if (path == database || path.startsWith(database + QLatin1Char('-'))) {
-            m_error = QStringLiteral("Choose a destination outside the active reading database");
-            Q_EMIT changed();
-            return;
-        }
-    }
-    if (!destination.isLocalFile() && destination.scheme() != QLatin1String("content")) {
-        m_error = QStringLiteral("Choose a local export destination");
-        Q_EMIT changed();
-        return;
-    }
     auto *watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, destination] {
         m_error = watcher->result();
@@ -142,32 +123,9 @@ void ReadingHistoryModel::exportDatabase(const QUrl &destination)
     });
     Q_EMIT exportRequested();
     watcher->setFuture(QtConcurrent::run(&m_pool, [destination] {
-        QTemporaryDir directory;
-        const QString snapshot = directory.filePath(QStringLiteral("reading-data.sqlite"));
         QString error;
-        if (!directory.isValid() || !Okular::ReadingDataStore::snapshot(ReadingHistory::defaultPath(), snapshot, &error)) {
-            return error.isEmpty() ? QStringLiteral("Could not create export snapshot") : error;
-        }
-        QFile source(snapshot);
-        QFile target(destination.isLocalFile() ? destination.toLocalFile() : destination.toString(QUrl::FullyEncoded));
-        if (!source.open(QIODevice::ReadOnly) || !target.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            return target.isOpen() ? source.errorString() : target.errorString();
-        }
-        while (!source.atEnd()) {
-            const QByteArray chunk = source.read(1024 * 1024);
-            if (chunk.isEmpty() && source.error() != QFileDevice::NoError) {
-                return source.errorString();
-            }
-            qint64 written = 0;
-            while (written < chunk.size()) {
-                const qint64 count = target.write(chunk.constData() + written, chunk.size() - written);
-                if (count <= 0) {
-                    return target.errorString();
-                }
-                written += count;
-            }
-        }
-        return target.flush() ? QString() : target.errorString();
+        Okular::ReadingDataStore::exportDatabase(destination, &error);
+        return error;
     }));
 }
 
